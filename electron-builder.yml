@@ -1,0 +1,30 @@
+appId: com.contract-manager.app
+productName: Gipfel管理系统
+copyright: Copyright © 2026
+directories:
+  output: dist
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 合同管理系统
+  uninstallDisplayName: 合同管理系统
+
+icon: assets/icon.png
+
+files:
+  - out/**/*
+  - assets/**/*
+  - "!src/**/*"
+  - "!.git/**/*"
+
+asarUnpack:
+  - "node_modules/sql.js/**/*"
