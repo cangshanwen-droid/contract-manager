@@ -6,7 +6,7 @@ import { notificationRepo } from '../database/repositories/notification.repo'
 import { getDatabase } from '../database/connection'
 import { queryOne, queryAll } from '../database/helpers'
 import { insertAuditLog } from '../database/repositories/audit.repo'
-import { requirePermission, auditIdentity } from '../session'
+import { requirePermission, auditIdentity, getSessionUser, forbiddenResponse } from '../session'
 
 export function registerContractHandlers(): void {
   const repo = new ContractRepository()
@@ -162,11 +162,29 @@ export function registerContractHandlers(): void {
     return !!row
   }
 
-  ipcMain.handle(IPC_CHANNELS.CONTRACT_LIST, (_e, regionId?: number, opts?: { limit?: number; offset?: number }) => {
+  // v22 数据隔离：由会话计算生效的公司过滤条件（渲染进程不可绕过）
+  //   rep      强隔离：有公司绑定 → 强制只看本公司（忽略透传值）
+  //   operator 保持全流程：未显式传 companyId 且绑定了公司 → 默认本公司；
+  //            显式传 null → 看全部；显式传 id → 看指定公司
+  //   admin    未绑定 → 看全部；显式传 id → 看指定公司
+  function resolveCompanyFilter(explicit: number | null | undefined): number | null | undefined {
+    const session = getSessionUser()
+    if (session?.role === 'rep' && session.company_id != null) {
+      return Number(session.company_id)
+    }
+    if (explicit !== undefined) return explicit
+    if (session?.role === 'operator' && session.company_id != null) {
+      return Number(session.company_id)
+    }
+    return undefined
+  }
+
+  ipcMain.handle(IPC_CHANNELS.CONTRACT_LIST, (_e, regionId?: number, opts?: { limit?: number; offset?: number; companyId?: number | null }) => {
     try {
       const perm = requirePermission(PERMISSIONS.CONTRACT_VIEW)
       if (!perm.ok) return perm.response
-      return repo.list(regionId, opts)
+      const companyId = resolveCompanyFilter(opts?.companyId)
+      return repo.list(regionId, { ...opts, companyId })
     } catch (err: any) {
       console.error('CONTRACT_LIST failed:', err)
       return { success: false, message: `获取合同列表失败：${err.message || '未知错误'}` }
@@ -177,7 +195,18 @@ export function registerContractHandlers(): void {
     try {
       const perm = requirePermission(PERMISSIONS.CONTRACT_VIEW)
       if (!perm.ok) return perm.response
-      return repo.getById(id)
+      const contract = repo.getById(id)
+      // v22 数据隔离：rep 强隔离 — 有公司绑定时禁止查看其他公司的合同
+      const session = getSessionUser()
+      if (
+        contract &&
+        session?.role === 'rep' &&
+        session.company_id != null &&
+        Number(contract.party_b_id) !== Number(session.company_id)
+      ) {
+        return forbiddenResponse('无权查看其他公司的合同')
+      }
+      return contract
     } catch (err: any) {
       console.error('CONTRACT_GET failed:', err)
       return { success: false, message: `获取合同详情失败：${err.message || '未知错误'}` }

@@ -3,14 +3,19 @@ import { IPC_CHANNELS } from '../../shared/constants'
 import { PERMISSIONS } from '../../shared/permissions'
 import { DashboardRepository } from '../database/repositories/dashboard.repo'
 import { queryAll } from '../database/helpers'
-import { requirePermission } from '../session'
+import { requirePermission, getSessionUser } from '../session'
 
 export function registerDashboardHandlers(): void {
   const repo = new DashboardRepository()
 
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_SUMMARY, () => {
     try {
-      return repo.getSummary()
+      // v22 数据隔离：rep 有公司绑定时，合同类统计只统计本公司
+      const session = getSessionUser()
+      const companyId = session?.role === 'rep' && session.company_id != null
+        ? Number(session.company_id)
+        : undefined
+      return repo.getSummary(companyId)
     } catch (err: any) {
       console.error('DASHBOARD_SUMMARY failed:', err)
       return { success: false, message: `获取仪表盘数据失败：${err.message || '未知错误'}` }

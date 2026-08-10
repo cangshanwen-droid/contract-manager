@@ -146,7 +146,7 @@ const StockMarketPage: React.FC = () => {
   // P0-2 修复：30s 轮询行情 — in-flight 守卫 + 失败指数退避（30s→60s→5m，恢复后重置）
   usePolling(loadRepStocks, QUOTE_REFRESH_MS, { enabled: role === 'rep' })
 
-  // 本公司已上市股票：本地 companies 表 is_listed=1 且有 stock_symbol（仅挂载时一次）
+  // 本公司已上市股票：本地 companies 表按登录用户所属公司过滤（is_listed=1 且有 stock_symbol）
   useEffect(() => {
     if (role !== 'rep') return
     let alive = true
@@ -156,14 +156,16 @@ const StockMarketPage: React.FC = () => {
         const list = Array.isArray(res) ? res : (res?.data || [])
         const syms = new Set<string>()
         for (const c of list) {
-          if (c.is_listed && c.stock_symbol) syms.add(String(c.stock_symbol).toUpperCase())
+          // 用户绑定公司后仅高亮本公司股票；未绑定（如历史账号）退化为全部已上市
+          const isMyCompany = auth?.company_id == null || Number(c.id) === Number(auth.company_id)
+          if (isMyCompany && c.is_listed && c.stock_symbol) syms.add(String(c.stock_symbol).toUpperCase())
         }
         if (alive) setMySymbols(syms)
       } catch { /* 本地公司数据不可用时不高亮 */ }
     }
     loadMySymbols()
     return () => { alive = false }
-  }, [role])
+  }, [role, auth?.company_id])
 
   // ── operator/admin 视图：统一登录 URL ──
   useEffect(() => {

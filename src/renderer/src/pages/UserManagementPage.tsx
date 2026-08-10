@@ -38,6 +38,9 @@ interface UserRow {
   role: string
   created_at?: string
   last_login?: string | null
+  // v22 公司绑定
+  company_id?: number | null
+  company_name?: string
 }
 
 interface Props {
@@ -45,12 +48,14 @@ interface Props {
   currentUserRole?: string
 }
 
-const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole }) => {
+const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
   const user = useAuth()
   // 仅 admin / 拥有 user.manage 权限者可重置密码
   const canManage = hasPermission(user, PERMISSIONS.USER_MANAGE)
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
+  // v22 公司绑定：所属公司下拉选项（company:list）
+  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm] = Form.useForm()
   const [deleteConfirming, setDeleteConfirming] = useState<number | null>(null)
@@ -76,6 +81,19 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
 
   useEffect(() => { load() }, [])
 
+  // v22 公司绑定：加载公司列表供「所属公司」下拉（失败不阻塞用户管理）
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await invoke(IPC_CHANNELS.COMPANY_LIST) as any
+        const list = Array.isArray(r) ? r : (r?.success && Array.isArray(r.items) ? r.items : null)
+        if (list) setCompanies(list.map((c: any) => ({ id: c.id, name: c.name })))
+      } catch {
+        /* 公司列表加载失败不阻塞用户管理 */
+      }
+    })()
+  }, [])
+
   // ── 快捷键：Escape 关闭弹窗 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -88,7 +106,8 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
   const handleCreate = async () => {
     try {
       const vals = await createForm.validateFields()
-      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, vals.role) as any
+      // v22 公司绑定：第 4 参 companyId（null = 未绑定）
+      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, vals.role, vals.company_id ?? null) as any
       if (!r.success) {
         message.error(r.message || '创建失败')
         return
@@ -197,6 +216,20 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
         <Tag color={ROLE_COLORS[v] || T.textMuted} style={{ fontSize: 12 }}>
           {ROLE_LABELS[v] || v}
         </Tag>
+      ),
+    },
+    {
+      // v22 公司绑定：列表展示所属公司
+      title: '所属公司',
+      dataIndex: 'company_name',
+      key: 'company_name',
+      width: 170,
+      render: (v: string | null | undefined) => (
+        v ? (
+          <span style={{ color: T.textSecondary, fontSize: 12 }}>{v}</span>
+        ) : (
+          <span style={{ color: T.textMuted, fontSize: 12 }}>未绑定</span>
+        )
       ),
     },
     {
@@ -360,6 +393,25 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
                 { value: 'operator', label: '操作端' },
                 { value: 'admin', label: '管理端' },
               ]}
+            />
+          </Form.Item>
+          {/* v22 公司绑定：可选所属公司（allowClear = 可留空不绑定） */}
+          <Form.Item
+            name="company_id"
+            label="所属公司"
+            extra="可选。绑定后该用户登录仅可见本公司的合同数据（代表端强制隔离）"
+          >
+            <Select
+              placeholder="未绑定公司"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={companies.map(c => ({ value: c.id, label: c.name }))}
+              notFoundContent={
+                companies.length === 0 ? (
+                  <span style={{ fontSize: 12, color: T.textMuted }}>暂无公司，请先在「公司管理」中创建</span>
+                ) : undefined
+              }
             />
           </Form.Item>
         </Form>

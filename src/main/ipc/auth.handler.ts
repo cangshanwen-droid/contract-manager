@@ -41,7 +41,10 @@ export function registerAuthHandlers(): void {
       }
 
       const user = queryOne(
-        'SELECT id, username, role, password FROM users WHERE username = ?',
+        `SELECT u.id, u.username, u.role, u.password, u.company_id, c.name AS company_name
+         FROM users u
+         LEFT JOIN companies c ON c.id = u.company_id
+         WHERE u.username = ?`,
         [username]
       )
       if (!user) {
@@ -83,10 +86,23 @@ export function registerAuthHandlers(): void {
         id: user.id as number,
         username: user.username as string,
         role: (user.role as string) || 'user',
-        permissions
+        permissions,
+        // v22 公司绑定：登录响应携带 company_id + company_name（数据隔离依据）
+        company_id: (user.company_id as number | null) ?? null,
+        company_name: (user.company_name as string | undefined) || undefined
       })
 
-      return { success: true, user: { id: user.id, username: user.username, role: user.role, permissions } }
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          permissions,
+          company_id: (user.company_id as number | null) ?? null,
+          company_name: (user.company_name as string | undefined) || undefined
+        }
+      }
     } catch (err: any) {
       console.error('AUTH_LOGIN failed:', err)
       return { success: false, message: `登录失败：${err.message || '未知错误'}` }
@@ -99,7 +115,7 @@ export function registerAuthHandlers(): void {
     return { success: true }
   })
 
-  ipcMain.handle(IPC_CHANNELS.AUTH_REGISTER, (_e, username: string, password: string, role?: string) => {
+  ipcMain.handle(IPC_CHANNELS.AUTH_REGISTER, (_e, username: string, password: string, role?: string, companyId?: number | null) => {
     try {
       // 用户创建类操作：需要 user.manage 权限（后端校验，防止绕过前端）
       const perm = requirePermission(PERMISSIONS.USER_MANAGE)
@@ -116,10 +132,17 @@ export function registerAuthHandlers(): void {
       }
       const existing = queryOne('SELECT id FROM users WHERE username = ?', [username])
       if (existing) return { success: false, message: '用户名已存在' }
+      // v22：可选绑定公司
+      let bindCompanyId: number | null = null
+      if (companyId != null && companyId !== 0) {
+        const comp = queryOne('SELECT id FROM companies WHERE id = ? AND is_active = 1', [companyId])
+        if (!comp) return { success: false, message: '绑定的公司不存在或已停用' }
+        bindCompanyId = Number(companyId)
+      }
       const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
       getDatabase().run(
-        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-        [username, hash, userRole]
+        'INSERT INTO users (username, password, role, company_id) VALUES (?, ?, ?, ?)',
+        [username, hash, userRole, bindCompanyId]
       )
       const newUserId = (getDatabase().exec('SELECT last_insert_rowid() as id')[0].values[0][0]) as number
       // P1-7 审计归属可信化：操作者取自主进程会话（无会话时兜底 system）
@@ -175,10 +198,10 @@ export function registerAuthHandlers(): void {
     }
   )
 
-  // admin 创建用户（指定角色）
+  // admin 创建用户（指定角色 + 可选绑定公司 v22）
   ipcMain.handle(
     IPC_CHANNELS.AUTH_CREATE_USER,
-    (_e, username: string, password: string, role: string, _operator?: string, _operatorRole?: string) => {
+    (_e, username: string, password: string, role: string, companyId?: number | null, _operator?: string, _operatorRole?: string) => {
       try {
         // user.manage 校验；首次使用引导（无会话且用户表为空）时放行，用于创建首个 admin
         if (getSessionUser()) {
@@ -198,10 +221,17 @@ export function registerAuthHandlers(): void {
         }
         const existing = queryOne('SELECT id FROM users WHERE username = ?', [username])
         if (existing) return { success: false, message: '用户名已存在' }
+        // v22 公司绑定：companyId 非空时校验公司存在（防止悬空外键）
+        let bindCompanyId: number | null = null
+        if (companyId != null && companyId !== 0) {
+          const comp = queryOne('SELECT id FROM companies WHERE id = ? AND is_active = 1', [companyId])
+          if (!comp) return { success: false, message: '绑定的公司不存在或已停用' }
+          bindCompanyId = Number(companyId)
+        }
         const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
         getDatabase().run(
-          'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-          [username, hash, role]
+          'INSERT INTO users (username, password, role, company_id) VALUES (?, ?, ?, ?)',
+          [username, hash, role, bindCompanyId]
         )
         const newUserId = (getDatabase().exec('SELECT last_insert_rowid() as id')[0].values[0][0]) as number
         insertAuditLog({
@@ -210,7 +240,7 @@ export function registerAuthHandlers(): void {
           action: 'create_user',
           target: 'user',
           target_id: newUserId,
-          new_value: JSON.stringify({ username, role }),
+          new_value: JSON.stringify({ username, role, company_id: bindCompanyId }),
           result: 'success'
         })
         return { success: true }
@@ -301,7 +331,13 @@ export function registerAuthHandlers(): void {
         if (!perm.ok) return perm.response
       }
       const db = getDatabase()
-      const users = queryAll('SELECT id, username, role, created_at, last_login FROM users ORDER BY id')
+      // v22：联表返回 company_id + company_name（用户管理页展示所属公司）
+      const users = queryAll(
+        `SELECT u.id, u.username, u.role, u.company_id, c.name AS company_name, u.created_at, u.last_login
+         FROM users u
+         LEFT JOIN companies c ON c.id = u.company_id
+         ORDER BY u.id`
+      )
       return { success: true, users }
     } catch (err: any) {
       console.error('AUTH_LIST_USERS failed:', err)

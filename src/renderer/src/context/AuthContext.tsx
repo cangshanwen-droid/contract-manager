@@ -6,6 +6,9 @@ export interface AuthUser {
   role: string
   /** 权限点列表（登录时由主进程根据 roles 表计算） */
   permissions: string[]
+  /** v22 公司绑定：登录用户所属公司（rep 数据隔离依据；admin/operator 可空） */
+  company_id?: number | null
+  company_name?: string
 }
 
 const AuthContext = createContext<AuthUser | null>(null)

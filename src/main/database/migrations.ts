@@ -436,6 +436,20 @@ CREATE INDEX IF NOT EXISTS idx_contract_items_contract ON contract_items(contrac
 CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON contracts(created_at);
     `
   },
+  {
+    version: 22,
+    name: 'add_users_company_binding',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v22 用户绑定公司 + 数据隔离：
+-- users.company_id → companies.id，代表端（rep）登录后只能看到
+-- 本公司的合同/资金/股票。admin 无绑定时看全部；operator 保持全流程。
+-- company_id 可空：NULL = 未绑定（admin 默认；operator 未绑定看全部）。
+-- ═══════════════════════════════════════════════════════════════
+ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id);
+CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
+    `
+  },
 ]
 
 export function runMigrations(): void {

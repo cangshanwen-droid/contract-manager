@@ -12,6 +12,9 @@ export interface SessionUser {
   username: string
   role: string
   permissions: string[]
+  /** 绑定的公司（v22 数据隔离）：rep 强隔离只读本公司数据；operator/admin 可空 */
+  company_id?: number | null
+  company_name?: string
 }
 
 let currentUser: SessionUser | null = null

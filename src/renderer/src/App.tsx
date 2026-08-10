@@ -250,7 +250,8 @@ const appTheme = {
 }
 
 function App(): JSX.Element {
-  const [user, setUser] = useState<{ id: number; username: string; role: string; permissions?: string[] } | null>(null)
+  // v22：登录用户对象携带 company_id / company_name（rep 数据隔离展示用）
+  const [user, setUser] = useState<{ id: number; username: string; role: string; permissions?: string[]; company_id?: number | null; company_name?: string } | null>(null)
 
   // 退出登录：通知主进程清除会话（后端权限校验依据）
   const handleLogout = () => {

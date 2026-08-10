@@ -91,17 +91,28 @@ export class ContractRepository {
   /**
    * P1-1 分页支持：opts.limit/offset 可选，未传时保持全量返回（本地 IPC 兼容旧行为）。
    * 云端模式经 cloudApi 默认带 limit=200。
+   * v22 数据隔离：opts.companyId 非空时按 party_b_id（乙方公司）过滤；
+   *   null/undefined = 不过滤（admin 看全部 / operator 显式取消过滤）。
    */
-  list(regionId?: number, opts?: { limit?: number; offset?: number }): Contract[] {
+  list(regionId?: number, opts?: { limit?: number; offset?: number; companyId?: number | null }): Contract[] {
     let sql = `SELECT c.*, ct.name as contract_type_name, r.name as region_name, comp.name as company_name
                FROM contracts c
                LEFT JOIN contract_types ct ON ct.id = c.contract_type_id
                LEFT JOIN regions r ON r.id = c.region_id
                LEFT JOIN companies comp ON comp.id = c.party_b_id`
     const params: unknown[] = []
+    const conditions: string[] = []
     if (regionId) {
-      sql += ' WHERE c.region_id = ?'
+      conditions.push('c.region_id = ?')
       params.push(regionId)
+    }
+    // v22：公司隔离（party_b_id = 用户绑定公司）
+    if (opts?.companyId != null) {
+      conditions.push('c.party_b_id = ?')
+      params.push(Number(opts.companyId))
+    }
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`
     }
     // P2-3：idx_contracts_created_at 覆盖该排序，避免 TEMP B-TREE 全量排序
     sql += ' ORDER BY c.created_at DESC'
