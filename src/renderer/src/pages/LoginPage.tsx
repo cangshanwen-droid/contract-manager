@@ -129,8 +129,14 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
           setAuthToken(JSON.stringify({ u: result.user.username, t: Date.now() }))
           // 统一登录：凭据经主进程 safeStorage 加密保存（供股票系统免登录），不再写 localStorage 明文
           try { await invoke(IPC_CHANNELS.CREDENTIAL_SET, { username: v.username, password: v.password }) } catch { /* 保存失败不影响登录 */ }
-          // 后台请求云端 token（不阻塞登录流程，失败静默降级）
-          cloudLogin(v.username, v.password)
+          // 云端连通性探测（限时 3s，不阻塞登录体验；失败时提示云端不可达）
+          const cloudOk = await Promise.race([
+            cloudLogin(v.username, v.password),
+            new Promise<''>((resolve) => setTimeout(() => resolve(''), 3000)),
+          ])
+          if (!cloudOk) {
+            message.warning('登录成功，但网络连接异常：暂时无法加载数据。请检查网络后重试', 5)
+          }
           onLogin(result.user)
         } else message.error('自动登录失败')
       } else {
@@ -140,8 +146,14 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
           setAuthToken(JSON.stringify({ u: result.user.username, t: Date.now() }))
           // 统一登录：凭据经主进程 safeStorage 加密保存（供股票系统免登录），不再写 localStorage 明文
           try { await invoke(IPC_CHANNELS.CREDENTIAL_SET, { username: v.username, password: v.password }) } catch { /* 保存失败不影响登录 */ }
-          // 后台请求云端 token（不阻塞登录流程，失败静默降级）
-          cloudLogin(v.username, v.password)
+          // 云端连通性探测（限时 3s，不阻塞登录体验；失败时提示云端不可达）
+          const cloudOk = await Promise.race([
+            cloudLogin(v.username, v.password),
+            new Promise<''>((resolve) => setTimeout(() => resolve(''), 3000)),
+          ])
+          if (!cloudOk) {
+            message.warning('登录成功，但网络连接异常：暂时无法加载数据。请检查网络后重试', 5)
+          }
           onLogin(result.user)
         } else message.error(result.message || '用户名或密码错误')
       }
