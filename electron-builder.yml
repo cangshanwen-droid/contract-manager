@@ -16,6 +16,11 @@ win:
   certificatePassword: gipfel-sign-2026
   signAndEditExecutable: true
 
+publish:
+  provider: github
+  owner: cangshanwen-droid
+  repo: contract-manager
+
 nsis:
   artifactName: Gipfel-Setup-${version}.${ext}
   oneClick: false

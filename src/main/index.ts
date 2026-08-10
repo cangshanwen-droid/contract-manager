@@ -8,6 +8,7 @@ import { registerAllHandlers } from './ipc/register-all'
 import path from 'path'
 import fs from 'fs'
 import { TRUSTED_CERT_HOSTS } from '../shared/cloud-config'
+import { initAutoUpdater } from './updater'
 
 // ── 安全 console：防止 EPIPE 崩溃（管道断开时 console 输出抛异常）──
 ;['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
@@ -214,6 +215,9 @@ app.whenReady().then(async () => {
 
   // 注册 IPC
   registerAllHandlers()
+
+  // 自动更新（仅打包版；启动 8s 后静默检查）
+  initAutoUpdater()
 
   // 启动自动备份
   startAutoBackup()
