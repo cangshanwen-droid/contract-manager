@@ -15,8 +15,10 @@ import { ReloadOutlined, EyeOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { CLOUD_ARENA_URL, fetchWithAdminKey } from '../api/cloudApi'
 import { invoke } from '../api/cloudApi'
+import { usePolling } from '../hooks/usePolling'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import AuditLogPanel from '../components/AuditLogPanel'
+import { tokens as T } from '../styles/design-tokens'
 
 interface AdminAccount {
   id: number
@@ -68,12 +70,12 @@ const fmtMoney = (v: number): string =>
   v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** 系统级指标卡片（管理端顶部行） */
-const MetricCard: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = '#E2E8F0', sub }) => (
+const MetricCard: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = T.textPrimary, sub }) => (
   <div style={{
-    background: '#111B2D', border: '1px solid #1E2D40', borderLeft: '3px solid #D4AF37',
+    background: T.panel, border: `1px solid ${T.border}`, borderLeft: '3px solid #D4AF37',
     borderRadius: 4, padding: '12px 16px', minWidth: 0,
   }}>
-    <div style={{ fontSize: 11, color: '#8A9BB5', marginBottom: 6, lineHeight: 1.5 }}>{label}</div>
+    <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 6, lineHeight: 1.5 }}>{label}</div>
     <div style={{
       fontFamily: "'Inter', 'SF Pro Display', 'JetBrains Mono', monospace",
       fontSize: 20, fontWeight: 600, color,
@@ -82,7 +84,7 @@ const MetricCard: React.FC<{ label: string; value: string; color?: string; sub?:
     }}>
       {value}
     </div>
-    {sub && <div style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>{sub}</div>}
+    {sub && <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>{sub}</div>}
   </div>
 )
 
@@ -120,65 +122,79 @@ const AccountMonitorPage: React.FC = () => {
   const [cloudDisconnected, setCloudDisconnected] = useState(false)
   const cloudFailedRef = useRef(false)
 
-  const loadUsers = useCallback(async () => {
-    if (!isAdmin) return
+  const loadUsers = useCallback(async (): Promise<boolean> => {
+    if (!isAdmin) return false
     setUsersLoading(true)
     try {
       const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
       if (r?.success && Array.isArray(r.users)) setUsers(r.users as LocalUser[])
+      return true
     } catch (e: any) {
       message.error(`系统用户加载失败：${e?.message || '未知'}`)
+      return false
     } finally { setUsersLoading(false) }
   }, [isAdmin])
 
-  const loadAccounts = useCallback(async () => {
-    if (!isAdmin) return
+  // P0-2 修复：loadAccounts 为云端慢请求，加 in-flight 守卫防止轮询叠加
+  const accountsInFlightRef = useRef(false)
+  const loadAccounts = useCallback(async (): Promise<boolean> => {
+    if (!isAdmin) return false
+    if (accountsInFlightRef.current) return false
+    accountsInFlightRef.current = true
     setLoading(true)
     try {
       const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}admin/accounts`)
       setAccounts(Array.isArray(data) ? data : [])
       cloudFailedRef.current = false
       setCloudDisconnected(false)
+      return true
     } catch (e: any) {
-      // 云端故障：仅首次失败弹一次 toast，后续 30s 轮询静默重试
+      // 云端故障：仅首次失败弹一次 toast，后续轮询静默重试
       if (!cloudFailedRef.current) {
         cloudFailedRef.current = true
         message.error(`股票账户加载失败：${e?.message || '网络错误'}`)
       }
       setCloudDisconnected(true)
-    } finally { setLoading(false) }
+      return false
+    } finally { setLoading(false); accountsInFlightRef.current = false }
   }, [isAdmin])
 
-  const loadFunds = useCallback(async () => {
-    if (!isAdmin) return
+  const loadFunds = useCallback(async (): Promise<boolean> => {
+    if (!isAdmin) return false
     setFundsLoading(true)
     try {
       const r = await invoke(IPC_CHANNELS.ACCOUNT_LIST) as any
       setFunds(Array.isArray(r) ? r as FundAccount[] : [])
+      return true
     } catch (e: any) {
       message.error(`资金账户加载失败：${e?.message || '未知'}`)
+      return false
     } finally { setFundsLoading(false) }
   }, [isAdmin])
 
-  const loadContracts = useCallback(async () => {
-    if (!isAdmin) return
+  const loadContracts = useCallback(async (): Promise<boolean> => {
+    if (!isAdmin) return false
     setContractsLoading(true)
     try {
       const r = await invoke(IPC_CHANNELS.CONTRACT_LIST) as any
       setContracts(Array.isArray(r) ? r as LocalContract[] : [])
+      return true
     } catch (e: any) {
       message.error(`合同加载失败：${e?.message || '未知'}`)
+      return false
     } finally { setContractsLoading(false) }
   }, [isAdmin])
 
   useEffect(() => { loadUsers(); loadAccounts(); loadFunds(); loadContracts() }, [loadUsers, loadAccounts, loadFunds, loadContracts])
 
-  // 30s 自动刷新
-  useEffect(() => {
-    if (!isAdmin) return
-    const iv = setInterval(() => { loadAccounts(); loadUsers(); loadFunds(); loadContracts() }, 30000)
-    return () => clearInterval(iv)
+  // 30s 自动刷新：任一子任务失败即触发指数退避（30s→60s→5m，恢复后重置）
+  const refreshAll = useCallback(async (): Promise<boolean> => {
+    if (!isAdmin) return false
+    const results = await Promise.all([loadAccounts(), loadUsers(), loadFunds(), loadContracts()])
+    return results.every(Boolean)
   }, [isAdmin, loadAccounts, loadUsers, loadFunds, loadContracts])
+
+  usePolling(refreshAll, 30000, { enabled: isAdmin, immediate: false })
 
   const openDetail = async (id: number) => {
     setDetailLoading(true)
@@ -193,7 +209,7 @@ const AccountMonitorPage: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <Card style={{ background: '#111B2D', borderColor: '#1E2D40', borderRadius: 4 }}>
+      <Card style={{ background: T.panel, borderColor: T.border, borderRadius: 4 }}>
         <Empty description="账户监控仅管理员可见" style={{ padding: 40 }} />
       </Card>
     )
@@ -227,13 +243,13 @@ const AccountMonitorPage: React.FC = () => {
     { title: '最后登录', dataIndex: 'last_login', width: 150,
       render: (v: string | null) => v
         ? <span style={{ fontSize: 12 }}>{v.replace('T', ' ').slice(0, 16)}</span>
-        : <span style={{ fontSize: 12, color: '#64748B' }}>从未登录</span> },
+        : <span style={{ fontSize: 12, color: T.textMuted }}>从未登录</span> },
   ]
 
   const fundColumns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '账户名', dataIndex: 'name' },
-    { title: '所属区域', dataIndex: 'region_name', render: (v: string) => v || <span style={{ color: '#64748B' }}>未分区</span> },
+    { title: '所属区域', dataIndex: 'region_name', render: (v: string) => v || <span style={{ color: T.textMuted }}>未分区</span> },
     { title: '余额', dataIndex: 'balance', align: 'right' as const,
       render: (v: number) => <span style={{ color: '#F5F7FA', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>¥{fmtMoney(v || 0)}</span> },
     { title: '创建时间', dataIndex: 'created_at', render: (v: string) => <span style={{ fontSize: 12 }}>{v?.replace('T', ' ')}</span> },
@@ -263,9 +279,9 @@ const AccountMonitorPage: React.FC = () => {
   return (
     <div className="page-fade-in">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#E2E8F0' }}>账户监控</span>
+        <span style={{ fontSize: 18, fontWeight: 600, color: T.textPrimary }}>账户监控</span>
         <Tag color="gold">管理端</Tag>
-        <span style={{ fontSize: 12, color: '#64748B' }}>
+        <span style={{ fontSize: 12, color: T.textMuted }}>
           监视全系统账号与账户 · 系统用户 {users.length} · 股票账户 {accounts.length} · 资金账户 {funds.length} · 合同 {contracts.length}
         </span>
         <div style={{ marginLeft: 'auto' }}>
@@ -279,14 +295,14 @@ const AccountMonitorPage: React.FC = () => {
           marginBottom: 12, padding: '8px 14px', borderRadius: 4,
           background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.25)',
           display: 'flex', alignItems: 'center', gap: 8,
-          fontSize: 12, color: '#E2E8F0',
+          fontSize: 12, color: T.textPrimary,
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%', background: '#D4AF37', flexShrink: 0,
             boxShadow: '0 0 6px rgba(212,175,55,0.8)',
           }} />
           <span style={{ fontWeight: 500 }}>云端连接中断 · 重试中</span>
-          <span style={{ color: '#64748B' }}>股票账户数据每 30 秒自动重试，恢复后自动更新</span>
+          <span style={{ color: T.textMuted }}>股票账户数据每 30 秒自动重试，恢复后自动更新</span>
         </div>
       )}
 
@@ -298,7 +314,7 @@ const AccountMonitorPage: React.FC = () => {
         <MetricCard label="活跃用户（30天）" value={String(activeUsers)} color="#60A5FA" sub={`${users.length} 个系统用户`} />
       </div>
 
-      <Card style={{ background: '#111B2D', borderColor: '#1E2D40', borderRadius: 4 }} styles={{ body: { padding: '12px' } }}>
+      <Card style={{ background: T.panel, borderColor: T.border, borderRadius: 4 }} styles={{ body: { padding: '12px' } }}>
         <Tabs
           activeKey={tab}
           onChange={setTab}
@@ -382,14 +398,14 @@ const AccountMonitorPage: React.FC = () => {
         width={560}
         open={!!detail}
         onClose={() => setDetail(null)}
-        styles={{ body: { background: '#0B1120' }, header: { background: '#0F1729', color: '#E2E8F0', borderBottom: '1px solid #1E2D40' } }}
+        styles={{ body: { background: T.bgRoot }, header: { background: T.bgPanel, color: T.textPrimary, borderBottom: `1px solid ${T.border}` } }}
       >
         {detailLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
         ) : detail ? (
           <>
             <Descriptions column={2} size="small"
-              styles={{ label: { color: '#8A9BB5' }, content: { color: '#E2E8F0' } }}
+              styles={{ label: { color: T.textSecondary }, content: { color: T.textPrimary } }}
               items={[
                 { key: 'id', label: 'ID', children: detail.user.id },
                 { key: 'uname', label: '用户名', children: detail.user.username },
@@ -397,7 +413,7 @@ const AccountMonitorPage: React.FC = () => {
                 { key: 'bal', label: '现金余额', children: <span style={{ color: '#F5F7FA' }}>¥{fmtMoney(detail.user.balance || 0)}</span> },
               ]}
             />
-            <div style={{ marginTop: 20, marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>
+            <div style={{ marginTop: 20, marginBottom: 8, fontSize: 13, fontWeight: 600, color: T.textPrimary }}>
               持仓明细 ({detail.positions.length})
             </div>
             <Table
@@ -415,7 +431,7 @@ const AccountMonitorPage: React.FC = () => {
                 { title: '现价', dataIndex: 'current_price', align: 'right', render: (v: number) => v?.toFixed(2) },
               ]}
             />
-            <div style={{ marginTop: 20, marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>
+            <div style={{ marginTop: 20, marginBottom: 8, fontSize: 13, fontWeight: 600, color: T.textPrimary }}>
               订单历史 ({detail.orders.length})
             </div>
             <Table

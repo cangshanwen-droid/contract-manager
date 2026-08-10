@@ -13,7 +13,9 @@ import { AutoComplete, Input } from 'antd'
 import { SearchOutlined, FileTextOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '../../api/cloudApi'
+import { useAuth } from '../../context/AuthContext'
 import { IPC_CHANNELS } from '../../../../shared/constants'
+import { tokens as T } from '../../styles/design-tokens'
 
 interface SearchOption {
   value: string
@@ -24,6 +26,8 @@ interface SearchOption {
 
 const GlobalSearch: React.FC = () => {
   const navigate = useNavigate()
+  const authUser = useAuth()
+  const role = authUser?.role
   const [input, setInput] = useState('')
   const [contracts, setContracts] = useState<any[]>([])
   const [regions, setRegions] = useState<any[]>([])
@@ -76,15 +80,15 @@ const GlobalSearch: React.FC = () => {
         label: (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileTextOutlined style={{ color: '#D4AF37', fontSize: 12 }} />
-            <span style={{ color: '#E2E8F0', fontSize: 12 }}>{c.contract_no || `#${c.id}`}</span>
-            <span style={{ color: '#64748B', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+            <span style={{ color: T.textPrimary, fontSize: 12 }}>{c.contract_no || `#${c.id}`}</span>
+            <span style={{ color: T.textMuted, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
               {c.contract_name || ''}
             </span>
           </div>
         ),
       }))
 
-    const regionOpts: SearchOption[] = regions
+    const regionOpts: SearchOption[] = role === 'rep' ? [] : regions
       .filter((r: any) => !kw || (r.name || '').toLowerCase().includes(kw))
       .slice(0, 6)
       .map((r: any) => ({
@@ -94,7 +98,7 @@ const GlobalSearch: React.FC = () => {
         label: (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <EnvironmentOutlined style={{ color: '#38BDF8', fontSize: 12 }} />
-            <span style={{ color: '#E2E8F0', fontSize: 12 }}>{r.name}</span>
+            <span style={{ color: T.textPrimary, fontSize: 12 }}>{r.name}</span>
           </div>
         ),
       }))
@@ -105,7 +109,7 @@ const GlobalSearch: React.FC = () => {
     if (groups.length === 0 && kw) {
       groups.push({
         label: '无匹配结果',
-        options: [{ key: 'empty', value: '', type: 'contract', label: <span style={{ color: '#64748B', fontSize: 12 }}>未找到「{input}」相关合同或区域，回车搜索合同</span> }],
+        options: [{ key: 'empty', value: '', type: 'contract', label: <span style={{ color: T.textMuted, fontSize: 12 }}>未找到「{input}」相关合同或区域，回车搜索合同</span> }],
       })
     }
     return groups
@@ -144,8 +148,8 @@ const GlobalSearch: React.FC = () => {
         size="small"
         allowClear
         placeholder="全局搜索 · Ctrl+K"
-        prefix={<SearchOutlined style={{ color: '#64748B' }} />}
-        style={{ background: '#0B1120', borderColor: '#1E2D40', color: '#E2E8F0' }}
+        prefix={<SearchOutlined style={{ color: T.textMuted }} />}
+        style={{ background: T.bgRoot, borderColor: T.border, color: T.textPrimary }}
       />
     </AutoComplete>
   )

@@ -14,6 +14,34 @@ const UPDATE_ALLOWED_FIELDS = [
   'updated_by'
 ]
 
+/**
+ * 合同级金额计算（P0-B 修复）：
+ * - 明细显式录入的 total_cost / expected_income 优先（投资合同=投资总额/预期收益、拨款合同=拨款金额）；
+ * - 未显式录入时按数量×单价×(1+税率) 推算成本（与 contract_items 的生成列 total 口径一致）；
+ * - 预期收入仅销售合同(type_id=7)按数量×单价推算（销售收入），其余类型无显式收益则计 0。
+ * 结果写入 contracts.total_cost / expected_income，供审批通过后登记资金流水（支出/收入）。
+ */
+function computeContractAmounts(
+  contractTypeId: number | null | undefined,
+  items: Partial<ContractItem>[]
+): { total_cost: number; expected_income: number } {
+  let totalCost = 0
+  let expectedIncome = 0
+  for (const item of items || []) {
+    const qty = item.quantity ?? 1
+    const price = item.unit_price ?? 0
+    const tax = item.tax_rate ?? 0
+    const itemCost = item.total_cost ?? qty * price * (1 + tax)
+    const itemIncome = item.expected_income ?? (contractTypeId === 7 ? qty * price : 0)
+    totalCost += itemCost
+    expectedIncome += itemIncome
+  }
+  return {
+    total_cost: Math.round(totalCost * 100) / 100,
+    expected_income: Math.round(expectedIncome * 100) / 100
+  }
+}
+
 export class ContractRepository {
   list(regionId?: number): Contract[] {
     let sql = `SELECT c.*, ct.name as contract_type_name, r.name as region_name, comp.name as company_name
@@ -77,14 +105,16 @@ export class ContractRepository {
 
     // 事务保护：合同+明细原子写入
     let contractId = 0
+    // P0-B 修复：创建时即计算合同级金额（避免 total_cost/expected_income 恒为 0，导致 completed 收入流水为空、拨款/投资金额不入账）
+    const amounts = computeContractAmounts(data.contract_type_id, data.items)
     db.run('BEGIN TRANSACTION')
     try {
       // P0-2 CREATE 白名单：status/approval_status 不允许透传--
       // 新合同固定 status='draft'、approval_status='none'（未审批），
       // 执行状态与审批状态只能走 update 状态机校验 / CONTRACT_APPROVE
       db.run(
-        `INSERT INTO contracts (contract_no, contract_name, contract_type_id, party_a, party_b_id, party_b_name, region_id, sign_date, status, approval_status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'none', ?, ?)`,
+        `INSERT INTO contracts (contract_no, contract_name, contract_type_id, party_a, party_b_id, party_b_name, region_id, sign_date, status, approval_status, notes, created_by, total_cost, expected_income)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'none', ?, ?, ?, ?)`,
         [
           contractNo,
           data.contract_name,
@@ -95,14 +125,16 @@ export class ContractRepository {
           data.region_id || null,
           data.sign_date || null,
           data.notes || '',
-          data.created_by || ''
+          data.created_by || '',
+          amounts.total_cost,
+          amounts.expected_income
         ]
       )
       contractId = db.exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number
       if (data.items && data.items.length > 0) {
         const stmt = db.prepare(
-          `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, total_cost, expected_income, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         for (const [idx, item] of data.items.entries()) {
           stmt.bind([
@@ -114,6 +146,8 @@ export class ContractRepository {
             item.tax_rate ?? 0,
             item.skill_level ?? 0,
             item.carbon_factor ?? 0,
+            item.total_cost ?? 0,
+            item.expected_income ?? 0,
             idx
           ])
           stmt.step()
@@ -160,21 +194,41 @@ export class ContractRepository {
 
     if (data.items !== undefined) {
       // 明细同步：整体替换（事务保护，与 create() 的写入逻辑同构）
+      // P0-B 修复：明细替换后重算合同级 total_cost / expected_income，保持与流水登记口径一致；
+      // 丢弃调用方透传的金额字段，避免 UPDATE SET 中出现重复列
+      const amountsTypeId = data.contract_type_id ?? (existing.contract_type_id as number | undefined)
+      // 投资(5)/拨款(6) 的 total_cost/expected_income 是用户显式录入（投资总额/拨款金额/预期收益），
+      // 编辑明细时须保留原值，避免被 数量×单价 推算覆盖导致金额丢失
+      const isExplicitAmountType = amountsTypeId === 5 || amountsTypeId === 6
+      const oldItems = existing.items || []
+      const mergedItems = data.items.map((item, idx) =>
+        isExplicitAmountType ? {
+          ...item,
+          total_cost: item.total_cost ?? oldItems[idx]?.total_cost ?? undefined,
+          expected_income: item.expected_income ?? oldItems[idx]?.expected_income ?? undefined
+        } : item
+      )
+      const amounts = computeContractAmounts(amountsTypeId, mergedItems)
+      const bizFields = fields.filter(f => !f.startsWith('total_cost =') && !f.startsWith('expected_income ='))
+      const bizValues = values.filter((_, i) =>
+        !fields[i].startsWith('total_cost =') && !fields[i].startsWith('expected_income =')
+      )
       db.run('BEGIN TRANSACTION')
       try {
-        if (fields.length > 0) {
-          db.run(
-            `UPDATE contracts SET ${fields.join(', ')}, updated_at = datetime('now','localtime') WHERE id = ?`,
-            [...values, id]
-          )
-        }
+        const setFields = bizFields.length > 0
+          ? `${bizFields.join(', ')}, total_cost = ?, expected_income = ?`
+          : 'total_cost = ?, expected_income = ?'
+        db.run(
+          `UPDATE contracts SET ${setFields}, updated_at = datetime('now','localtime') WHERE id = ?`,
+          [...bizValues, amounts.total_cost, amounts.expected_income, id]
+        )
         db.run('DELETE FROM contract_items WHERE contract_id = ?', [id])
-        if (data.items.length > 0) {
+        if (mergedItems.length > 0) {
           const stmt = db.prepare(
-            `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, total_cost, expected_income, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
-          for (const [idx, item] of data.items.entries()) {
+          for (const [idx, item] of mergedItems.entries()) {
             stmt.bind([
               id,
               item.item_name || '',
@@ -184,6 +238,8 @@ export class ContractRepository {
               item.tax_rate ?? 0,
               item.skill_level ?? 0,
               item.carbon_factor ?? 0,
+              item.total_cost ?? 0,
+              item.expected_income ?? 0,
               idx
             ])
             stmt.step()

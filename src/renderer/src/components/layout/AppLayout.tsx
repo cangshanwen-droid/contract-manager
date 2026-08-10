@@ -1,7 +1,7 @@
 /**
  * AppLayout - Gipfel Institutional Platform v6
  *
- * 侧边栏: 220px, #111B2D 基础暗色
+ * 侧边栏: 220px, T.panel(#0F2748) 基础暗色
  * Logo: 64px 居中，不重复品牌名
  * 导航: 业务组/工具组/市场组 三分组 + 分割线
  * Active: 金色左边框条 (#D4AF37 3px) + 微亮背景
@@ -36,6 +36,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import type { MenuProps } from 'antd'
 import { useAuth } from '../../context/AuthContext'
 import { PERMISSIONS } from '../../../../shared/permissions'
+import { tokens as T } from '../../styles/design-tokens'
 
 const { Sider, Content, Header } = Layout
 
@@ -105,28 +106,28 @@ const ROUTE_HIERARCHY: Record<string, { label: string; parent?: string }> = {
  * Sidebar menu overrides - Gold accent theme
  * Selected: #D4AF37 gold left border 3px + rgba(212,175,55,0.10) bg
  * Hover: rgba(255,255,255,0.04) subtle bg highlight
- * Default: #94A3B8 text
+ * Default: T.textSecondary text
  * Group titles: uppercase, muted, with top-border dividers between groups
  */
 const menuOverrideCSS = `
   .gipfel-sidebar .ant-menu-item-selected {
     background-color: rgba(212, 175, 55, 0.10) !important;
-    color: #E2E8F0 !important;
+    color: var(--gipfel-text-primary) !important;
     border-left: 3px solid #D4AF37 !important;
   }
   .gipfel-sidebar .ant-menu-item:not(.ant-menu-item-selected):hover {
     background-color: rgba(255, 255, 255, 0.04) !important;
-    color: #E2E8F0 !important;
+    color: var(--gipfel-text-primary) !important;
   }
   .gipfel-sidebar .ant-menu-item .anticon {
     color: inherit !important;
     font-size: 14px !important;
   }
   .gipfel-sidebar .ant-menu-item-selected .anticon {
-    color: #E2E8F0 !important;
+    color: var(--gipfel-text-primary) !important;
   }
   .gipfel-sidebar .ant-menu-item {
-    color: #94A3B8 !important;
+    color: var(--gipfel-text-secondary) !important;
     line-height: 1.5 !important;
     margin: 0 !important;
     padding-left: 18px !important;
@@ -135,14 +136,14 @@ const menuOverrideCSS = `
     height: 40px !important;
   }
   .gipfel-sidebar .ant-menu-item-group-title {
-    color: #64748B !important;
+    color: var(--gipfel-text-muted) !important;
     font-size: 11px !important;
     font-weight: 600 !important;
     padding-left: 18px !important;
     margin-top: 20px !important;
     margin-bottom: 2px !important;
     line-height: 1.5 !important;
-    border-top: 1px solid #1E2D40 !important;
+    border-top: 1px solid var(--gipfel-border) !important;
     padding-top: 20px !important;
   }
   .gipfel-sidebar .ant-menu-item-group:first-child .ant-menu-item-group-title {
@@ -220,7 +221,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
   // ── 生成面包屑层级 ──
   const breadcrumbItems = useMemo(() => {
     const crumbs: { title: React.ReactNode }[] = [
-      { title: <span style={{ color: '#94A3B8', fontSize: 12 }}>首页</span> }
+      { title: <span style={{ color: T.textSecondary, fontSize: 12 }}>首页</span> }
     ]
     if (segments.length > 0 && segments[0] !== 'dashboard') {
       const routeInfo = ROUTE_HIERARCHY[segments[0]]
@@ -230,17 +231,17 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           const parentInfo = ROUTE_HIERARCHY[routeInfo.parent]
           if (parentInfo) {
             crumbs.push({
-              title: <span style={{ color: '#94A3B8', fontSize: 12, cursor: 'pointer' }}
+              title: <span style={{ color: T.textSecondary, fontSize: 12, cursor: 'pointer' }}
                 onClick={() => navigate('/' + routeInfo.parent)}>{parentInfo.label}</span>
             })
           }
         }
         crumbs.push({
-          title: <span style={{ color: '#E2E8F0', fontSize: 12, fontWeight: 500 }}>{routeInfo.label}</span>
+          title: <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 500 }}>{routeInfo.label}</span>
         })
       } else {
         crumbs.push({
-          title: <span style={{ color: '#E2E8F0', fontSize: 12 }}>{segments[0]}</span>
+          title: <span style={{ color: T.textPrimary, fontSize: 12 }}>{segments[0]}</span>
         })
       }
     }
@@ -258,9 +259,10 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           document.activeElement.blur()
         }
       }
-      // Ctrl+Shift+N - 跳转区域管理并打开新建区域弹窗
+      // Ctrl+Shift+N - 跳转区域管理并打开新建区域弹窗（rep 无区域管理权限，拦截）
       if (e.ctrlKey && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
         e.preventDefault()
+        if (role === 'rep') return
         navigate('/regions')
         // 等路由切换后派发事件，RegionListPage 监听并打开弹窗
         setTimeout(() => {
@@ -316,7 +318,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
     <Layout className="gipfel-layout" style={{ height: '100vh' }}>
       <style>{menuOverrideCSS}</style>
 
-      {/* Sidebar: 220px - 暗色 #111B2D */}
+      {/* Sidebar: 220px - 暗色 T.panel(#0F2748) */}
       <Sider
         width={220}
         collapsedWidth={64}
@@ -326,8 +328,8 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
         theme="dark"
         trigger={null}
         style={{
-          background: '#111B2D',
-          borderRight: '1px solid #1E2D40',
+          background: T.panel,
+          borderRight: `1px solid ${T.border}`,
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -337,7 +339,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           height: 64,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: collapsed ? '12px 8px' : '12px 16px',
-          borderBottom: '1px solid #1E2D40',
+          borderBottom: `1px solid ${T.border}`,
           flexShrink: 0,
         }}>
           <img src={LOGO_ICON} alt="GIPFEL"
@@ -364,7 +366,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
 
         {/* 底部用户区域 - 用户名 + 角色标签 + 点击退出 */}
         <div style={{
-          borderTop: '1px solid #1E2D40',
+          borderTop: `1px solid ${T.border}`,
           padding: collapsed ? '10px 8px' : '14px 16px',
           cursor: onLogout ? 'pointer' : 'default',
           transition: 'background 150ms ease',
@@ -395,7 +397,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
                   <UserOutlined style={{ color: '#D4AF37', fontSize: 14 }} />
                 </div>
                 <span style={{
-                  fontSize: 13, color: '#E2E8F0',
+                  fontSize: 13, color: T.textPrimary,
                   lineHeight: 1.5, fontWeight: 500,
                 }}>
                   {username || 'Admin'}
@@ -411,7 +413,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
 
               {/* 退出提示 */}
               <div style={{
-                fontSize: 11, color: '#64748B', marginTop: 4,
+                fontSize: 11, color: T.textMuted, marginTop: 4,
                 display: 'flex', alignItems: 'center',
               }}>
                 <LogoutOutlined style={{ marginRight: 6, fontSize: 11 }} />
@@ -425,14 +427,14 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
       </Sider>
 
       {/* Main content area */}
-      <Layout style={{ background: '#0B1120' }}>
+      <Layout style={{ background: T.bgRoot }}>
         {/* Top bar - breadcrumb + collapse trigger */}
         <Header className="gipfel-topbar" style={{
-          background: '#111B2D',
+          background: T.panel,
           padding: '0 32px',
           height: 52,
           display: 'flex', alignItems: 'center',
-          borderBottom: '1px solid #1E2D40',
+          borderBottom: `1px solid ${T.border}`,
           gap: 16,
         }}>
           {/* 侧栏折叠按钮 */}
@@ -441,13 +443,13 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             style={{
               cursor: 'pointer',
               fontSize: 16,
-              color: '#94A3B8',
+              color: T.textSecondary,
               transition: 'color 150ms',
               lineHeight: '52px',
               flexShrink: 0,
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = '#E2E8F0' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = '#94A3B8' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textPrimary }}
+            onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textSecondary }}
           >
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </span>
@@ -476,7 +478,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
 
           {/* 底部版权 / 版本信息 */}
           <div style={{
-            borderTop: '1px solid #1E2D40',
+            borderTop: `1px solid ${T.border}`,
             marginTop: 24,
             paddingTop: 12,
             display: 'flex',
@@ -485,7 +487,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             gap: 12,
             flexWrap: 'wrap',
             fontSize: 11,
-            color: '#64748B',
+            color: T.textMuted,
             lineHeight: 1.55,
           }}>
             <span>© 2026 Gipfel 机构平台 · 基础设施合同管理 + 区域模拟</span>

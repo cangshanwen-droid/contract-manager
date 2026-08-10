@@ -10,7 +10,7 @@
  *   品牌蓝 #1677FF 用于核心 KPI 数字和图表
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Empty, Skeleton, Button, Tag, message } from 'antd'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -20,6 +20,7 @@ import {
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '../api/cloudApi'
+import { usePolling } from '../hooks/usePolling'
 import { useAuth } from '../context/AuthContext'
 import { tokens as T } from '../styles/design-tokens'
 import { formatMoneyCNY, formatPercentWithSign, formatTrend, POSITIVE_COLOR, NEGATIVE_COLOR } from '../utils/format'
@@ -65,28 +66,28 @@ const DashboardPage: React.FC = () => {
   // 行情获取失败标记：失败时区域卡片显示「行情暂不可用」降级提示，而非静默隐藏
   const [quoteFailed, setQuoteFailed] = useState(false)
 
-  useEffect(() => {
-    const loadStockData = async () => {
-      try {
-        const result = await invoke(IPC_CHANNELS.STOCK_GET_MARKET)
-        if (result?.success && result.data?.stocks) {
-          const quotes: Record<string, any> = {}
-          for (const s of result.data.stocks) {
-            quotes[s.symbol] = { price: s.price, change: s.change, changePct: s.changePct }
-          }
-          setStockQuotes(quotes)
-          setQuoteFailed(false)
-        } else {
-          setQuoteFailed(true)
+  const loadStockData = useCallback(async (): Promise<boolean> => {
+    try {
+      const result = await invoke(IPC_CHANNELS.STOCK_GET_MARKET)
+      if (result?.success && result.data?.stocks) {
+        const quotes: Record<string, any> = {}
+        for (const s of result.data.stocks) {
+          quotes[s.symbol] = { price: s.price, change: s.change, changePct: s.changePct }
         }
-      } catch {
-        setQuoteFailed(true)
+        setStockQuotes(quotes)
+        setQuoteFailed(false)
+        return true
       }
+      setQuoteFailed(true)
+      return false
+    } catch {
+      setQuoteFailed(true)
+      return false
     }
-    loadStockData()
-    const timer = setInterval(loadStockData, 30000)
-    return () => clearInterval(timer)
   }, [])
+
+  // P0-2 修复：30s 轮询行情 — in-flight 守卫 + 失败指数退避（30s→60s→5m，恢复后重置）
+  usePolling(loadStockData, 30000)
 
   // ── admin: 加载系统概览统计 ──
   useEffect(() => {
@@ -192,6 +193,7 @@ const DashboardPage: React.FC = () => {
 
   // ── Empty state ──
   if (!hasData) {
+    const isRep = user?.role === 'rep'
     return (
       <div className="page-fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <Empty
@@ -202,16 +204,22 @@ const DashboardPage: React.FC = () => {
                 暂无数据
               </div>
               <div style={{ color: T.textMuted, fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
-                请先创建区域和合同
+                {isRep ? '当前为只读视图，区域与合同数据由操作端创建后同步展示' : '请先创建区域和合同'}
               </div>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <Button type="primary" size="small" onClick={() => navigate('/regions')}>
-                  创建区域
-                </Button>
-                <Button size="small" onClick={() => navigate('/contracts')}>
-                  创建合同
-                </Button>
-              </div>
+              {isRep ? (
+                <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.6 }}>
+                  如需新增数据，请联系操作端或管理端
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  <Button type="primary" size="small" onClick={() => navigate('/regions')}>
+                    创建区域
+                  </Button>
+                  <Button size="small" onClick={() => navigate('/contracts')}>
+                    创建合同
+                  </Button>
+                </div>
+              )}
             </div>
           }
         />
@@ -460,7 +468,8 @@ const DashboardPage: React.FC = () => {
             isPlaceholder={regions.length === 0 || i >= regions.length}
             stockQuotes={stockQuotes}
             quoteFailed={quoteFailed}
-            onClick={() => navigate('/regions')}
+            clickable={user?.role !== 'rep'}
+            onClick={() => { if (user?.role !== 'rep') navigate('/regions') }}
           />
         ))}
       </div>
@@ -689,10 +698,11 @@ const TodoCard: React.FC<{ label: string; count: number; color: string; onClick:
 const RegionInfoCard: React.FC<{
   region: any
   isPlaceholder: boolean
+  clickable?: boolean
   onClick: () => void
   stockQuotes: Record<string, {price:number, change:number, changePct:number}>
   quoteFailed: boolean
-}> = ({ region, isPlaceholder, onClick, stockQuotes, quoteFailed }) => {
+}> = ({ region, isPlaceholder, clickable = true, onClick, stockQuotes, quoteFailed }) => {
   const happiness = region.current_happiness != null
     ? region.current_happiness.toFixed(1)
     : '--'
@@ -719,7 +729,7 @@ const RegionInfoCard: React.FC<{
             border: isPlaceholder ? `1px dashed ${T.border}` : `1px solid ${T.border}`,
             borderRadius: 4,
             padding: '18px 20px',
-            cursor: isPlaceholder ? 'default' : 'pointer',
+            cursor: !isPlaceholder && clickable ? 'pointer' : 'default',
             display: 'flex', flexDirection: 'column', gap: 10,
             opacity: isPlaceholder ? 0.5 : 1,
           }}

@@ -12,8 +12,10 @@ import { Badge, Popover, Button, Empty, Spin, Tag } from 'antd'
 import { BellOutlined, CheckOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { invoke } from '../../api/cloudApi'
+import { usePolling } from '../../hooks/usePolling'
 import { IPC_CHANNELS } from '../../../../shared/constants'
 import type { AppNotification, NotificationType } from '../../../../shared/types'
+import { tokens as T } from '../../styles/design-tokens'
 
 const TYPE_META: Record<NotificationType, { color: string; label: string }> = {
   approval:     { color: 'gold',   label: '审批' },
@@ -48,11 +50,18 @@ const NotificationBell: React.FC = () => {
   const openRef = useRef(open)
   openRef.current = open
 
-  const refreshUnread = useCallback(async () => {
+  // P0-2 修复：in-flight 守卫（轮询与主进程推送共用），慢请求不叠加
+  const unreadInFlightRef = useRef(false)
+  const refreshUnread = useCallback(async (): Promise<boolean> => {
+    if (unreadInFlightRef.current) return false
+    unreadInFlightRef.current = true
     try {
       const res = await invoke(IPC_CHANNELS.NOTIFICATION_UNREAD_COUNT)
       if (res?.success) setUnread(res.count || 0)
-    } catch { /* 忽略轮询错误 */ }
+      return true
+    } catch { /* 忽略轮询错误 */ return false } finally {
+      unreadInFlightRef.current = false
+    }
   }, [])
 
   const loadList = useCallback(async () => {
@@ -63,17 +72,18 @@ const NotificationBell: React.FC = () => {
     } catch { /* 忽略 */ } finally { setLoading(false) }
   }, [])
 
-  // 挂载加载 + 15s 轮询未读数 + 主进程推送即时刷新
+  // 挂载加载 + 15s 轮询未读数（P0-2：in-flight 守卫 + 失败退避）+ 主进程推送即时刷新
   useEffect(() => {
-    refreshUnread()
     loadList()
-    const timer = setInterval(refreshUnread, 15000)
     const off = window.api.on(IPC_CHANNELS.NOTIFICATION_CHANGED_EVENT, () => {
       refreshUnread()
       if (openRef.current) loadList()
     })
-    return () => { clearInterval(timer); off() }
+    return () => { off() }
   }, [refreshUnread, loadList])
+
+  // 15s 轮询未读数：失败退避 15s→30s→5m，恢复后重置
+  usePolling(refreshUnread, 15000)
 
   // 打开面板时拉取最新列表
   useEffect(() => {
@@ -102,14 +112,14 @@ const NotificationBell: React.FC = () => {
       maxHeight: 440,
       display: 'flex',
       flexDirection: 'column',
-      background: '#1A1F2E',
+      background: T.bgCard,
     }}>
       {/* 面板头部：标题 + 全部已读 */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '10px 14px', borderBottom: '1px solid #1E2D40', flexShrink: 0,
+        padding: '10px 14px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
       }}>
-        <span style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>通知中心</span>
+        <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 600 }}>通知中心</span>
         <Button
           type="link" size="small"
           icon={<CheckOutlined />}
@@ -152,7 +162,7 @@ const NotificationBell: React.FC = () => {
                     {meta.label}
                   </Tag>
                   <span style={{
-                    color: '#E2E8F0', fontSize: 12.5,
+                    color: T.textPrimary, fontSize: 12.5,
                     fontWeight: n.read ? 400 : 600,
                     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
@@ -165,7 +175,7 @@ const NotificationBell: React.FC = () => {
                 {/* 内容摘要（最多两行） */}
                 {n.content && (
                   <div style={{
-                    color: '#94A3B8', fontSize: 12, marginTop: 4, lineHeight: 1.5,
+                    color: T.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 1.5,
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                   }}>
@@ -173,7 +183,7 @@ const NotificationBell: React.FC = () => {
                   </div>
                 )}
                 {/* 时间 */}
-                <div style={{ color: '#64748B', fontSize: 11, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ color: T.textMuted, fontSize: 11, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <ClockCircleOutlined style={{ fontSize: 11 }} />
                   {timeAgo(n.created_at)}
                 </div>
@@ -192,17 +202,17 @@ const NotificationBell: React.FC = () => {
       placement="bottomRight"
       open={open}
       onOpenChange={setOpen}
-      overlayInnerStyle={{ padding: 0, background: '#1A1F2E', borderRadius: 4, border: '1px solid #1E2D40' }}
+      overlayInnerStyle={{ padding: 0, background: T.bgCard, borderRadius: 4, border: `1px solid ${T.border}` }}
     >
       <Badge count={unread} size="small" offset={[-4, 4]} style={{ boxShadow: 'none' }}>
         <span
           style={{
-            cursor: 'pointer', fontSize: 16, color: '#94A3B8',
+            cursor: 'pointer', fontSize: 16, color: T.textSecondary,
             lineHeight: '52px', display: 'inline-flex', alignItems: 'center',
             transition: 'color 150ms ease', padding: '0 4px',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = '#E2E8F0' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = '#94A3B8' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textPrimary }}
+          onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textSecondary }}
         >
           <BellOutlined />
         </span>

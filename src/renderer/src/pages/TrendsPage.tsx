@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { tokens as T } from '../styles/design-tokens'
 import { Select, Spin, Empty, Button } from 'antd'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useNavigate } from 'react-router-dom'
@@ -95,13 +96,13 @@ const TrendsPage: React.FC = () => {
               { title: '成交价', key: 'sellPrice', color: C.orange, domain: [0, 'auto'] as [number, string] },
             ].map((c, i) => (
               <div key={i} style={panel}>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 500 }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 8, fontWeight: 500 }}>{c.title}</div>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="round" stroke="#7c8798" tick={{ fontSize: 11 }} />
                     <YAxis domain={c.domain} stroke="#7c8798" tick={{ fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#0f0f0f', border: '1px solid #1a2740', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }} />
+                    <Tooltip contentStyle={{ background: '#0f0f0f', border: '1px solid #1a2740', borderRadius: 4, color: T.textPrimary, fontSize: 12 }} />
                     <Line type="monotone" dataKey={c.key} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>

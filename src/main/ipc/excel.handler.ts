@@ -132,62 +132,94 @@ export function registerExcelHandlers(): void {
       const imported: string[] = []
       const errors: string[] = []
 
-      for (const sheetName of wb.SheetNames) {
-        const table = Object.entries(TABLE_LABELS).find(([, label]) => label === sheetName)?.[0]
-        if (!table) {
-          errors.push(`未知工作表: ${sheetName}，已跳过`)
-          continue
-        }
+      // P0-C 修复：整个导入用事务包裹，流水 INSERT 与余额 UPDATE 原子生效，
+      // 避免部分成功导致流水与余额脱钩
+      db.run('BEGIN TRANSACTION')
+      try {
+        for (const sheetName of wb.SheetNames) {
+          const table = Object.entries(TABLE_LABELS).find(([, label]) => label === sheetName)?.[0]
+          if (!table) {
+            errors.push(`未知工作表: ${sheetName}，已跳过`)
+            continue
+          }
 
-        // 白名单二次校验，防止 SQL 注入
-        if (!isAllowedTable(table)) {
-          errors.push(`不允许导入的表: ${table}`)
-          continue
-        }
+          // 白名单二次校验，防止 SQL 注入
+          if (!isAllowedTable(table)) {
+            errors.push(`不允许导入的表: ${table}`)
+            continue
+          }
 
-        const ws = wb.Sheets[sheetName]
-        const data = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[]
+          const ws = wb.Sheets[sheetName]
+          const data = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[]
 
-        if (data.length === 0) continue
+          if (data.length === 0) continue
 
-        // 获取列名（排除自动计算列和ID列）- table 已通过白名单校验
-        const tableInfo = db.exec(`PRAGMA table_info(${table})`)
-        if (!tableInfo.length) continue
+          // 获取列名（排除自动计算列和ID列）- table 已通过白名单校验
+          const tableInfo = db.exec(`PRAGMA table_info(${table})`)
+          if (!tableInfo.length) continue
 
-        const allColumns = tableInfo[0].values.map((v) => v[1] as string)
-        const autoColumns = new Set(['id', 'created_at', 'updated_at',
-          'amount', 'total_land_area', 'tax_amount', 'total',
-          'calculated_at', 'applied_at'])
-        const columns = allColumns.filter((c) => !autoColumns.has(c))
+          const allColumns = tableInfo[0].values.map((v) => v[1] as string)
+          const autoColumns = new Set(['id', 'created_at', 'updated_at',
+            'total_land_area', 'tax_amount', 'total',
+            'calculated_at', 'applied_at'])
+          // P0-C 修复：account_transactions.amount 是用户录入的真实金额（非自动计算列），
+          // 必须允许导入；其余表的 amount 仍是生成列，保持过滤
+          const isTransactions = table === 'account_transactions'
+          if (isTransactions) {
+            autoColumns.delete('amount')
+          } else {
+            autoColumns.add('amount')
+          }
+          const columns = allColumns.filter((c) => !autoColumns.has(c))
 
-        // 白名单校验列名：只允许数据库中实际存在的列
-        const columnSet = new Set(allColumns)
+          // 白名单校验列名：只允许数据库中实际存在的列
+          const columnSet = new Set(allColumns)
 
-        for (const row of data) {
-          // 过滤并校验每一行的列名
-          const validCols: string[] = []
-          const validValues: unknown[] = []
-          for (const col of columns) {
-            if (columnSet.has(col)) {
-              validCols.push(col)
-              validValues.push(row[col] ?? null)
+          for (const row of data) {
+            // 过滤并校验每一行的列名
+            const validCols: string[] = []
+            const validValues: unknown[] = []
+            for (const col of columns) {
+              if (columnSet.has(col)) {
+                validCols.push(col)
+                validValues.push(row[col] ?? null)
+              }
+            }
+
+            const placeholders = validCols.map(() => '?').join(', ')
+            const colNames = validCols.join(', ')
+
+            try {
+              // table 和 colNames 均已通过白名单校验
+              db.run(
+                `INSERT OR IGNORE INTO ${table} (${colNames}) VALUES (${placeholders})`,
+                validValues as any[]
+              )
+
+              // P0-C 修复：导入流水后同步更新对应区域账户余额（income 累加 / expense 累减），
+              // 使 region_accounts.balance 与 account_transactions 保持一致，不再脱钩
+              if (isTransactions) {
+                const accountId = Number(row['account_id'])
+                const amount = Number(row['amount'])
+                const transType = String(row['trans_type'] ?? '')
+                if (Number.isFinite(accountId) && accountId > 0 && Number.isFinite(amount) && amount !== 0) {
+                  const sign = transType === 'income' ? 1 : -1
+                  db.run(
+                    `UPDATE region_accounts SET balance = balance + ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+                    [sign * amount, accountId]
+                  )
+                }
+              }
+            } catch (err: any) {
+              errors.push(`${sheetName}: ${err.message}`)
             }
           }
-
-          const placeholders = validCols.map(() => '?').join(', ')
-          const colNames = validCols.join(', ')
-
-          try {
-            // table 和 colNames 均已通过白名单校验
-            db.run(
-              `INSERT OR IGNORE INTO ${table} (${colNames}) VALUES (${placeholders})`,
-              validValues as any[]
-            )
-          } catch (err: any) {
-            errors.push(`${sheetName}: ${err.message}`)
-          }
+          imported.push(sheetName)
         }
-        imported.push(sheetName)
+        db.run('COMMIT')
+      } catch (err: any) {
+        db.run('ROLLBACK')
+        throw err
       }
 
       return {

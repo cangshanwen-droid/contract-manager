@@ -27,7 +27,7 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  rep: '#94A3B8',
+  rep: T.textSecondary,
   operator: '#D4AF37',
   admin: '#D4AF37',
 }
@@ -194,7 +194,7 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
       key: 'role',
       width: 120,
       render: (v: string) => (
-        <Tag color={ROLE_COLORS[v] || '#64748B'} style={{ fontSize: 12 }}>
+        <Tag color={ROLE_COLORS[v] || T.textMuted} style={{ fontSize: 12 }}>
           {ROLE_LABELS[v] || v}
         </Tag>
       ),

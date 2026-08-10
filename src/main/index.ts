@@ -17,6 +17,55 @@ import { TRUSTED_CERT_HOSTS } from '../shared/cloud-config'
   } as never
 })
 
+// ── 崩溃恢复（P0-3）────────────────────────────────────────────
+// 内部应用策略：不弹崩溃对话框打扰用户，静默记录 + 自动恢复。
+
+/** 崩溃日志路径：userData/crash.log */
+function getCrashLogPath(): string {
+  return path.join(app.getPath('userData'), 'crash.log')
+}
+
+function writeCrashLog(entry: string): void {
+  try {
+    const p = getCrashLogPath()
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    fs.appendFileSync(p, `[${new Date().toISOString()}] ${entry}\n`)
+  } catch { /* 日志写入失败静默（如磁盘满） */ }
+}
+
+// 主进程未捕获异常/未处理拒绝：记录日志，不终止（内部应用，避免直接闪退）
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+  writeCrashLog(`uncaughtException: ${err?.stack || err?.message || String(err)}`)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+  writeCrashLog(`unhandledRejection: ${reason instanceof Error ? reason.stack || reason.message : String(reason)}`)
+})
+
+// 渲染进程崩溃自动恢复：非用户主动关闭时自动 reload（最多 2 次）
+app.on('web-contents-created', (_event, contents) => {
+  let reloadCount = 0
+  contents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit') return // 用户主动关闭窗口，不恢复
+    if (contents.isDestroyed()) return
+    console.warn(`[render-process-gone] reason=${details.reason} exitCode=${details.exitCode} reload=${reloadCount}/2`)
+    writeCrashLog(`render-process-gone: reason=${details.reason} exitCode=${details.exitCode} reload=${reloadCount}/2`)
+    if (reloadCount >= 2) {
+      console.error('[render-process-gone] 自动恢复已达上限（2 次），不再重载')
+      return
+    }
+    reloadCount += 1
+    // 延迟 500ms 等资源释放后再重载
+    setTimeout(() => {
+      if (!contents.isDestroyed()) {
+        console.warn(`[render-process-gone] 自动 reload 渲染进程（第 ${reloadCount}/2 次）`)
+        contents.reload()
+      }
+    }, 500)
+  })
+})
+
 // 自动备份定时器
 let autoBackupTimer: ReturnType<typeof setInterval> | null = null
 
@@ -86,9 +135,35 @@ function createWindow(): void {
     if (level >= 2) console.log(`[RENDERER ERROR] ${message}`)
   })
 
+  // 窗口打开拦截：仅允许打开受信任主机的 https 链接（安全审计 P0-D 修复）
+  // 白名单：云端主机 106.54.26.86 与 gipfel.duckdns.org（含其子域），其余一律拒绝。
+  // 用 URL.hostname 精确匹配而非 startsWith，防止 106.54.26.86.evil.com 之类前缀伪造。
+  const TRUSTED_OPEN_HOSTS = [...TRUSTED_CERT_HOSTS, 'gipfel.duckdns.org']
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const url = details.url
+    let allowed = false
+    try {
+      const u = new URL(url)
+      allowed = u.protocol === 'https:' &&
+        TRUSTED_OPEN_HOSTS.some(h => u.hostname === h || u.hostname.endsWith(`.${h}`))
+    } catch { /* 非 URL 一律拒绝 */ }
+    if (allowed) {
+      shell.openExternal(url)
+    } else {
+      console.warn(`[window-open] 已拦截非受信链接: ${url.slice(0, 80)}`)
+    }
     return { action: 'deny' }
+  })
+
+  // 导航拦截：禁止渲染进程导航到任意外部页面（安全审计 P0-1）
+  // 防止 XSS 后 location.href 跳到恶意站点并携带 preload 桥
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = url.startsWith('file://') || url.startsWith('http://localhost') ||
+      url.startsWith('https://106.54.26.86') || url.startsWith('http://106.54.26.86')
+    if (!allowed) {
+      console.warn(`[will-navigate] 已拦截导航: ${url.slice(0, 80)}`)
+      event.preventDefault()
+    }
   })
 
   if (is.dev) {

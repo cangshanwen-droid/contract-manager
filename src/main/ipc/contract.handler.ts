@@ -259,9 +259,10 @@ export function registerContractHandlers(): void {
       // ── 资金流水登记（仅已审批合同，幂等防重复入账）──
       if (isContractApproved(id)) {
         // 进入执行阶段 → 登记合同支出
+        // P0-B 修复：金额取合同级 total_cost（create/update 时由明细计算，含投资总额/拨款金额与税额），
+        // 避免仅按 数量×单价 少记金额导致拨款/投资不入账
         if (data.status === 'active' && !hasContractTransaction(id, 'expense', '合同支出')) {
-          const items = result.items || []
-          const totalCost = items.reduce((sum: number, item: any) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
+          const totalCost = Number(result.total_cost) || 0
           if (totalCost > 0) {
             syncContractCostToAccount(id, totalCost, '合同执行', (data as any).updated_by || '')
           }

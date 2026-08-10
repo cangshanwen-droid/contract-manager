@@ -41,7 +41,7 @@ export function registerStockHandlers(): void {
     if (!token) return { success: false, message: '未配置Token' }
 
     try {
-      const res = await net.fetch('${CLOUD_API_BASE}/market/stocks', {
+      const res = await net.fetch(`${CLOUD_API_BASE}/market/stocks`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) return { success: false, message: `HTTP ${res.status}` }

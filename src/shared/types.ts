@@ -69,6 +69,9 @@ export interface ContractItem {
   sort_order: number
   skill_level: number
   carbon_factor: number
+  // v8 迁移新增：明细级金额（投资合同=投资总额/预期收益、拨款合同=拨款金额），创建时可透传
+  total_cost?: number
+  expected_income?: number
 }
 
 export interface ContractWithItems extends Contract {

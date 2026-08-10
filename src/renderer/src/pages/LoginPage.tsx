@@ -9,6 +9,7 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { LogoFull } from '../components/LogoSystem'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { setAuthToken, cloudLogin } from '../api/cloudApi'
+import { tokens as T } from '../styles/design-tokens'
 
 const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
 
@@ -19,6 +20,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
   const [isFirstUse, setIsFirstUse] = useState(false)
   const [form] = Form.useForm()
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rafRef = useRef<number | null>(null)
   const reducedMotionRef = useRef(false)
 
   // --- capability card hover state ---
@@ -95,12 +97,19 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
       ctx.beginPath(); ctx.moveTo(lx - waveWidth, ly); ctx.lineTo(lx + waveWidth, ly); ctx.stroke()
       ctx.globalAlpha = 1
 
-      if (!reducedMotionRef.current) requestAnimationFrame(run)
+      if (!reducedMotionRef.current) {
+        rafRef.current = requestAnimationFrame(run)
+      } else {
+        rafRef.current = null
+      }
     }
-    if (!reducedMotionRef.current) requestAnimationFrame(run)
+    if (!reducedMotionRef.current) rafRef.current = requestAnimationFrame(run)
     else run(0)
 
     return () => {
+      // P0-1 修复：取消未完成的 rAF，防止登录后 Canvas 循环永久空转
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
       window.removeEventListener('resize', handleResize)
       mq.removeEventListener('change', onMotionChange)
     }
@@ -176,7 +185,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
             </div>
           </div>
 
-          <div style={{ marginTop: 8, fontSize: 14, fontWeight: 400, color: '#8A9BB5', letterSpacing: '.16em' }}>
+          <div style={{ marginTop: 8, fontSize: 14, fontWeight: 400, color: T.textSecondary, letterSpacing: '.16em' }}>
             智能金融管理平台
           </div>
           <div style={{ fontSize: 11, color: 'rgba(138,155,181,0.4)', letterSpacing: '.12em', marginTop: 2 }}>
@@ -216,7 +225,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
           <div style={{ marginTop: 40, display: 'flex', gap: 32, justifyContent: 'center' }}>
             {['MARKET DATA', 'AI ANALYTICS', 'RISK ENGINE'].map((s, idx) => (
               <span key={s} style={{
-                fontSize: 11, letterSpacing: '.12em', color: '#8A9BB5',
+                fontSize: 11, letterSpacing: '.12em', color: T.textSecondary,
                 opacity: 0.2,
                 animation: reducedMotionRef.current ? 'none' : `labelShimmer 3s ease-in-out ${idx * 0.6}s infinite`,
               }}>{s}</span>
@@ -250,7 +259,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
           <div style={{ textAlign: 'center', marginBottom: 26 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#F5F7FA', letterSpacing: '.03em' }}>欢迎回来</div>
             <div style={{ width: 28, height: 2, margin: '8px auto 0', background: 'linear-gradient(90deg, transparent, #D4AF37, transparent)', borderRadius: 1 }} />
-            <div style={{ fontSize: 11, color: '#8A9BB5', marginTop: 8, letterSpacing: '.05em' }}>登录 Gipfel 智能金融平台</div>
+            <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 8, letterSpacing: '.05em' }}>登录 Gipfel 智能金融平台</div>
             <div style={{ fontSize: 11, color: 'rgba(138,155,181,0.35)', marginTop: 4, letterSpacing: '.06em' }}>Secure access · Intelligent finance</div>
           </div>
 
@@ -258,21 +267,21 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
           <Form form={form} onFinish={handleSubmit} layout="vertical" size="large">
             <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]} style={{ marginBottom: 16 }}>
-              <Input prefix={<UserOutlined style={{ color: '#8A9BB5', fontSize: 14 }} />}
+              <Input prefix={<UserOutlined style={{ color: T.textSecondary, fontSize: 14 }} />}
                 placeholder="用户名" autoFocus
                 style={{ height: 44, borderRadius: 8, fontSize: 13, background: 'rgba(5,18,38,.6)', borderColor: 'rgba(255,255,255,.05)', color: '#F5F7FA', transition: 'all 250ms ease', caretColor: '#D4AF37' }}
                 onFocus={e => { e.target.style.borderColor = 'rgba(212,175,55,.3)'; e.target.style.boxShadow = '0 0 0 3px rgba(212,175,55,.03)' }}
                 onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,.05)'; e.target.style.boxShadow = 'none' }} />
             </Form.Item>
             <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]} style={{ marginBottom: isFirstUse ? 16 : 22 }}>
-              <Input.Password prefix={<LockOutlined style={{ color: '#8A9BB5', fontSize: 14 }} />}
+              <Input.Password prefix={<LockOutlined style={{ color: T.textSecondary, fontSize: 14 }} />}
                 placeholder="密码"
                 style={{ height: 44, borderRadius: 8, fontSize: 13, background: 'rgba(5,18,38,.6)', borderColor: 'rgba(255,255,255,.05)', color: '#F5F7FA', caretColor: '#D4AF37' }}
                 onFocus={(e: any) => { e.target.style.borderColor = 'rgba(212,175,55,.3)'; e.target.style.boxShadow = '0 0 0 3px rgba(212,175,55,.03)' }}
                 onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,.05)'; e.target.style.boxShadow = 'none' }} />
             </Form.Item>
             {isFirstUse && <Form.Item name="confirm" rules={[{ required: true, message: '请确认密码' }]} style={{ marginBottom: 22 }}>
-              <Input.Password prefix={<LockOutlined style={{ color: '#8A9BB5', fontSize: 14 }} />} placeholder="确认密码"
+              <Input.Password prefix={<LockOutlined style={{ color: T.textSecondary, fontSize: 14 }} />} placeholder="确认密码"
                 style={{ height: 44, borderRadius: 8, fontSize: 13, background: 'rgba(5,18,38,.6)', borderColor: 'rgba(255,255,255,.05)', color: '#F5F7FA', caretColor: '#D4AF37' }} />
             </Form.Item>}
             <Form.Item style={{ marginBottom: 0 }}>

@@ -7,11 +7,11 @@
  * 数字字体: Inter / SF Pro Display + tabular-nums
  * 行高:     标题 1.2  /  正文 1.55
  *
- * 色彩系统:
- *   背景: #0B1120 → #111B2D → #162032 (3层, ~4%亮度差)
- *   边框: #1E2D40 → #253548 → #2E4058 (弱→中→强)
- *   文字: #E2E8F0 → #94A3B8 → #64748B (主→次→弱)
- *   accent: #3B82F6
+ * 色彩系统 (对齐 design-tokens.ts, 见 :root 变量):
+ *   背景: #061A33 → #0F2748 → #1A1F2E (3层, ~4%亮度差)
+ *   边框: rgba(212,175,55,0.12) (弱) / #D4AF37 (强)
+ *   文字: #F5F7FA → #8A9BB5 → rgba(138,155,181,0.5) (主→次→弱)
+ *   accent: #D4AF37
  *
  * 空间:
  *   内容 padding: 32px
@@ -313,7 +313,7 @@ html, body {
 .btn-pressure:active { animation: btn-press-in 100ms ease forwards; }
 
 /* 2. KPI 呼吸 */
-.kpi-breathing { transition: color 200ms ease; color: #E2E8F0; }
+.kpi-breathing { transition: color 200ms ease; color: var(--gipfel-text-primary); }
 .kpi-breathing:hover { color: #FFFFFF; }
 
 /* 3. 侧栏锁定 */
@@ -329,10 +329,10 @@ html, body {
 .data-row { position: relative; }
 .data-row::after {
   content: ''; position: absolute; bottom: 0; left: 8px; right: 8px;
-  height: 1px; background: #1E2D40;
+  height: 1px; background: var(--gipfel-border);
   transition: height 150ms ease, background 150ms ease;
 }
-.data-row:hover::after { height: 1.5px; background: #D4AF37; }
+.data-row:hover::after { height: 1.5px; background: var(--gipfel-primary); }
 
 /* 5. 导航确认 - 页面标题提前淡入 */
 @keyframes nav-ripple {

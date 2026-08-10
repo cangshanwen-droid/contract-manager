@@ -179,7 +179,7 @@ const CompanyListPage: React.FC = () => {
             {filtered.map(c => (
               <Col key={c.id} xs={24} sm={12} md={8} lg={8}>
                 <div style={{
-                  background: T.bgCard, border: '1px solid #1E2D40', borderRadius: 4,
+                  background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4,
                   padding: '14px 16px', transition: 'border-color 200ms ease',
                 }} className="data-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 8 }}>

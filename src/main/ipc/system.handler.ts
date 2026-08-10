@@ -17,7 +17,7 @@ import { requirePermission } from '../session'
 import type { SystemHealth } from '../../shared/types'
 import { CLOUD_API_BASE } from '../../shared/cloud-config'
 
-const API_BASE = '${CLOUD_API_BASE}'
+const API_BASE = `${CLOUD_API_BASE}`
 const HEALTH_TIMEOUT_MS = 5000
 
 async function ping(url: string, name: string): Promise<{ ok: boolean; latency_ms: number | null; message?: string }> {

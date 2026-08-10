@@ -1,4 +1,5 @@
 import React from 'react'
+import { tokens as T } from '../styles/design-tokens'
 import { Button, Typography } from 'antd'
 
 interface Props {
@@ -32,7 +33,7 @@ class ErrorBoundary extends React.Component<Props, State> {
           color: '#e8edf5', padding: 24
         }}>
           <Typography.Title level={4} style={{ color: '#C44040' }}>页面出现错误</Typography.Title>
-          <Typography.Text style={{ color: '#94a3b8', marginBottom: 16, maxWidth: 400, textAlign: 'center' }}>
+          <Typography.Text style={{ color: T.textSecondary, marginBottom: 16, maxWidth: 400, textAlign: 'center' }}>
             {this.state.error?.message}
           </Typography.Text>
           <Button type="primary" onClick={() => { this.setState({ hasError: false }); window.location.reload() }}>

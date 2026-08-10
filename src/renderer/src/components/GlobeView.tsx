@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react'
+import { tokens as T } from '../styles/design-tokens'
 
 export interface GlobeRegion {
   name: string
@@ -279,41 +280,41 @@ const GlobeView: React.FC<GlobeViewProps> = ({ regions, width = 520, height = 52
             minWidth: 160,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginBottom: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary, marginBottom: 6 }}>
             {hovered.name}
           </div>
           {hovered.population != null && (
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>
               人口：<span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                color: '#e2e8f0',
+                color: T.textPrimary,
                 fontWeight: 500,
               }}>{hovered.population.toLocaleString()}</span>
             </div>
           )}
           {hovered.contract_count != null && (
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>
               项目：<span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                color: '#e2e8f0',
+                color: T.textPrimary,
                 fontWeight: 500,
               }}>{hovered.contract_count.toLocaleString()}</span>
             </div>
           )}
           {hovered.carbon_emissions != null && (
-            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>
               碳排：<span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                color: '#e2e8f0',
+                color: T.textPrimary,
                 fontWeight: 500,
               }}>{hovered.carbon_emissions.toLocaleString()} 吨</span>
             </div>
           )}
           {hovered.happiness != null && (
-            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+            <div style={{ fontSize: 11, color: T.textSecondary }}>
               幸福度：<span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                color: '#e2e8f0',
+                color: T.textPrimary,
                 fontWeight: 500,
               }}>{hovered.happiness.toFixed(1)}/100</span>
             </div>

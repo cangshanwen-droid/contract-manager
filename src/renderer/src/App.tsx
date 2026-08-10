@@ -21,6 +21,7 @@ import AccountPage from './pages/AccountPage'
 import SettingsPage from './pages/SettingsPage'
 import UserManagementPage from './pages/UserManagementPage'
 import AnnouncementPage from './pages/AnnouncementPage'
+import { tokens as T } from './styles/design-tokens'
 
 /*
  /* ═══════════════════════════════════════════════════════════════════════════════
@@ -32,16 +33,16 @@ import AnnouncementPage from './pages/AnnouncementPage'
    *
    * 色彩系统：
    *   ── 背景栈 (3 层) ──
-   *   #0B1120  画布 - 页面根背景，最深
-   *   #0F1729  面板 - 侧栏/顶栏
-   *   #1A1F2E  卡片 - 内容卡片/KPI卡片/弹窗
+   *   #061A33  画布 - 页面根背景，最深 (T.bgRoot)
+   *   #0F2748  面板 - 侧栏/顶栏 (T.bgPanel)
+   *   #1A1F2E  卡片 - 内容卡片/KPI卡片/弹窗 (T.bgCard)
    *
    *   ── Accent: #D4AF37 金融金 ──
    *
    *   ── 文字层级 (3 层) ──
-   *   #E2E8F0  主文字 - 标题、正文、KPI 数值
-   *   #94A3B8  次文字 - 标签、描述、辅助信息
-   *   #64748B  弱文字 - placeholder、禁用态、面包屑
+   *   #F5F7FA  主文字 - 标题、正文、KPI 数值 (T.textPrimary)
+   *   #8A9BB5  次文字 - 标签、描述、辅助信息 (T.textSecondary)
+   *   rgba(138,155,181,0.5)  弱文字 - placeholder、禁用态、面包屑 (T.textMuted)
    */
 
 const appTheme = {
@@ -57,32 +58,32 @@ const appTheme = {
     colorPrimaryActive: '#B8960A',
 
     // ── Semantic: 金融级语义色 ──
-    colorSuccess: '#10B981',
+    colorSuccess: T.success,
     colorWarning: '#D4AF37',
     colorError: '#EF4444',
     colorInfo: '#D4AF37',
 
     // ── Luminance Stacking: 3-layer background ──
-    //   canvas #0B1120 → panel #0F1729 → card #1A1F2E
-    colorBgBase: '#0B1120',
-    colorBgContainer: '#1A1F2E',
-    colorBgElevated: '#1A1F2E',
-    colorBgLayout: '#0B1120',
-    colorBgSpotlight: '#1A1F2E',
+    //   canvas T.bgRoot(#061A33) → panel T.bgPanel(#0F2748) → card T.bgCard(#1A1F2E)
+    colorBgBase: T.bgRoot,
+    colorBgContainer: T.bgCard,
+    colorBgElevated: T.bgCard,
+    colorBgLayout: T.bgRoot,
+    colorBgSpotlight: T.bgCard,
     colorBgMask: 'rgba(0, 0, 0, 0.75)',
 
     // ── Borders: 3-layer solid micro-borders ──
-    //   weak #1E2D40 → medium #253548 → strong #2E4058
-    colorBorder: '#1E2D40',
+    //   border: T.border (rgba(212,175,55,0.12)) — #253548 无对应 token，保留
+    colorBorder: T.border,
     colorBorderSecondary: '#253548',
 
     // ── Text: 3-layer hierarchy ──
-    //   primary #E2E8F0 → secondary #94A3B8 → weak #64748B
-    colorTextBase: '#E2E8F0',
-    colorText: '#E2E8F0',
-    colorTextSecondary: '#94A3B8',
-    colorTextTertiary: '#64748B',
-    colorTextQuaternary: '#64748B',
+    //   primary T.textPrimary → secondary T.textSecondary → weak T.textMuted
+    colorTextBase: T.textPrimary,
+    colorText: T.textPrimary,
+    colorTextSecondary: T.textSecondary,
+    colorTextTertiary: T.textMuted,
+    colorTextQuaternary: T.textMuted,
 
     // ── Shape: 4px 金融克制圆角 ──
     borderRadius: 4,
@@ -122,17 +123,17 @@ const appTheme = {
   components: {
     // ── Layout ──
     Layout: {
-      bodyBg: '#0B1120',
-      headerBg: '#0F1729',
-      siderBg: '#0F1729',
-      triggerBg: '#0F1729',
+      bodyBg: T.bgRoot,
+      headerBg: T.bgPanel,
+      siderBg: T.bgPanel,
+      triggerBg: T.bgPanel,
     },
 
     // ── Menu (Navigation) ──
     Menu: {
       darkItemBg: 'transparent',
-      darkItemColor: '#64748B',
-      darkItemHoverColor: '#E2E8F0',
+      darkItemColor: T.textMuted,
+      darkItemHoverColor: T.textPrimary,
       darkItemSelectedColor: '#D4AF37',
       darkItemSelectedBg: 'rgba(212, 175, 55, 0.12)',
       darkItemHoverBg: 'rgba(212, 175, 55, 0.05)',
@@ -144,7 +145,7 @@ const appTheme = {
 
     // ── Card ──
     Card: {
-      colorBgContainer: '#1A1F2E',
+      colorBgContainer: T.bgCard,
       paddingLG: 16,
       borderRadiusLG: 4,
       boxShadow: 'none',
@@ -152,19 +153,19 @@ const appTheme = {
 
     // ── Table ──
     Table: {
-      headerBg: '#0F1729',
-      headerColor: '#94A3B8',
-      headerSplitColor: '#1E2D40',
+      headerBg: T.bgPanel,
+      headerColor: T.textSecondary,
+      headerSplitColor: T.border,
       rowHoverBg: 'rgba(212, 175, 55, 0.05)',
-      borderColor: '#1E2D40',
+      borderColor: T.border,
       cellPaddingBlock: 10,
       cellPaddingInline: 16,
     },
 
     // ── Modal ──
     Modal: {
-      contentBg: '#1A1F2E',
-      headerBg: '#1A1F2E',
+      contentBg: T.bgCard,
+      headerBg: T.bgCard,
       borderRadiusLG: 4,
     },
 
@@ -202,8 +203,8 @@ const appTheme = {
 
     // ── Tabs ──
     Tabs: {
-      itemColor: '#64748B',
-      itemHoverColor: '#E2E8F0',
+      itemColor: T.textMuted,
+      itemHoverColor: T.textPrimary,
       itemSelectedColor: '#D4AF37',
       inkBarColor: '#D4AF37',
       titleFontSize: 13,
@@ -211,36 +212,36 @@ const appTheme = {
 
     // ── Breadcrumb ──
     Breadcrumb: {
-      itemColor: '#64748B',
-      lastItemColor: '#E2E8F0',
-      linkColor: '#94A3B8',
+      itemColor: T.textMuted,
+      lastItemColor: T.textPrimary,
+      linkColor: T.textSecondary,
       linkHoverColor: '#D4AF37',
       fontSize: 12,
     },
 
     // ── Tooltip ──
     Tooltip: {
-      colorBgSpotlight: '#1A1F2E',
+      colorBgSpotlight: T.bgCard,
     },
 
     // ── Dropdown ──
     Dropdown: {
-      colorBgElevated: '#1A1F2E',
+      colorBgElevated: T.bgCard,
     },
 
     // ── Notification ──
     Notification: {
-      colorBgElevated: '#1A1F2E',
+      colorBgElevated: T.bgCard,
     },
 
     // ── Popover ──
     Popover: {
-      colorBgElevated: '#1A1F2E',
+      colorBgElevated: T.bgCard,
     },
 
     // ── Alert ──
     Alert: {
-      colorSuccessBg: 'rgba(16, 185, 129, 0.10)',
+      colorSuccessBg: 'rgba(34, 197, 94, 0.10)',
       colorErrorBg: 'rgba(239, 68, 68, 0.10)',
       colorWarningBg: 'rgba(212, 168, 56, 0.10)',
       colorInfoBg: 'rgba(212, 175, 55, 0.10)',

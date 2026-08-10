@@ -15,6 +15,7 @@
  */
 
 import React from 'react'
+import { tokens as T } from '../styles/design-tokens'
 import LOGO_FULL from '../assets/logo-full.txt?raw'
 import LOGO_ICON from '../assets/logo-icon.txt?raw'
 
@@ -49,7 +50,7 @@ export const LogoIcon: React.FC<{ size?: number }> = ({ size = 36 }) => (
 // ── LogoWord: 纯文字 - 大写品牌名，金融感 ──
 export const LogoWord: React.FC<{ fontSize?: number }> = ({ fontSize = 18 }) => (
   <span className="gipfel-logo" style={{
-    fontSize, fontWeight: 600, color: '#e2e8f0',
+    fontSize, fontWeight: 600, color: T.textPrimary,
     textTransform: 'uppercase', letterSpacing: '0.12em',
     fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
     lineHeight: 1.3,
@@ -62,7 +63,7 @@ export const LogoRow: React.FC<{ iconSize?: number; fontSize?: number; gap?: num
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap }}>
       <LogoIcon size={iconSize} />
       <span style={{
-        fontSize, fontWeight: 600, color: '#e2e8f0',
+        fontSize, fontWeight: 600, color: T.textPrimary,
         textTransform: 'uppercase', letterSpacing: '0.12em',
         fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
         lineHeight: 1.3, whiteSpace: 'nowrap',

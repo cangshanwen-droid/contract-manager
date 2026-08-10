@@ -428,24 +428,29 @@ const ContractListPage: React.FC = () => {
 
   const addItem = () => {
     const base = { item_name: '', quantity: 1, unit_price: 0 }
+    // ⚠️ type_id 映射与 FIELD_SETS / seed.ts 一致（P0-A 修复）：
+    //   1=基建 2=开采 3=采购 4=劳动力 5=投资 6=拨款 7=销售 8=减碳
     switch (contractTypeId) {
       case 1: // 基建
         setItems([...items, { ...base, land_area: 0 }])
         break
-      case 2: // 劳动力
-        setItems([...items, { ...base, skill_level: 0 }])
-        break
-      case 3: // 开采
+      case 2: // 开采
         setItems([...items, { ...base, carbon_factor: 0 }])
         break
-      case 4: case 5: // 销售/采购
+      case 3: // 采购
         setItems([...items, { ...base, tax_rate: 0 }])
         break
-      case 6: // 投资
+      case 4: // 劳动力
+        setItems([...items, { ...base, skill_level: 0 }])
+        break
+      case 5: // 投资
         setItems([...items, { ...base, expected_income: 0, total_cost: 0 }])
         break
-      case 7: // 拨款
+      case 6: // 拨款
         setItems([...items, { ...base, total_cost: 0 }])
+        break
+      case 7: // 销售
+        setItems([...items, { ...base, tax_rate: 0 }])
         break
       case 8: // 减碳
         setItems([...items, { ...base, carbon_factor: 0 }])
@@ -512,7 +517,7 @@ const ContractListPage: React.FC = () => {
     {
       title: '状态', dataIndex: 'status', width: 190,
       filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
-        <div style={{ padding: 8, background: '#1A1F2E', border: '1px solid rgba(212,175,55,0.12)', borderRadius: 4 }}>
+        <div style={{ padding: 8, background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4 }}>
           <Checkbox.Group
             options={[
               { label: '草稿', value: 'draft' },
@@ -584,6 +589,9 @@ const ContractListPage: React.FC = () => {
   const renderItemFields = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
     type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number }
+    // ⚠️ 类型 ID 必须与 seed.ts 的 contract_types 插入顺序一致（P0-A 修复）：
+    //   1=基建 2=开采 3=采购 4=劳动力 5=投资 6=拨款 7=销售 8=减碳
+    //   后端 summarizeByRegion() 同样按此 ID 分支出，改动前必须同步核对。
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
       1: { title: '基建项目', hint: '基础设施建设合同 - 填写项目名、数量、单价与占地面积',
         fields: [
@@ -592,47 +600,47 @@ const ContractListPage: React.FC = () => {
           { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
           { label: '占地面积(㎡)', span: 5, field: 'land_area', type: 'num', placeholder: '如：1200' },
         ] },
-      2: { title: '招聘岗位', hint: '劳动力合同 - 招聘岗位、人数、月薪与技能等级',
-        fields: [
-          { label: '岗位名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：技术工人' },
-          { label: '人数', span: 4, field: 'quantity', type: 'num', placeholder: '如：10' },
-          { label: '月薪(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：8000' },
-          { label: '技能等级', span: 4, field: 'skill_level', type: 'select', placeholder: '选择等级' },
-        ] },
-      3: { title: '开采项', hint: '原料开采合同 - 原料名称、数量、单价与碳排放系数',
+      2: { title: '开采项', hint: '原料开采合同 - 原料名称、数量、单价与碳排放系数',
         fields: [
           { label: '原料名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：铁矿石' },
           { label: '数量(吨)', span: 4, field: 'quantity', type: 'num', placeholder: '如：100' },
           { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：500' },
           { label: '碳排放系数', span: 4, field: 'carbon_factor', type: 'num', placeholder: '如：0.8', step: 0.1 },
         ] },
-      4: { title: '销售产品', hint: '销售合同 - 产品名称、数量、单价与税率',
-        fields: [
-          { label: '产品名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：钢材' },
-          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：50' },
-          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：3000' },
-          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
-        ] },
-      5: { title: '采购物资', hint: '采购合同 - 物资名称、数量、单价与税率',
+      3: { title: '采购物资', hint: '采购合同 - 物资名称、数量、单价与税率',
         fields: [
           { label: '物资名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：水泥' },
           { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：200' },
           { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：450' },
           { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
         ] },
-      6: { title: '投资项目', hint: '投资合同 - 项目名称、投资总额、预期收益与数量',
+      4: { title: '招聘岗位', hint: '劳动力合同 - 招聘岗位、人数、月薪与技能等级',
+        fields: [
+          { label: '岗位名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：技术工人' },
+          { label: '人数', span: 4, field: 'quantity', type: 'num', placeholder: '如：10' },
+          { label: '月薪(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：8000' },
+          { label: '技能等级', span: 4, field: 'skill_level', type: 'select', placeholder: '选择等级' },
+        ] },
+      5: { title: '投资项目', hint: '投资合同 - 项目名称、投资总额、预期收益与数量',
         fields: [
           { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：产业园二期' },
           { label: '投资总额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：10000000' },
           { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：15000000' },
           { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
         ] },
-      7: { title: '拨款项目', hint: '拨款合同 - 项目名称、拨款金额、数量与单价',
+      6: { title: '拨款项目', hint: '拨款合同 - 项目名称、拨款金额、数量与单价',
         fields: [
           { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：农田补贴' },
           { label: '拨款金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：500000' },
           { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
           { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
+        ] },
+      7: { title: '销售产品', hint: '销售合同 - 产品名称、数量、单价与税率',
+        fields: [
+          { label: '产品名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：钢材' },
+          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：50' },
+          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：3000' },
+          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
         ] },
       8: { title: '减碳项目', hint: '减碳合同 - 项目名称、减排量、碳排系数与单价',
         fields: [

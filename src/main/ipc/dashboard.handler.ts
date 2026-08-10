@@ -38,8 +38,25 @@ export function registerDashboardHandlers(): void {
     }
   })
 
+  // file:open 外部链接打开（P0-D 修复：scheme 白名单，仅放行 http/https，
+  // 拒绝 file: / ms-settings: / smb: 等本地/协议链接，防止渲染进程被诱导打开任意本地文件）
   ipcMain.handle(IPC_CHANNELS.FILE_OPEN, (_e, url: string) => {
     try {
+      if (typeof url !== 'string' || url.length === 0 || url.length > 2048) {
+        return { success: false, message: '无效的链接' }
+      }
+      let parsed: URL
+      try {
+        parsed = new URL(url)
+      } catch {
+        return { success: false, message: '仅允许打开 http/https 链接' }
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { success: false, message: `已拦截非 http/https 链接: ${parsed.protocol}` }
+      }
+      if (!parsed.hostname) {
+        return { success: false, message: '链接缺少有效主机名' }
+      }
       shell.openExternal(url)
       return { success: true }
     } catch (err: any) {

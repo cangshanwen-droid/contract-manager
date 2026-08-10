@@ -8,9 +8,12 @@
 
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
 
-const API_BASE = '${CLOUD_API_BASE}'
+const API_BASE = `${CLOUD_API_BASE}`
 const AUTH_TOKEN_KEY = 'gipfel_auth_token'
 const CLOUD_MODE_KEY = 'cloudMode'
+
+/** 云端请求超时（P0-2 修复）：断网时 10s 内中止，避免请求悬挂 30s+ */
+const REQUEST_TIMEOUT_MS = 10000
 
 // ── 云端模式开关 ──
 
@@ -53,11 +56,14 @@ export function clearAuthToken(): void {
  * 返回云端 token，失败返回空字符串。
  */
 export async function cloudLogin(username: string, password: string): Promise<string> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
+      signal: controller.signal,
     })
     if (!res.ok) return ''
     const data = await res.json()
@@ -67,6 +73,8 @@ export async function cloudLogin(username: string, password: string): Promise<st
   } catch {
     // 网络不通时静默降级 - 不影响本地登录
     return ''
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -80,12 +88,24 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`云端 API 错误 ${res.status}: ${body || res.statusText}`)
+  // P0-2 修复：AbortController 10s 超时，断网时中止悬挂请求
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`云端 API 错误 ${res.status}: ${body || res.statusText}`)
+    }
+    return res.json()
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`云端请求超时（${REQUEST_TIMEOUT_MS / 1000}s）：${path}`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
   }
-  return res.json()
 }
 
 // ── 公开导出 fetch 供直接调用（股票页面使用）──
@@ -93,7 +113,7 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
 export const fetch = cloudFetch
 
 /** 云端完整版地址（股票交易 Arena） */
-export const CLOUD_ARENA_URL = '${CLOUD_API_BASE}'
+export const CLOUD_ARENA_URL = `${CLOUD_API_BASE}`
 
 /** 管理端密钥缓存（仅成功获取后缓存，未配置时不缓存以便重试） */
 let cachedAdminKey: string | null = null
@@ -120,16 +140,29 @@ export async function fetchWithAdminKey(url: string): Promise<any> {
   if (!key) {
     throw new Error('未配置管理端密钥（请设置环境变量 GIPFEL_ADMIN_KEY 或 userData 下 admin-key.txt）')
   }
-  const res = await window.fetch(url, {
-    method: 'GET',
-    headers: { 'X-Admin-Key': key },
-    cache: 'no-store' as RequestCache,
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail || `请求失败 (${res.status})`)
+  // P0-2 修复：AbortController 10s 超时，断网时中止悬挂请求
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await window.fetch(url, {
+      method: 'GET',
+      headers: { 'X-Admin-Key': key },
+      cache: 'no-store' as RequestCache,
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body?.detail || `请求失败 (${res.status})`)
+    }
+    return res.json()
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`云端请求超时（${REQUEST_TIMEOUT_MS / 1000}s）：${url}`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
   }
-  return res.json()
 }
 
 // ── 云端 invoke：将 IPC channel 映射到 REST ──

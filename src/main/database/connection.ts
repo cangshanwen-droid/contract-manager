@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs'
-import { app } from 'electron'
+import { app, dialog } from 'electron'
 import initSqlJs, { Database as SqlJsDatabase, SqlJsStatic } from 'sql.js'
 
 let db: SqlJsDatabase | null = null
@@ -77,6 +77,87 @@ function patchDatabase(instance: SqlJsDatabase): void {
   }
 }
 
+/**
+ * 尝试从文件加载数据库并做完整性校验。
+ * 返回 { ok: true, db } 或 { ok: false, error }（文件不存在/损坏/校验失败均视为失败）。
+ */
+function tryLoadDatabase(
+  SQL: SqlJsStatic,
+  filePath: string
+): { ok: true; db: SqlJsDatabase } | { ok: false; error: string } {
+  try {
+    if (!fs.existsSync(filePath)) return { ok: false, error: '文件不存在' }
+    const buffer = fs.readFileSync(filePath)
+    const candidate = new SQL.Database(buffer)
+    if (candidate.checkIntegrity() !== 'ok') {
+      try { candidate.close() } catch { /* ignore */ }
+      return { ok: false, error: '完整性校验失败（integrity_check）' }
+    }
+    return { ok: true, db: candidate }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) }
+  }
+}
+
+/**
+ * P0-4 备份回退链：contract-manager.db.bak → backups/ 最新自动备份。
+ * 返回第一个完整性校验通过的备份库；全部不可用时返回 null。
+ */
+function recoverFromBackups(SQL: SqlJsStatic): SqlJsDatabase | null {
+  const candidates: string[] = [`${dbPath}.bak`]
+  try {
+    const backupDir = path.join(app.getPath('userData'), 'backups')
+    if (fs.existsSync(backupDir)) {
+      const newest = fs.readdirSync(backupDir)
+        .filter((f) => f.startsWith('auto-backup-') && f.endsWith('.db'))
+        .sort()
+        .reverse()
+        .map((f) => path.join(backupDir, f))
+      candidates.push(...newest)
+    }
+  } catch { /* 备份目录不可读则跳过 */ }
+
+  for (const candidate of candidates) {
+    const result = tryLoadDatabase(SQL, candidate)
+    if (result.ok) {
+      console.warn(`[DB] 从备份恢复成功：${candidate}`)
+      return result.db
+    }
+    console.warn(`[DB] 备份不可用：${candidate}（${result.error}）`)
+  }
+  return null
+}
+
+/** 把损坏的主库文件隔离为 .corrupt-<时间戳>.db，保留现场便于人工恢复 */
+function quarantineCorruptMain(): void {
+  try {
+    if (fs.existsSync(dbPath)) {
+      const corruptPath = `${dbPath}.corrupt-${Date.now()}`
+      fs.renameSync(dbPath, corruptPath)
+      console.warn(`[DB] 损坏的主库已隔离为 ${corruptPath}`)
+    }
+  } catch { /* 隔离失败不阻塞启动 */ }
+}
+
+function resetTxnState(): void {
+  txnDepth = 0
+  pendingWrite = false
+}
+
+/** 全新空库时提示用户数据已重置（仅真实 Electron 环境弹窗，测试环境静默） */
+function notifyDbReset(): void {
+  try {
+    if (typeof dialog !== 'undefined' && dialog?.showMessageBox) {
+      void dialog.showMessageBox({
+        type: 'warning',
+        title: '数据库已重置',
+        message: '本地数据库文件已损坏且无可用备份，数据已重置为空库。',
+        detail: '原损坏文件已保留为 .corrupt-*.db，如需找回数据请通过「系统设置 → 恢复数据库」选择备份恢复。',
+      })
+    }
+  } catch { /* 弹窗失败不影响启动 */ }
+}
+
 export async function initDatabase(): Promise<void> {
   const SQL = await initSqlJs({
     locateFile: (file: string) => {
@@ -88,15 +169,46 @@ export async function initDatabase(): Promise<void> {
   })
   SQLModule = SQL
   dbPath = path.join(app.getPath('userData'), 'contract-manager.db')
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath)
-    db = new SQL.Database(buffer)
-  } else {
+
+  // 首次运行：无库文件 → 直接建新库（正常路径，不算故障）
+  if (!fs.existsSync(dbPath)) {
     db = new SQL.Database()
+    patchDatabase(db)
+    resetTxnState()
+    return
   }
+
+  // 主库存在 → 尝试加载 + 完整性校验
+  const primary = tryLoadDatabase(SQL, dbPath)
+  if (primary.ok) {
+    db = primary.db
+    patchDatabase(db)
+    resetTxnState()
+    return
+  }
+
+  // ══ P0-4 主库损坏回退链：.bak → backups/ 最新备份 → 全新空库 ══
+  console.warn(`[DB] 主库加载失败（${primary.error}），启动备份回退链`)
+  const recovered = recoverFromBackups(SQL)
+  if (recovered) {
+    db = recovered
+    patchDatabase(db)
+    resetTxnState()
+    // 先隔离损坏主库，再落盘，避免 _flushSave 把损坏文件复制成新的 .bak
+    quarantineCorruptMain()
+    _flushSave()
+    console.warn('[DB] 已从备份恢复数据库，损坏的主库已隔离（.corrupt-*.db）')
+    return
+  }
+
+  // 所有备份均不可用 → 全新空库 + 提示用户数据已重置
+  console.warn('[DB] 备份回退失败，创建全新空库（数据已重置）')
+  db = new SQL.Database()
   patchDatabase(db)
-  txnDepth = 0
-  pendingWrite = false
+  resetTxnState()
+  quarantineCorruptMain()
+  _flushSave()
+  notifyDbReset()
 }
 
 export function getDatabase(): SqlJsDatabase {
@@ -139,18 +251,23 @@ export function closeDatabase(): void {
 /**
  * 从备份文件恢复数据库：整体替换内存库并立即落盘。
  * 由 backup.handler 的 DB_RESTORE 调用（先 saveDatabase(true) 再恢复）。
+ * P0-4：恢复前校验完整性，损坏的备份文件直接拒绝，避免把坏库载入内存。
  */
 export function restoreDatabaseFromFile(filePath: string): void {
   if (!SQLModule) throw new Error('SQL 引擎未初始化')
   if (!fs.existsSync(filePath)) throw new Error('备份文件不存在')
   const buffer = fs.readFileSync(filePath)
+  const candidate = new SQLModule.Database(buffer)
+  if (candidate.checkIntegrity() !== 'ok') {
+    try { candidate.close() } catch { /* ignore */ }
+    throw new Error('备份文件完整性校验失败，请确认是有效的数据库备份')
+  }
   if (db) {
     try { db.close() } catch { /* ignore */ }
     db = null
   }
-  db = new SQLModule.Database(buffer)
+  db = candidate
   patchDatabase(db)
-  txnDepth = 0
-  pendingWrite = false
+  resetTxnState()
   _flushSave()
 }

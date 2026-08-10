@@ -3,7 +3,7 @@ import { net } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { CLOUD_API_BASE } from '../../shared/cloud-config'
 
-const STOCK_API = '${CLOUD_API_BASE}'
+const STOCK_API = `${CLOUD_API_BASE}`
 
 interface StockQuote {
   symbol: string
