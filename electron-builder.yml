@@ -17,6 +17,7 @@ win:
   signAndEditExecutable: true
 
 nsis:
+  artifactName: Gipfel管理系统-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
