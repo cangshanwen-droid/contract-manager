@@ -7,7 +7,7 @@ directories:
 asar: false
 
 win:
-  artifactName: Gipfel管理系统-Setup-${version}.exe
+  artifactName: Gipfel-Setup-${version}.exe
   target:
     - target: nsis
       arch:
@@ -17,7 +17,7 @@ win:
   signAndEditExecutable: true
 
 nsis:
-  artifactName: Gipfel管理系统-Setup-${version}.${ext}
+  artifactName: Gipfel-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
