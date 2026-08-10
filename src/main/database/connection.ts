@@ -85,6 +85,10 @@ function patchDatabase(instance: SqlJsDatabase): void {
 /**
  * 尝试从文件加载数据库并做完整性校验。
  * 返回 { ok: true, db } 或 { ok: false, error }（文件不存在/损坏/校验失败均视为失败）。
+ *
+ * ⚠️ 修复（v1.3.0 bug）：sql.js 的 Database 原型没有 checkIntegrity() 方法，
+ * 旧代码调用 candidate.checkIntegrity() 必然 throw → 每次启动误判"损坏"→
+ * 数据被重置为空库并弹窗。改用 SQL 级 PRAGMA integrity_check 校验。
  */
 function tryLoadDatabase(
   SQL: SqlJsStatic,
@@ -94,9 +98,16 @@ function tryLoadDatabase(
     if (!fs.existsSync(filePath)) return { ok: false, error: '文件不存在' }
     const buffer = fs.readFileSync(filePath)
     const candidate = new SQL.Database(buffer)
-    if (candidate.checkIntegrity() !== 'ok') {
+    try {
+      const res = candidate.exec('PRAGMA integrity_check')
+      const ok = Array.isArray(res) && res.length > 0 && res[0]?.values?.[0]?.[0] === 'ok'
+      if (!ok) {
+        try { candidate.close() } catch { /* ignore */ }
+        return { ok: false, error: '完整性校验失败（integrity_check）' }
+      }
+    } catch (err: any) {
       try { candidate.close() } catch { /* ignore */ }
-      return { ok: false, error: '完整性校验失败（integrity_check）' }
+      return { ok: false, error: `完整性校验异常：${err?.message || String(err)}` }
     }
     return { ok: true, db: candidate }
   } catch (err: any) {
