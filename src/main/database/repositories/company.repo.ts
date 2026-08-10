@@ -5,37 +5,51 @@ import type { Company } from '../../../shared/types'
 export class CompanyRepository {
   list(): Company[] {
     return queryAll(
-      'SELECT * FROM companies WHERE is_active = 1 ORDER BY name'
+      `SELECT c.*, r.name as region_name
+       FROM companies c
+       LEFT JOIN regions r ON r.id = c.region_id
+       WHERE c.is_active = 1
+       ORDER BY c.name`
     ) as Company[]
   }
 
   getById(id: number): Company | undefined {
-    const r = queryOne('SELECT * FROM companies WHERE id = ?', [id])
+    const r = queryOne(
+      `SELECT c.*, r.name as region_name
+       FROM companies c
+       LEFT JOIN regions r ON r.id = c.region_id
+       WHERE c.id = ? AND c.is_active = 1`,
+      [id]
+    )
     return r ? (r as Company) : undefined
   }
 
   create(data: Partial<Company>): Company {
     const db = getDatabase()
     db.run(
-      `INSERT INTO companies (name, region, company_type, contact, phone, email, address, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO companies (name, region, region_id, company_type, contact, phone, email, address, notes, is_listed, stock_symbol, stock_initial_price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.name || '',
         data.region || '',
+        data.region_id ?? null,
         data.company_type || '',
         data.contact || '',
         data.phone || '',
         data.email || '',
         data.address || '',
-        data.notes || ''
+        data.notes || '',
+        data.is_listed || 0,
+        data.stock_symbol || '',
+        data.stock_initial_price ?? 100
       ]
     )
-    const id = db.exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number
+    const id = (db.exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number)
     return this.getById(id)!
   }
 
   update(id: number, data: Partial<Company>): Company | undefined {
-    const fields = Object.keys(data).filter((k) => k !== 'id' && k !== 'created_at')
+    const fields = Object.keys(data).filter((k) => k !== 'id' && k !== 'created_at' && k !== 'region_name')
     if (fields.length === 0) return this.getById(id)
     const setClause = fields.map((k) => `${k} = ?`).join(', ')
     const values = fields.map((k) => (data as Record<string, unknown>)[k])

@@ -1,6 +1,9 @@
 // ---- 数据库实体接口 ----
 
 export type ContractStatus = 'draft' | 'active' | 'completed' | 'terminated' | 'expired'
+// 审批状态：none=未提交审批(草稿) pending=待审批 approved=已审批 rejected=已驳回
+export type ApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected'
+export type ContractApprovalAction = 'submit' | 'approve' | 'reject'
 
 export interface Region {
   id: number
@@ -20,16 +23,35 @@ export interface Contract {
   id: number
   contract_no: string
   contract_name: string
+  contract_type_id: number
+  contract_type_name?: string
   party_a: string
   party_b_id: number | null
   party_b_name: string
+  company_name?: string
   region_id: number | null
   region_name?: string
   sign_date: string | null
   status: ContractStatus
+  approval_status: ApprovalStatus
+  approved_by: string
+  approved_at: string | null
   notes: string
+  total_cost: number
+  progress: number
+  expected_income: number
+  created_by: string
+  updated_by: string
   created_at: string
   updated_at: string
+}
+
+export interface ContractType {
+  id: number
+  name: string
+  description: string
+  color: string
+  sort_order: number
 }
 
 export interface ContractItem {
@@ -45,23 +67,43 @@ export interface ContractItem {
   tax_amount: number
   total: number
   sort_order: number
+  skill_level: number
+  carbon_factor: number
 }
 
 export interface ContractWithItems extends Contract {
   items: ContractItem[]
 }
 
+export interface ContractVersion {
+  id: number
+  contract_id: number
+  version: number
+  snapshot: Record<string, unknown>
+  changed_fields: string[]
+  created_by: string
+  created_at: string
+}
+
 export interface Company {
   id: number
   name: string
   region: string
+  region_id: number | null
+  region_name?: string
   company_type: string
   contact: string
   phone: string
   email: string
   address: string
   notes: string
+  employee_count: number
+  annual_output: number
+  carbon_emission: number
   is_active: number
+  is_listed: number
+  stock_symbol: string
+  stock_initial_price: number
   created_at: string
   updated_at: string
 }
@@ -127,6 +169,41 @@ export interface DashboardSummary {
   total_land_area: number
   avg_happiness: number | null
   avg_employment: number | null
+  total_contract_amount: number
+  total_account_balance: number
+  total_accounts: number
+}
+
+/** 系统概览（仅 admin）：用户构成 + 活跃度 + 最近创建用户 */
+export interface DashboardSystemStats {
+  total_users: number
+  admin_count: number
+  operator_count: number
+  rep_count: number
+  active_users_30d: number
+  logins_24h: number
+  recent_users: {
+    id: number
+    username: string
+    role: string
+    created_at: string | null
+    last_login: string | null
+  }[]
+}
+
+/** 服务器状态：云端 API / 股票 API 健康检查 */
+export interface ServiceHealthItem {
+  name: string
+  ok: boolean
+  latency_ms: number | null
+  message?: string
+}
+
+export interface SystemHealth {
+  cloud_api: ServiceHealthItem
+  stock_api: ServiceHealthItem
+  db_ok: boolean
+  checked_at: string
 }
 
 export interface TrendDataPoint {
@@ -165,4 +242,34 @@ export interface FormulaOutput {
   actual_infra_employment_bonus: number
   total_employment_rate: number
   next_population: number
+}
+
+export interface AuditLog {
+  id: number
+  username: string
+  role: string
+  action: string
+  target: string
+  target_id: number | null
+  old_value: string | null
+  new_value: string | null
+  ip: string | null
+  timestamp: string
+  result: string
+}
+
+// ---- 通知中心 ----
+
+/** 通知类型：approval(审批) | announcement(公告) | transaction(交易) | system(系统) */
+export type NotificationType = 'approval' | 'announcement' | 'transaction' | 'system'
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  title: string
+  content: string
+  type: NotificationType
+  link: string
+  read: number
+  created_at: string
 }

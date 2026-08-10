@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   Table, Button, Modal, Form, Input, Select, DatePicker, Space, Popconfirm,
-  Typography, message, Spin, Tag, InputNumber, Card, Row, Col, Divider
+  Typography, message, Skeleton, Empty, Tag, InputNumber, Card, Row, Col, Divider, Checkbox, Tabs, Segmented
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, EyeOutlined, CalculatorOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined, SearchOutlined, FilterOutlined, HistoryOutlined, SendOutlined, CheckCircleOutlined, StopOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
+import { IPC_CHANNELS } from '../../../shared/constants'
+import { PERMISSIONS, hasPermission } from '../../../shared/permissions'
 import { api } from '../api/dashboard.api'
-import type { Contract, ContractWithItems, Company, Region, ContractType } from '../../../shared/types'
+import { invoke } from '../api/cloudApi'
+import { tokens as T } from '../styles/design-tokens'
+import { formatMoneyCNY, POSITIVE_COLOR, NEGATIVE_COLOR } from '../utils/format'
+import type { Contract, ContractWithItems, Company, Region, ContractType, ContractVersion } from '../../../shared/types'
+import { useAuth } from '../context/AuthContext'
 import dayjs from 'dayjs'
 
 const statusColors: Record<string, string> = {
@@ -13,22 +20,101 @@ const statusColors: Record<string, string> = {
   terminated: 'error', expired: 'warning'
 }
 const statusLabels: Record<string, string> = {
-  draft: '草稿', active: '进行中', completed: '已完成',
-  terminated: '终止', expired: '过期'
+  draft: '草稿', active: '执行中', completed: '已完成',
+  terminated: '已终止', expired: '已过期'
+}
+// 审批状态：none=未提交 pending=待审批 approved=已审批 rejected=已驳回
+const approvalLabels: Record<string, string> = {
+  none: '未提交', pending: '待审批', approved: '已审批', rejected: '已驳回'
 }
 
+// 完整状态机视图：审批状态 + 执行状态组合成展示态
+// 草稿 → 待审批 → 已审批 → 执行中 → 已完成/已终止
+function contractState(c: Contract): { key: string; label: string; color: string } {
+  if (c.approval_status === 'pending') return { key: 'pending', label: '待审批', color: 'processing' }
+  if (c.approval_status === 'rejected') return { key: 'rejected', label: '已驳回', color: 'error' }
+  if (c.approval_status === 'approved') {
+    switch (c.status) {
+      case 'active': return { key: 'active', label: '执行中', color: 'processing' }
+      case 'completed': return { key: 'completed', label: '已完成', color: 'success' }
+      case 'terminated': return { key: 'terminated', label: '已终止', color: 'error' }
+      case 'expired': return { key: 'expired', label: '已过期', color: 'warning' }
+      default: return { key: 'approved', label: '已审批', color: 'success' }
+    }
+  }
+  // 未提交审批（草稿）或历史数据（无审批列，默认视为已审批）
+  const s = c.status || 'draft'
+  return { key: s, label: statusLabels[s] || s, color: statusColors[s] || 'default' }
+}
+
+// 快照字段中文名映射（版本历史展示用）
+const FIELD_LABELS: Record<string, string> = {
+  contract_no: '合同编号',
+  contract_name: '合同名称',
+  contract_type_id: '合同类型',
+  contract_type_name: '合同类型',
+  party_a: '甲方',
+  party_b_id: '签约公司',
+  party_b_name: '签约公司',
+  company_name: '签约公司',
+  region_id: '所属区域',
+  region_name: '所属区域',
+  sign_date: '签约日期',
+  status: '状态',
+  notes: '备注',
+  total_cost: '总成本',
+  progress: '进度',
+  expected_income: '预期收益'
+}
+const SNAPSHOT_FIELDS: [string, string][] = [
+  ['contract_no', '合同编号'],
+  ['contract_name', '合同名称'],
+  ['contract_type_name', '合同类型'],
+  ['party_a', '甲方'],
+  ['company_name', '签约公司'],
+  ['region_name', '所属区域'],
+  ['sign_date', '签约日期'],
+  ['status', '状态'],
+  ['notes', '备注'],
+  ['total_cost', '总成本'],
+  ['progress', '进度'],
+  ['expected_income', '预期收益']
+]
+
 const ContractListPage: React.FC = () => {
+  const user = useAuth()
+  // 细粒度权限点（后端同步校验，此处仅为按钮级隐藏）
+  const canCreate = hasPermission(user, PERMISSIONS.CONTRACT_CREATE)
+  const canEdit = hasPermission(user, PERMISSIONS.CONTRACT_EDIT)
+  const canApprove = hasPermission(user, PERMISSIONS.CONTRACT_APPROVE)
+  const [searchParams] = useSearchParams()
   const [contracts, setContracts] = useState<Contract[]>([])
   const [contractTypes, setContractTypes] = useState<ContractType[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<ContractWithItems | null>(null)
+  const [versions, setVersions] = useState<ContractVersion[]>([])
+  const [versionDetail, setVersionDetail] = useState<ContractVersion | null>(null)
   const [companies, setCompanies] = useState<Company[]>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [contractTypeId, setContractTypeId] = useState<number | null>(null)
   const [items, setItems] = useState<Partial<any>[]>([])
   const [form] = Form.useForm()
+  const nameInputRef = useRef<any>(null)
+  // 支持 URL 参数：?q=搜索词 &status=快捷筛选（Dashboard 待办工作台跳转）
+  const [searchText, setSearchText] = useState(searchParams.get('q') || '')
+  const [quickFilter, setQuickFilter] = useState<string>(
+    ['pending', 'active', 'expired', 'todo', 'draft'].includes(searchParams.get('status') || '')
+      ? (searchParams.get('status') as string)
+      : 'all'
+  )
+  const [filterType, setFilterType] = useState<number | undefined>()
+  const [filterRegion, setFilterRegion] = useState<number | undefined>()
 
   const load = async () => {
     setLoading(true)
@@ -37,7 +123,7 @@ const ContractListPage: React.FC = () => {
         api.contractType.list(),
         api.company.list(),
         api.region.list(),
-        window.api.invoke('contract:list') as Promise<Contract[]>
+        invoke(IPC_CHANNELS.CONTRACT_LIST) as Promise<Contract[]>
       ])
       setContractTypes(ctList as ContractType[])
       setCompanies(comps as Company[])
@@ -50,44 +136,176 @@ const ContractListPage: React.FC = () => {
 
   useEffect(() => { load() }, [])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setFormOpen(false); setEditOpen(false); setDetailOpen(false) }
+      if (e.ctrlKey && e.key === 'n') { e.preventDefault(); if (canCreate) openCreate() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [canCreate])
+
+  // 快捷筛选映射：'todo' = 我的待办（草稿 + 待审批 + 已驳回待重提）
+  const quickFilterMatch = (c: Contract): boolean => {
+    const key = contractState(c).key
+    if (quickFilter === 'all') return true
+    if (quickFilter === 'todo') return key === 'draft' || key === 'pending' || key === 'rejected'
+    return key === quickFilter
+  }
+
+  // Filtered contracts
+  const filteredContracts = contracts.filter(c => {
+    if (!quickFilterMatch(c)) return false
+    if (searchText && !c.contract_no?.toLowerCase().includes(searchText.toLowerCase()) &&
+        !c.contract_name?.toLowerCase().includes(searchText.toLowerCase())) return false
+    if (filterType && c.contract_type_id !== filterType) return false
+    if (filterRegion && c.region_id !== filterRegion) return false
+    return true
+  })
+
   const openCreate = () => {
-    setContractTypeId(null)
-    setItems([])
-    form.resetFields()
-    setFormOpen(true)
+    setContractTypeId(null); setItems([]); form.resetFields(); setFormOpen(true)
+  }
+
+  // 新建弹窗打开后默认聚焦第一个输入框（合同名称）— 数据录入效率
+  useEffect(() => {
+    if (formOpen) {
+      const timer = setTimeout(() => { nameInputRef.current?.focus() }, 80)
+      return () => clearTimeout(timer)
+    }
+  }, [formOpen])
+
+  const openEdit = (c: Contract) => {
+    setEditingContract(c)
+    setEditOpen(true)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingContract) return
+    setEditSubmitting(true)
+    try {
+      const res = await invoke(IPC_CHANNELS.CONTRACT_UPDATE, editingContract.id, {
+        contract_name: editingContract.contract_name,
+        notes: editingContract.notes,
+        updated_by: user?.username || ''
+      })
+      if (res && res.success === false) { message.error(res.message || '更新失败'); return }
+      setContracts(prev => prev.map(c => c.id === editingContract.id ? { ...c, ...editingContract } : c))
+      message.success('更新成功')
+      setEditOpen(false)
+    } catch {
+      message.error('更新失败')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  // 审批操作：submit(提交审批) / approve(批准) / reject(驳回)
+  const handleApproval = async (id: number, action: 'submit' | 'approve' | 'reject') => {
+    try {
+      const res = await invoke(IPC_CHANNELS.CONTRACT_APPROVE, id, action, user?.username || '', user?.role || '')
+      if (res && res.success === false) { message.error(res.message || '操作失败'); return }
+      const updated = res as Contract
+      setContracts(prev => prev.map(c => c.id === id ? updated : c))
+      message.success(action === 'submit' ? '已提交审批' : action === 'approve' ? '审批通过' : '已驳回')
+    } catch (err: any) {
+      message.error(err?.message || '操作失败')
+    }
+  }
+
+  // 执行状态流转：开始执行 / 完成 / 终止（仅已审批合同可操作）
+  const handleLifecycle = async (id: number, status: string) => {
+    try {
+      const res = await invoke(IPC_CHANNELS.CONTRACT_UPDATE, id, { status, updated_by: user?.username || '' })
+      if (res && res.success === false) { message.error(res.message || '状态更新失败'); return }
+      setContracts(prev => prev.map(c => c.id === id ? { ...c, status } : c))
+      message.success('状态已更新')
+    } catch (err: any) {
+      message.error(err?.message || '状态更新失败')
+    }
   }
 
   const openDetail = async (id: number) => {
-    const c = await (window.api.invoke('contract:get', id) as Promise<ContractWithItems>)
+    const [c, versionRows] = await Promise.all([
+      invoke(IPC_CHANNELS.CONTRACT_GET, id) as Promise<ContractWithItems>,
+      invoke(IPC_CHANNELS.CONTRACT_LIST_VERSIONS, id) as Promise<ContractVersion[]>
+    ])
     setDetail(c)
+    setVersions(Array.isArray(versionRows) ? versionRows : [])
     setDetailOpen(true)
   }
 
   const handleDelete = async (id: number) => {
-    await window.api.invoke('contract:delete', id)
-    message.success('删除成功')
-    load()
+    try {
+      await invoke(IPC_CHANNELS.CONTRACT_DELETE, id)
+      setContracts(prev => prev.filter(c => c.id !== id))
+      message.success('删除成功')
+    } catch {
+      message.error('删除失败')
+    }
   }
 
   const handleSave = async () => {
-    const values = await form.validateFields()
-    if (items.length === 0) {
-      message.warning('请至少添加一个明细项')
-      return
+    setSubmitting(true)
+    try {
+      const values = await form.validateFields()
+      if (items.length === 0) { message.warning('请至少添加一个明细项'); setSubmitting(false); return }
+
+      // 获取选中的公司名称
+      const selectedCompany = companies.find(c => c.id === values.party_b_id)
+      const partyBName = selectedCompany?.name || values.party_b_name || ''
+
+      const saved = await invoke(IPC_CHANNELS.CONTRACT_CREATE, {
+        ...values,
+        contract_type_id: contractTypeId,
+        party_b_name: partyBName,
+        party_b_id: values.party_b_id ?? null,
+        sign_date: values.sign_date?.format('YYYY-MM-DD') || null,
+        items,
+        created_by: user?.username || ''
+      }) as Contract
+      message.success('合同创建成功（草稿，请提交审批）')
+      setContracts(prev => [saved, ...prev])
+      // Reset for continuous entry
+      setItems([])
+      form.resetFields()
+      form.setFieldsValue({ contract_type_id: contractTypeId, sign_date: values.sign_date })
+    } catch (err: any) {
+      if (err?.errorFields) return // 表单验证错误，Form 已展示
+      message.error(err?.message || '创建失败')
+    } finally {
+      setSubmitting(false)
     }
-    await window.api.invoke('contract:create', {
-      ...values,
-      contract_type_id: contractTypeId,
-      sign_date: values.sign_date?.format('YYYY-MM-DD') || null,
-      items
-    })
-    message.success('合同创建成功')
-    setFormOpen(false)
-    load()
   }
 
   const addItem = () => {
-    setItems([...items, { item_name: '', quantity: 1, unit_price: 0, land_area: 0, tax_rate: 0, skill_level: 0, carbon_factor: 0 }])
+    const base = { item_name: '', quantity: 1, unit_price: 0 }
+    switch (contractTypeId) {
+      case 1: // 基建
+        setItems([...items, { ...base, land_area: 0 }])
+        break
+      case 2: // 劳动力
+        setItems([...items, { ...base, skill_level: 0 }])
+        break
+      case 3: // 开采
+        setItems([...items, { ...base, carbon_factor: 0 }])
+        break
+      case 4: case 5: // 销售/采购
+        setItems([...items, { ...base, tax_rate: 0 }])
+        break
+      case 6: // 投资
+        setItems([...items, { ...base, expected_income: 0, total_cost: 0 }])
+        break
+      case 7: // 拨款
+        setItems([...items, { ...base, total_cost: 0 }])
+        break
+      case 8: // 减碳
+        setItems([...items, { ...base, carbon_factor: 0 }])
+        break
+      default:
+        setItems([...items, { ...base, land_area: 0 }])
+    }
   }
   const updateItem = (idx: number, field: string, value: unknown) => {
     const newItems = [...items]
@@ -100,6 +318,40 @@ const ContractListPage: React.FC = () => {
 
   const contractTypeName = contractTypes.find(t => t.id === contractTypeId)?.name || ''
 
+  // 渲染历史快照字段值（解析 ID 为名称，状态为中文标签）
+  const renderSnapValue = (key: string, v: unknown): React.ReactNode => {
+    if (v === null || v === undefined || v === '') return <span style={{ color: T.textMuted }}>-</span>
+    switch (key) {
+      case 'status':
+        return <Tag color={statusColors[v as string]}>{statusLabels[v as string] || String(v)}</Tag>
+      case 'contract_type_id':
+      case 'contract_type_name':
+        return <Tag>{contractTypes.find(t => t.id === Number(v))?.name || String(v)}</Tag>
+      case 'region_id':
+      case 'region_name':
+        return regions.find(r => r.id === Number(v))?.name || String(v)
+      case 'party_b_id':
+      case 'company_name':
+        return companies.find(c => c.id === Number(v))?.name || String(v)
+      default:
+        return String(v)
+    }
+  }
+
+  // Card style for form sections — luminance stacking
+  const itemCardStyle: React.CSSProperties = {
+    background: T.bgCard,
+    border: `1px solid ${T.border}`,
+    borderRadius: 4,
+  }
+  const itemCardHeaderStyle = {
+    background: T.bgCard,
+    borderBottom: `1px solid ${T.border}`,
+    minHeight: 32,
+    padding: '6px 12px',
+  }
+  const itemCardBodyStyle = { padding: '10px 12px' }
+
   const columns = [
     { title: '合同编号', dataIndex: 'contract_no', width: 150 },
     { title: '名称', dataIndex: 'contract_name', ellipsis: true },
@@ -107,168 +359,274 @@ const ContractListPage: React.FC = () => {
       render: (v: string) => <Tag>{v}</Tag>
     },
     { title: '区域', dataIndex: 'region_name', width: 80 },
-    {
-      title: '状态', dataIndex: 'status', width: 80,
-      render: (v: string) => <Tag color={statusColors[v]}>{statusLabels[v] || v}</Tag>
+    { title: '签约公司', dataIndex: 'company_name', width: 120,
+      render: (v: string) => v ? <span style={{ fontSize: 12 }}>{v}</span> : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
     },
-    { title: '签约日期', dataIndex: 'sign_date', width: 100 },
+    {
+      title: '状态', dataIndex: 'status', width: 230,
+      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
+        <div style={{ padding: 8, background: '#1A1F2E', border: '1px solid rgba(212,175,55,0.12)', borderRadius: 4 }}>
+          <Checkbox.Group
+            options={[
+              { label: '草稿', value: 'draft' },
+              { label: '待审批', value: 'pending' },
+              { label: '已审批', value: 'approved' },
+              { label: '执行中', value: 'active' },
+              { label: '已完成', value: 'completed' },
+              { label: '已终止', value: 'terminated' },
+              { label: '已驳回', value: 'rejected' },
+            ]}
+            value={selectedKeys as string[]}
+            onChange={(checkedValues) => setSelectedKeys(checkedValues)}
+            style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+          />
+          <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
+            <Button size="small" type="link" onClick={() => { if (clearFilters) clearFilters() } }>重置</Button>
+            <Button size="small" type="primary" onClick={() => confirm()}>确定</Button>
+          </div>
+        </div>
+      ),
+      filterIcon: (filtered: boolean) => <FilterOutlined style={{ color: filtered ? '#D4AF37' : undefined }} />,
+      onFilter: (value: any, record: Contract) => contractState(record).key === value,
+      render: (_: string, r: Contract) => {
+        const st = contractState(r)
+        return (
+          <Space size={4} wrap>
+            <Tag color={st.color} style={{ marginRight: 0 }}>{st.label}</Tag>
+            {canApprove && r.approval_status === 'none' && r.status === 'draft' && (
+              <Button size="small" type="primary" ghost icon={<SendOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8 }} onClick={() => handleApproval(r.id, 'submit')}>提交审批</Button>
+            )}
+            {canApprove && r.approval_status === 'rejected' && (
+              <Button size="small" type="primary" ghost icon={<SendOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8 }} onClick={() => handleApproval(r.id, 'submit')}>重新提交</Button>
+            )}
+            {canApprove && r.approval_status === 'pending' && (
+              <>
+                <Popconfirm title="确认批准该合同？批准后计入资金流水" onConfirm={() => handleApproval(r.id, 'approve')}>
+                  <Button size="small" icon={<CheckCircleOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8, background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}>批准</Button>
+                </Popconfirm>
+                <Popconfirm title="确认驳回该合同？" onConfirm={() => handleApproval(r.id, 'reject')}>
+                  <Button size="small" danger icon={<StopOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8 }}>驳回</Button>
+                </Popconfirm>
+              </>
+            )}
+            {canApprove && r.approval_status === 'approved' && r.status === 'draft' && (
+              <Button size="small" type="primary" ghost icon={<PlayCircleOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8 }} onClick={() => handleLifecycle(r.id, 'active')}>开始执行</Button>
+            )}
+            {canApprove && r.approval_status === 'approved' && r.status === 'active' && (
+              <>
+                <Popconfirm title="确认完成该合同？完成后结算收入流水" onConfirm={() => handleLifecycle(r.id, 'completed')}>
+                  <Button size="small" icon={<CheckCircleOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8, background: '#52c41a', borderColor: '#52c41a', color: '#fff' }}>完成</Button>
+                </Popconfirm>
+                <Popconfirm title="确认终止该合同？" onConfirm={() => handleLifecycle(r.id, 'terminated')}>
+                  <Button size="small" danger icon={<StopOutlined />} style={{ height: 24, fontSize: 12, paddingInline: 8 }}>终止</Button>
+                </Popconfirm>
+              </>
+            )}
+          </Space>
+        )
+      }
+    },
+    { title: '签约日期', dataIndex: 'sign_date', width: 100, sorter: (a: Contract, b: Contract) => (a.sign_date || '').localeCompare(b.sign_date || '') },
     {
       title: '操作', width: 120,
       render: (_: unknown, r: Contract) => (
         <Space>
-          <Button size="small" icon={<EyeOutlined />} onClick={() => openDetail(r.id)} />
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canEdit ? <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} /> : null}
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(r.id)} />
+          {canEdit && (
+            <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}>
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
   ]
 
   const renderItemFields = () => {
-    switch (contractTypeId) {
-      case 2: // 劳动力合同
-        return (
-          <Card title="招聘岗位" size="small" extra={<Button size="small" onClick={addItem}>+ 添加岗位</Button>}>
-            {items.map((item, idx) => (
-              <Row key={idx} gutter={8} style={{ marginBottom: 8 }} align="middle">
-                <Col span={6}>
-                  <Input placeholder="岗位名称" value={item.item_name} onChange={e => updateItem(idx, 'item_name', e.target.value)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="人数" style={{ width: '100%' }} min={0}
-                    value={item.quantity} onChange={v => updateItem(idx, 'quantity', v)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="月薪" style={{ width: '100%' }} min={0}
-                    value={item.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} />
-                </Col>
-                <Col span={4}>
-                  <Select placeholder="技能等级" style={{ width: '100%' }}
-                    value={item.skill_level}
-                    onChange={v => updateItem(idx, 'skill_level', v)}
-                    options={[
-                      { value: 0, label: '普通工人' },
-                      { value: 1, label: '高素质人才' }
-                    ]}
-                  />
-                </Col>
-                <Col span={2}>
-                  <Button danger size="small" onClick={() => removeItem(idx)}>删</Button>
-                </Col>
-              </Row>
-            ))}
-            {items.length === 0 && <Typography.Text type="secondary">点击上方按钮添加招聘岗位</Typography.Text>}
-          </Card>
-        )
-
-      case 3: // 原料开采合同
-        return (
-          <Card title="开采项" size="small" extra={<Button size="small" onClick={addItem}>+ 添加原料</Button>}>
-            {items.map((item, idx) => (
-              <Row key={idx} gutter={8} style={{ marginBottom: 8 }} align="middle">
-                <Col span={6}>
-                  <Input placeholder="原料名称" value={item.item_name} onChange={e => updateItem(idx, 'item_name', e.target.value)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="数量(吨)" style={{ width: '100%' }} min={0}
-                    value={item.quantity} onChange={v => updateItem(idx, 'quantity', v)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="单价" style={{ width: '100%' }} min={0}
-                    value={item.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="碳排放系数" style={{ width: '100%' }} min={0} step={0.1}
-                    value={item.carbon_factor} onChange={v => updateItem(idx, 'carbon_factor', v)} />
-                </Col>
-                <Col span={2}>
-                  <Button danger size="small" onClick={() => removeItem(idx)}>删</Button>
-                </Col>
-              </Row>
-            ))}
-            {items.length === 0 && <Typography.Text type="secondary">点击上方按钮添加原料开采项</Typography.Text>}
-          </Card>
-        )
-
-      case 4: // 销售合同
-      case 5: // 采购合同
-        return (
-          <Card title={contractTypeId === 4 ? '销售产品' : '采购物资'} size="small"
-            extra={<Button size="small" onClick={addItem}>+ 添加</Button>}>
-            {items.map((item, idx) => (
-              <Row key={idx} gutter={8} style={{ marginBottom: 8 }} align="middle">
-                <Col span={6}>
-                  <Input placeholder="名称" value={item.item_name} onChange={e => updateItem(idx, 'item_name', e.target.value)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="数量" style={{ width: '100%' }} min={0}
-                    value={item.quantity} onChange={v => updateItem(idx, 'quantity', v)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="单价" style={{ width: '100%' }} min={0}
-                    value={item.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} />
-                </Col>
-                <Col span={2}>
-                  <Button danger size="small" onClick={() => removeItem(idx)}>删</Button>
-                </Col>
-              </Row>
-            ))}
-            {items.length === 0 && <Typography.Text type="secondary">点击上方按钮添加</Typography.Text>}
-          </Card>
-        )
-
-      default: // 基建合同(1)和其他
-        return (
-          <Card title="基建项目" size="small" extra={<Button size="small" onClick={addItem}>+ 添加项目</Button>}>
-            {items.map((item, idx) => (
-              <Row key={idx} gutter={8} style={{ marginBottom: 8 }} align="middle">
-                <Col span={4}>
-                  <Input placeholder="项目名称" value={item.item_name} onChange={e => updateItem(idx, 'item_name', e.target.value)} />
-                </Col>
-                <Col span={3}>
-                  <InputNumber placeholder="数量" style={{ width: '100%' }} min={0}
-                    value={item.quantity} onChange={v => updateItem(idx, 'quantity', v)} />
-                </Col>
-                <Col span={3}>
-                  <InputNumber placeholder="单价" style={{ width: '100%' }} min={0}
-                    value={item.unit_price} onChange={v => updateItem(idx, 'unit_price', v)} />
-                </Col>
-                <Col span={4}>
-                  <InputNumber placeholder="占地面积(㎡)" style={{ width: '100%' }} min={0}
-                    value={item.land_area} onChange={v => updateItem(idx, 'land_area', v)} />
-                </Col>
-                <Col span={2}>
-                  <Button danger size="small" onClick={() => removeItem(idx)}>删</Button>
-                </Col>
-              </Row>
-            ))}
-            {items.length === 0 && <Typography.Text type="secondary">点击上方按钮添加基建项目</Typography.Text>}
-          </Card>
-        )
+    // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
+    type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number }
+    const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
+      1: { title: '基建项目', hint: '基础设施建设合同 — 填写项目名、数量、单价与占地面积',
+        fields: [
+          { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：道路硬化工程' },
+          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：3' },
+          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
+          { label: '占地面积(㎡)', span: 5, field: 'land_area', type: 'num', placeholder: '如：1200' },
+        ] },
+      2: { title: '招聘岗位', hint: '劳动力合同 — 招聘岗位、人数、月薪与技能等级',
+        fields: [
+          { label: '岗位名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：技术工人' },
+          { label: '人数', span: 4, field: 'quantity', type: 'num', placeholder: '如：10' },
+          { label: '月薪(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：8000' },
+          { label: '技能等级', span: 4, field: 'skill_level', type: 'select', placeholder: '选择等级' },
+        ] },
+      3: { title: '开采项', hint: '原料开采合同 — 原料名称、数量、单价与碳排放系数',
+        fields: [
+          { label: '原料名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：铁矿石' },
+          { label: '数量(吨)', span: 4, field: 'quantity', type: 'num', placeholder: '如：100' },
+          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：500' },
+          { label: '碳排放系数', span: 4, field: 'carbon_factor', type: 'num', placeholder: '如：0.8', step: 0.1 },
+        ] },
+      4: { title: '销售产品', hint: '销售合同 — 产品名称、数量、单价与税率',
+        fields: [
+          { label: '产品名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：钢材' },
+          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：50' },
+          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：3000' },
+          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
+        ] },
+      5: { title: '采购物资', hint: '采购合同 — 物资名称、数量、单价与税率',
+        fields: [
+          { label: '物资名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：水泥' },
+          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：200' },
+          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：450' },
+          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
+        ] },
+      6: { title: '投资项目', hint: '投资合同 — 项目名称、投资总额、预期收益与数量',
+        fields: [
+          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：产业园二期' },
+          { label: '投资总额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：10000000' },
+          { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：15000000' },
+          { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
+        ] },
+      7: { title: '拨款项目', hint: '拨款合同 — 项目名称、拨款金额、数量与单价',
+        fields: [
+          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：农田补贴' },
+          { label: '拨款金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：500000' },
+          { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
+          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
+        ] },
+      8: { title: '减碳项目', hint: '减碳合同 — 项目名称、减排量、碳排系数与单价',
+        fields: [
+          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：光伏发电' },
+          { label: '减排量(吨)', span: 5, field: 'quantity', type: 'num', placeholder: '如：500' },
+          { label: '碳排系数', span: 5, field: 'carbon_factor', type: 'num', placeholder: '如：0.5', step: 0.1 },
+          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：100' },
+        ] },
     }
+    const config = FIELD_SETS[contractTypeId || 1]
+    const addLabel = config.title.replace('项', '').replace('岗位', '')
+
+    return (
+      <Card title={config.title} size="small"
+        extra={<Button size="small" onClick={addItem}>+ 添加{addLabel}</Button>}
+        style={itemCardStyle} styles={{ header: itemCardHeaderStyle, body: itemCardBodyStyle }}>
+        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 10, fontSize: 12 }}>
+          {config.hint}
+        </Typography.Text>
+        {items.length === 0 && (
+          <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>
+            点击上方按钮添加{config.title} · {config.fields.map(f => f.label).join(' / ')}
+          </Typography.Text>
+        )}
+        {items.map((item, idx) => (
+          <div key={idx} style={{ border: `1px solid ${T.border}`, borderRadius: 4, padding: '8px 10px', marginBottom: 8, background: T.bgPanel }}>
+            <Row gutter={8} align="bottom">
+              {config.fields.map(f => (
+                <Col span={f.span} key={f.field}>
+                  <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>{f.label}</div>
+                  {f.type === 'select' ? (
+                    <Select placeholder={f.placeholder} style={{ width: '100%' }}
+                      value={(item as any)[f.field]}
+                      onChange={v => updateItem(idx, f.field, v)}
+                      options={[
+                        { value: 0, label: '普通工人' },
+                        { value: 1, label: '高素质人才' }
+                      ]} />
+                  ) : f.type === 'text' ? (
+                    <Input placeholder={f.placeholder} value={(item as any)[f.field] || ''}
+                      onChange={e => updateItem(idx, f.field, e.target.value)} />
+                  ) : (
+                    <InputNumber placeholder={f.placeholder} style={{ width: '100%' }} min={0}
+                      step={f.step} value={(item as any)[f.field]}
+                      onChange={v => updateItem(idx, f.field, v)} />
+                  )}
+                </Col>
+              ))}
+              <Col span={2}>
+                <Popconfirm title="确认删除此项？" onConfirm={() => removeItem(idx)}>
+                  <Button danger size="small" style={{ marginBottom: 0 }}>删除</Button>
+                </Popconfirm>
+              </Col>
+            </Row>
+          </div>
+        ))}
+      </Card>
+    )
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>合同管理</Typography.Title>
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建合同
-          </Button>
-        </Space>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="section-title" style={{ margin: 0, border: 'none', padding: 0 }}>{canEdit ? '合同管理' : '合同总览'}</div>
+          {!canEdit && (
+            <Tag color="gold" style={{ margin: 0, fontSize: 11, lineHeight: '18px' }}>
+              只读
+            </Tag>
+          )}
+        </div>
+        {canCreate && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={openCreate}>新建合同</Button>}
       </div>
-      <Spin spinning={loading}>
-        <Table
-          dataSource={contracts}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Input prefix={<SearchOutlined />} placeholder="搜索编号/名称" size="small" style={{ width: 180 }}
+            allowClear value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Select placeholder="合同类型" size="small" style={{ width: 130 }} allowClear
+            value={filterType} onChange={setFilterType}
+            options={contractTypes.map(t => ({ value: t.id, label: t.name }))} />
+          <Select placeholder="区域" size="small" style={{ width: 100 }} allowClear
+            value={filterRegion} onChange={setFilterRegion}
+            options={regions.map(r => ({ value: r.id, label: r.name }))} />
+          <Segmented
+            size="small"
+            value={quickFilter}
+            onChange={(v) => setQuickFilter(v as string)}
+            options={[
+              { value: 'all', label: '全部' },
+              { value: 'todo', label: '我的待办' },
+              { value: 'pending', label: '待审批' },
+              { value: 'active', label: '执行中' },
+              { value: 'expired', label: '已过期' },
+              { value: 'rejected', label: '已驳回' },
+            ]}
+          />
+          <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 'auto', lineHeight: '24px' }}>
+            {filteredContracts.length} 条 / {contracts.length} 总计{canEdit ? '  ·  Ctrl+N 新建' : ' （只读模式）'}
+          </span>
+        </div>
+        <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4 }}>
+          <Table
+          dataSource={filteredContracts}
           rowKey="id"
           columns={columns}
           pagination={{ pageSize: 20 }}
           size="small"
-          locale={{ emptyText: '暂无合同，点击右上角新建' }}
-        />
-      </Spin>
+          className="dense-table"
+          showSorterTooltip={{ title: '点击排序' }}
+          locale={{ emptyText:
+              <div style={{ padding: '24px 0' }}>
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <div>
+                      <span style={{ color: T.textPrimary, fontSize: 14, fontWeight: 500 }}>
+                        暂无合同
+                      </span>
+                      <br />
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>
+                        创建您的第一份合同
+                      </span>
+                    </div>
+                  }
+                >
+                  {canCreate && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={openCreate}>
+                    创建合同
+                  </Button>}
+                </Empty>
+              </div>
+            }}
+          />
+        </div>
 
       <Modal
         title="新建合同"
@@ -277,12 +635,15 @@ const ContractListPage: React.FC = () => {
         onOk={handleSave}
         width={720}
         okText="保存合同"
+        confirmLoading={submitting}
+        destroyOnClose
+        afterOpenChange={(open) => { if (open) setTimeout(() => nameInputRef.current?.focus(), 60) }}
       >
         <Form form={form} layout="vertical" size="small">
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item name="contract_name" label="合同名称" rules={[{ required: true }]}>
-                <Input />
+                <Input ref={nameInputRef} placeholder="输入合同名称后回车保存" />
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -296,20 +657,27 @@ const ContractListPage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={5}>
-              <Form.Item name="party_b_name" label="对方公司">
+              <Form.Item name="party_b_id" label="签约公司">
                 <Select
                   showSearch
-                  placeholder="搜索选择"
-                  options={companies.map(c => ({ value: c.name, label: c.name }))}
+                  placeholder="搜索选择公司"
+                  options={companies.map(c => ({ value: c.id, label: c.name }))}
                   allowClear
+                  filterOption={(input, option) =>
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                  }
                 />
               </Form.Item>
             </Col>
             <Col span={5}>
-              <Form.Item name="region_id" label="所属区域">
+              <Form.Item name="region_id" label="所属区域" rules={[{ required: true, message: '请选择区域' }]}>
                 <Select
+                  placeholder="选择区域"
                   options={regions.map(r => ({ value: r.id, label: r.name }))}
-                  allowClear
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                  }
                 />
               </Form.Item>
             </Col>
@@ -344,28 +712,164 @@ const ContractListPage: React.FC = () => {
             请先选择合同类型
           </Typography.Text>
         )}
+        <Divider style={{ margin: '8px 0' }} />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          新建合同默认为「草稿」，需提交审批通过后方可执行并计入资金流水。
+        </Typography.Text>
       </Modal>
 
-      <Modal title="合同详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={640}>
+      <Modal title="编辑合同" open={editOpen} onCancel={() => setEditOpen(false)} onOk={handleEditSave} width={440} confirmLoading={editSubmitting} destroyOnClose>
+        {editingContract && (
+          <Form layout="vertical" size="small">
+            <Form.Item label="合同名称">
+              <Input value={editingContract.contract_name}
+                onChange={(e) => setEditingContract({ ...editingContract, contract_name: e.target.value })} />
+            </Form.Item>
+            <Form.Item label="审批状态">
+              <Tag color={contractState(editingContract).color}>{contractState(editingContract).label}</Tag>
+              <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 8 }}>
+                状态由审批流程控制，请在列表中操作
+              </span>
+            </Form.Item>
+            <Form.Item label="备注">
+              <Input.TextArea rows={2} value={editingContract.notes || ''}
+                onChange={(e) => setEditingContract({ ...editingContract, notes: e.target.value })} />
+            </Form.Item>
+          </Form>
+        )}
+      </Modal>
+
+      <Modal title="合同详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={760} destroyOnClose>
         {detail && (
+          <Tabs
+            size="small"
+            items={[
+              {
+                key: 'info',
+                label: '基本信息',
+                children: (
+                  <>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        <tr><td style={{ padding: 6, fontWeight: 500, width: 100 }}>编号</td><td>{detail.contract_no}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>名称</td><td>{detail.contract_name}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>类型</td><td><Tag>{detail.contract_type_name}</Tag></td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>区域</td><td>{detail.region_name || '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>对方公司</td><td>{detail.company_name || detail.party_b_name || '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>状态</td><td><Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag></td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>审批状态</td><td>
+                          <Tag color={contractState(detail).color}>{contractState(detail).label}</Tag>
+                          <span style={{ fontSize: 11, color: T.textMuted }}>
+                            （{approvalLabels[detail.approval_status] || detail.approval_status}）
+                            {detail.approved_at ? ` · ${detail.approved_by || '—'} · ${detail.approved_at}` : ''}
+                          </span>
+                        </td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>签约日期</td><td>{detail.sign_date || '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>操作人</td><td>创建：{detail.created_by || '-'}　更新：{detail.updated_by || '-'}</td></tr>
+                      </tbody>
+                    </table>
+                    {detail.items && detail.items.length > 0 && (
+                      <>
+                        <Divider />
+                        <Typography.Text strong>明细项</Typography.Text>
+                        <Table dataSource={detail.items} rowKey="id" size="small" pagination={false}
+                          columns={Object.keys(detail.items[0] || {}).filter(k => ['item_name', 'quantity', 'unit_price', 'amount', 'land_area', 'skill_level', 'carbon_factor'].includes(k)).map(k => ({ title: k, dataIndex: k, render: (v: any) => typeof v === 'number' ? v.toFixed(2) : v }))}
+                        />
+                      </>
+                    )}
+                  </>
+                )
+              },
+              {
+                key: 'versions',
+                label: <span><HistoryOutlined /> 版本历史（{versions.length}）</span>,
+                children: (
+                  <Table
+                    dataSource={versions}
+                    rowKey="id"
+                    size="small"
+                    pagination={false}
+                    locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无版本记录" /> }}
+                    columns={[
+                      { title: '版本', dataIndex: 'version', width: 70,
+                        render: (v: number) => <Tag color="gold">v{v}</Tag>
+                      },
+                      { title: '更新时间', dataIndex: 'created_at', width: 165 },
+                      { title: '操作人', dataIndex: 'created_by', width: 110,
+                        render: (v: string) => v || '-'
+                      },
+                      { title: '变更内容', dataIndex: 'changed_fields',
+                        render: (fields: string[], r: ContractVersion) => {
+                          if (r.version === 1 && (!fields || fields.length === 0)) {
+                            return <Tag>创建合同</Tag>
+                          }
+                          if (!fields || fields.length === 0) return <span style={{ color: T.textMuted }}>—</span>
+                          return fields.map(f => <Tag key={f} style={{ marginRight: 4 }}>{FIELD_LABELS[f] || f}</Tag>)
+                        }
+                      },
+                      { title: '操作', width: 80,
+                        render: (_: unknown, r: ContractVersion) => (
+                          <Button type="link" size="small" onClick={() => setVersionDetail(r)}>查看</Button>
+                        )
+                      }
+                    ]}
+                  />
+                )
+              }
+            ]}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        title={versionDetail ? `版本详情 v${versionDetail.version}` : '版本详情'}
+        open={!!versionDetail}
+        onCancel={() => setVersionDetail(null)}
+        footer={null}
+        width={720}
+        destroyOnClose
+      >
+        {versionDetail && (
           <>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                <tr><td style={{ padding: 6, fontWeight: 500, width: 100 }}>编号</td><td>{detail.contract_no}</td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>名称</td><td>{detail.contract_name}</td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>类型</td><td><Tag>{detail.contract_type_name}</Tag></td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>区域</td><td>{detail.region_name || '-'}</td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>乙方</td><td>{detail.party_b_name || '-'}</td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>状态</td><td><Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag></td></tr>
-                <tr><td style={{ padding: 6, fontWeight: 500 }}>签约日期</td><td>{detail.sign_date || '-'}</td></tr>
+                <tr><td style={{ padding: 6, fontWeight: 500, width: 100 }}>版本</td><td><Tag color="gold">v{versionDetail.version}</Tag></td></tr>
+                <tr><td style={{ padding: 6, fontWeight: 500 }}>保存时间</td><td>{versionDetail.created_at || '-'}</td></tr>
+                <tr><td style={{ padding: 6, fontWeight: 500 }}>操作人</td><td>{versionDetail.created_by || '-'}</td></tr>
+                <tr><td style={{ padding: 6, fontWeight: 500 }}>变更内容</td><td>
+                  {versionDetail.version === 1 && versionDetail.changed_fields.length === 0
+                    ? <Tag>创建合同</Tag>
+                    : versionDetail.changed_fields.length > 0
+                      ? versionDetail.changed_fields.map(f => <Tag key={f} style={{ marginRight: 4 }}>{FIELD_LABELS[f] || f}</Tag>)
+                      : <span style={{ color: T.textMuted }}>—</span>}
+                </td></tr>
               </tbody>
             </table>
-            {detail.items && detail.items.length > 0 && (
+            <Divider />
+            <Typography.Text strong>历史快照字段</Typography.Text>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
+              <tbody>
+                {SNAPSHOT_FIELDS.map(([key, label]) => (
+                  <tr key={key}>
+                    <td style={{ padding: 6, fontWeight: 500, width: 100 }}>{label}</td>
+                    <td>{renderSnapValue(key, versionDetail.snapshot[key])}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {Array.isArray(versionDetail.snapshot.items) && versionDetail.snapshot.items.length > 0 && (
               <>
                 <Divider />
-                <Typography.Text strong>明细项</Typography.Text>
-                <Table dataSource={detail.items} rowKey="id" size="small" pagination={false}
-                  columns={Object.keys(detail.items[0] || {}).filter(k => ['item_name', 'quantity', 'unit_price', 'amount', 'land_area', 'skill_level', 'carbon_factor'].includes(k)).map(k => ({ title: k, dataIndex: k, render: (v: any) => typeof v === 'number' ? v.toFixed(2) : v }))}
+                <Typography.Text strong>明细项快照</Typography.Text>
+                <Table dataSource={versionDetail.snapshot.items as any[]} rowKey={(_, idx) => String(idx)} size="small" pagination={false}
+                  columns={[
+                    { title: '项目名称', dataIndex: 'item_name' },
+                    { title: '数量', dataIndex: 'quantity', width: 80, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') },
+                    { title: '单价', dataIndex: 'unit_price', width: 90, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') },
+                    { title: '占地面积', dataIndex: 'land_area', width: 90, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') },
+                    { title: '技能等级', dataIndex: 'skill_level', width: 90, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') },
+                    { title: '碳排系数', dataIndex: 'carbon_factor', width: 90, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') }
+                  ]}
                 />
               </>
             )}

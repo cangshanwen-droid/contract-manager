@@ -1,7 +1,8 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { getDatabase } from '../database/connection'
-import { queryAll } from '../database/helpers'
+import { queryAll, queryOne } from '../database/helpers'
+import { syncStockPrices } from '../stock-sync'
 import type { FormulaInput, FormulaOutput } from '../../shared/types'
 
 function calculateFormulas(input: FormulaInput): FormulaOutput {
@@ -39,8 +40,8 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
   const happiness =
     0.6 * consumer_satisfaction +
     0.1 * Math.log10(population + 100) +
-    2 * talentRatio +
-    0.2 * carbonPerCapita
+    0.2 * talentRatio +
+    -0.2 * carbonPerCapita
 
   const clampedHappiness = Math.max(1, Math.min(100, happiness * 10))
 
@@ -90,60 +91,78 @@ export function registerFormulaHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.FORMULA_CALCULATE,
     (_e, input: FormulaInput): FormulaOutput => {
-      const output = calculateFormulas(input)
-      const db = getDatabase()
+      try {
+        const output = calculateFormulas(input)
+        const db = getDatabase()
 
-      // 计算下一轮次
-      const logRows = queryAll(
-        'SELECT COALESCE(MAX(round), 0) as mr FROM formula_logs WHERE region_id = ?',
-        [input.region_id]
-      )
-      const nextRound = (logRows[0]?.mr as number ?? 0) + 1
+        db.run('BEGIN TRANSACTION')
 
-      // 保存日志
-      db.run(
-        `INSERT INTO formula_logs
-          (region_id, round, input_population, input_talent, input_carbon,
-           input_supply, input_demand, input_price_avg,
-           output_happiness, output_base_price, output_sell_price,
-           output_employment_rate, output_population_next)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          input.region_id,
-          nextRound,
-          input.population,
-          input.talent_population,
-          input.carbon_emissions,
-          input.supply_quantity,
-          input.demand_quantity,
-          input.current_avg_price,
-          output.happiness,
-          output.base_price,
-          output.sell_price,
-          output.total_employment_rate,
-          Math.round(output.next_population)
-        ]
-      )
+        const logRows = queryAll(
+          'SELECT COALESCE(MAX(round), 0) as mr FROM formula_logs WHERE region_id = ?',
+          [input.region_id]
+        )
+        const nextRound = (logRows[0]?.mr as number ?? 0) + 1
 
-      // 更新区域
-      db.run(
-        `UPDATE regions SET current_happiness = ?, current_employment_rate = ?,
-         population = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
-        [output.happiness, output.total_employment_rate, Math.round(output.next_population), input.region_id]
-      )
+        db.run(
+          `INSERT INTO formula_logs
+            (region_id, round, input_population, input_talent, input_carbon,
+             input_supply, input_demand, input_price_avg,
+             output_happiness, output_base_price, output_sell_price,
+             output_employment_rate, output_population_next)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            input.region_id, nextRound,
+            input.population, input.talent_population, input.carbon_emissions,
+            input.supply_quantity, input.demand_quantity, input.current_avg_price,
+            output.happiness, output.base_price, output.sell_price,
+            output.total_employment_rate, Math.round(output.next_population)
+          ]
+        )
 
-      return output
+        db.run(
+          `UPDATE regions SET current_happiness = ?, current_employment_rate = ?,
+           population = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+          [output.happiness, output.total_employment_rate, Math.round(output.next_population), input.region_id]
+        )
+
+        db.run('COMMIT')
+
+        // 同步股价到股票交易系统（异步，不阻塞）
+        try {
+          const region = queryOne('SELECT name, population FROM regions WHERE id = ?', [input.region_id]) as any
+          if (region) {
+            syncStockPrices({
+              regionName: region.name,
+              happiness: output.happiness,
+              carbonEmissions: input.carbon_emissions,
+              population: Math.round(output.next_population),
+              prevPopulation: input.population,
+            }).catch(e => console.error('Stock sync failed:', e))
+          }
+        } catch { /* sync failure should not break formula */ }
+
+        return output
+      } catch (e: any) {
+        try { getDatabase().run('ROLLBACK') } catch { /* ignore */ }
+        console.error('FORMULA_CALCULATE failed:', e)
+        return { success: false, message: `模拟计算失败：${e.message || '未知错误'}` } as any
+      }
     }
   )
 
   ipcMain.handle(IPC_CHANNELS.FORMULA_LOG_LIST, (_e, regionId: number) => {
-    return queryAll(
-      `SELECT fl.*, r.name as region_name
-       FROM formula_logs fl
-       JOIN regions r ON r.id = fl.region_id
-       WHERE fl.region_id = ?
-       ORDER BY fl.round ASC`,
-      [regionId]
-    )
+    try {
+      return queryAll(
+        `SELECT fl.*, r.name as region_name
+         FROM formula_logs fl
+         JOIN regions r ON r.id = fl.region_id
+         WHERE fl.region_id = ?
+         ORDER BY fl.round ASC`,
+        [regionId]
+      )
+    } catch (err: any) {
+      console.error('FORMULA_LOG_LIST failed:', err)
+      return { success: false, message: `获取模拟日志失败：${err.message || '未知错误'}` }
+    }
   })
 }

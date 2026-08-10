@@ -1,4 +1,4 @@
-import { getDatabase } from './connection'
+import { getDatabase, notifyWrite } from './connection'
 import { Database } from 'sql.js'
 
 /**
@@ -34,6 +34,8 @@ export function execute(sql: string, params: unknown[] = []): number {
   stmt.step()
   const modified = db.getRowsModified()
   stmt.free()
+  // 立即持久化（写语句走 notifyWrite 落盘；SELECT 无副作用）
+  notifyWrite(sql)
   return modified
 }
 
@@ -51,8 +53,30 @@ export function lastInsertId(): number {
 
 /**
  * 执行多条 SQL 语句（用于迁移）
+ *
+ * P0-3 防御：ALTER TABLE ADD COLUMN 无 IF NOT EXISTS 语义，若迁移中途失败
+ * （版本号未写入 schema_migrations），重启重跑会 duplicate column 崩溃。
+ * 这里逐条执行并先查 PRAGMA table_info，列已存在则跳过，保证幂等可重跑。
  */
 export function executeMulti(sql: string): void {
   const db = getDatabase()
-  db.run(sql)
+  const statements = sql
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  for (const stmt of statements) {
+    // 去掉整行 `--` 注释后再判断是否为 ALTER（v19 等迁移的 ALTER 前有注释行）
+    const cleanStmt = stmt.replace(/^\s*--.*$/gm, '').trim()
+    const alterMatch = /^ALTER\s+TABLE\s+([^\s]+)\s+ADD\s+COLUMN\s+([^\s]+)/i.exec(cleanStmt)
+    if (alterMatch) {
+      const table = alterMatch[1]
+      const column = alterMatch[2]
+      const cols = queryAll(`PRAGMA table_info(${table})`) as { name: string }[]
+      if (cols.some((c) => c.name === column)) {
+        console.log(`[migrations] 列已存在，跳过: ${table}.${column}`)
+        continue
+      }
+    }
+    db.run(stmt)
+  }
 }

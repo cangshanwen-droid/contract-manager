@@ -1,7 +1,6 @@
 import { IPC_CHANNELS } from '../../../shared/constants'
 import type { Region } from '../../../shared/types'
-
-const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
+import { invoke } from './cloudApi'
 
 export const regionApi = {
   list: () => invoke(IPC_CHANNELS.REGION_LIST) as Promise<Region[]>,

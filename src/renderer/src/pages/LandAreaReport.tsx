@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Table, Spin, Typography, Row, Col, Statistic } from 'antd'
+import { Table, Empty } from 'antd'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, PieChart, Pie, Cell
+  Tooltip
 } from 'recharts'
 import { IPC_CHANNELS } from '../../../shared/constants'
-
-const COLORS = ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96', '#13c2c2', '#f5222d']
-
-const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
+import { invoke } from '../api/cloudApi'
+import { tokens as T } from '../styles/design-tokens'
 
 const LandAreaReport: React.FC = () => {
   const [detailData, setDetailData] = useState<any[]>([])
@@ -28,6 +26,7 @@ const LandAreaReport: React.FC = () => {
   }, [])
 
   const totalLandArea = regionSummary.reduce((s: number, r: any) => s + r.total_land_area, 0)
+  const regionNames = [...new Set(detailData.map(d => d.region_name))]
 
   const detailColumns = [
     { title: '区域', dataIndex: 'region_name', width: 100 },
@@ -47,111 +46,141 @@ const LandAreaReport: React.FC = () => {
     }
   ]
 
-  // 按区域分组的基建类型数据
-  const regionNames = [...new Set(detailData.map(d => d.region_name))]
   const barData = regionSummary.map(r => ({
     name: r.region_name,
     area: Number(r.total_land_area.toFixed(2))
   }))
 
-  const pieData = detailData.map(d => ({
-    name: `${d.region_name}-${d.item_name}`,
-    value: Number(d.total_land_area.toFixed(2))
-  }))
+  const sortedArea = [...detailData]
+    .map(d => ({
+      name: `${d.region_name}-${d.item_name}`,
+      value: Number(d.total_land_area.toFixed(2))
+    }))
+    .sort((a, b) => b.value - a.value)
+
+  const top8 = sortedArea.slice(0, 8)
+  const othersValue = sortedArea.slice(8).reduce((s, d) => s + d.value, 0)
+  const rankedBarData = othersValue > 0
+    ? [...top8, { name: `其他 (${sortedArea.length - 8}项)`, value: Number(othersValue.toFixed(2)) }]
+    : top8
+
+  // 统计卡片 — 暖金左边框
+  const statCard: React.CSSProperties = {
+    background: T.card,
+    border: `1px solid ${T.border}`,
+    borderLeft: `3px solid ${T.warmGold}`,
+    borderRadius: 4,
+    padding: '10px 14px',
+  }
+
+  // 面板样式
+  const darkPanel: React.CSSProperties = {
+    background: T.panel,
+    border: `1px solid ${T.border}`,
+    borderRadius: 4,
+    padding: '12px 14px',
+  }
+
+  // Tooltip 暖色样式
+  const tooltipStyle: React.CSSProperties = {
+    background: T.card,
+    border: `1px solid ${T.warmGold}`,
+    borderRadius: 4,
+    color: T.silver,
+    fontSize: 12,
+  }
 
   return (
     <div>
-      <Typography.Title level={4}>占地面积报表</Typography.Title>
-      <Spin spinning={loading}>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Card size="small">
-              <Statistic title="总占地面积" value={totalLandArea} suffix="㎡" precision={2} />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card size="small">
-              <Statistic title="区域数" value={regionNames.length} />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card size="small">
-              <Statistic title="基建类型数" value={detailData.length} />
-            </Card>
-          </Col>
-        </Row>
+      <div className="section-title" style={{ margin: 0, border: 'none', padding: 0, marginBottom: 16 }}>占地面积</div>
+      {!loading && detailData.length === 0 ? (
+        <div style={{ padding: '60px 0', textAlign: 'center' }}>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <div>
+                <span style={{ color: T.silver, fontSize: 14, fontWeight: 500 }}>暂无土地面积数据</span>
+                <br />
+                <span style={{ color: T.silver3, fontSize: 12 }}>创建基建合同后将自动统计占地面积</span>
+              </div>
+            }
+          />
+        </div>
+      ) : (
+      <>
+        {/* 顶部统计卡片 — 暖金边框 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 12 }}>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: T.silver3 }}>总占地面积</div>
+            <div style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", fontSize: 18, fontWeight: 600, color: T.warmGold }}>{totalLandArea.toLocaleString()} ㎡</div>
+          </div>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: T.silver3 }}>区域数</div>
+            <div style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", fontSize: 18, fontWeight: 600, color: T.silver }}>{regionNames.length}</div>
+          </div>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: T.silver3 }}>类型数</div>
+            <div style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", fontSize: 18, fontWeight: 600, color: T.silver }}>{detailData.length}</div>
+          </div>
+        </div>
 
-        <Row gutter={16}>
-          <Col span={12}>
-            <Card title="各区域占地面积对比" size="small">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3a4e" />
-                  <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                  <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      background: '#1e293b',
-                      border: '1px solid #2d3a4e',
-                      borderRadius: 8,
-                      color: '#e8edf5',
-                      fontSize: 12
-                    }}
-                    formatter={(v: number) => [`${v.toFixed(2)} ㎡`, '占地面积']}
-                  />
-                  <Bar dataKey="area" fill="#f59e0b" name="占地面积(㎡)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card title="占地面积分布" size="small">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: '#1e293b',
-                      border: '1px solid #2d3a4e',
-                      borderRadius: 8,
-                      color: '#e8edf5',
-                      fontSize: 12
-                    }}
-                    formatter={(v: number) => [`${v.toFixed(2)} ㎡`, '占地面积']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card>
-          </Col>
-        </Row>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+          {/* 左: 各区域占地面积对比 */}
+          <div style={darkPanel}>
+            <div className="section-title">各区域占地面积对比</div>
+            {regionSummary.length === 0 ? (
+              <div style={{ textAlign: 'center', color: T.silver3, padding: '40px 0', fontSize: 12 }}>暂无数据</div>
+            ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={barData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2740" />
+                <XAxis dataKey="name" stroke={T.silver3} tick={{ fontSize: 11 }} />
+                <YAxis stroke={T.silver3} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="area" fill={T.accent} radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            )}
+          </div>
 
-        <Row gutter={16} style={{ marginTop: 16 }}>
-          <Col span={12}>
-            <Card title="按区域汇总" size="small">
-              <Table dataSource={regionSummary} rowKey="region_name"
-                columns={regionColumns} pagination={false} size="small" />
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card title="按基建类型明细" size="small">
-              <Table dataSource={detailData} rowKey={(r) => `${r.region_name}-${r.item_name}`}
-                columns={detailColumns} pagination={false} size="small" />
-            </Card>
-          </Col>
-        </Row>
-      </Spin>
+          {/* 右: 占地面积排名 */}
+          <div style={darkPanel}>
+            <div className="section-title">占地面积排名 (Top 8)</div>
+            {rankedBarData.length === 0 ? (
+              <div style={{ textAlign: 'center', color: T.silver3, padding: '40px 0', fontSize: 12 }}>暂无数据</div>
+            ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={rankedBarData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a2740" horizontal={false} />
+                <XAxis type="number" stroke={T.silver3} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" stroke={T.silver3} tick={{ fontSize: 11 }} width={130} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(v: number) => [`${v.toFixed(2)} ㎡`, '占地面积']}
+                />
+                <Bar dataKey="value" fill={T.accent} radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ ...darkPanel, padding: 0 }}>
+            <div className="section-title" style={{ padding: '10px 14px', margin: 0 }}>按区域汇总</div>
+            <Table dataSource={regionSummary} rowKey="region_name" columns={regionColumns}
+              pagination={false} size="small" loading={loading} className="dense-table"
+              locale={{ emptyText: <span style={{ color: T.silver3, fontSize: 11 }}>暂无数据</span> }} />
+          </div>
+          <div style={{ ...darkPanel, padding: 0 }}>
+            <div className="section-title" style={{ padding: '10px 14px', margin: 0 }}>按基建类型明细</div>
+            <Table dataSource={detailData} rowKey={(r) => `${r.region_name}-${r.item_name}`}
+              columns={detailColumns} pagination={false} size="small" loading={loading} className="dense-table"
+              locale={{ emptyText: <span style={{ color: T.silver3, fontSize: 11 }}>暂无数据</span> }} />
+          </div>
+        </div>
+      </>
+      )}
     </div>
   )
 }

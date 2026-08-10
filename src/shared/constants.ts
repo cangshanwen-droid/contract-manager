@@ -14,14 +14,20 @@ export const IPC_CHANNELS = {
   CONTRACT_LIST: 'contract:list',
   CONTRACT_GET: 'contract:get',
   CONTRACT_CREATE: 'contract:create',
+  CONTRACT_UPDATE: 'contract:update',
   CONTRACT_DELETE: 'contract:delete',
+  CONTRACT_APPROVE: 'contract:approve',
   CONTRACT_SUMMARIZE: 'contract:summarize',
+  CONTRACT_LIST_VERSIONS: 'contract:list-versions',
 
   CONTRACT_TYPE_LIST: 'contract-type:list',
 
   INFRA_TYPE_LIST: 'infra-type:list',
 
   DASHBOARD_SUMMARY: 'dashboard:summary',
+  DASHBOARD_SYSTEM_STATS: 'dashboard:system-stats',
+
+  SYSTEM_HEALTH: 'system:health',
 
   FORMULA_CALCULATE: 'formula:calculate',
   FORMULA_LOG_LIST: 'formula:log-list',
@@ -35,21 +41,52 @@ export const IPC_CHANNELS = {
   INFRA_CALC_LOAD: 'infra-calc:load',
 
   AUTH_LOGIN: 'auth:login',
+  AUTH_LOGOUT: 'auth:logout',
   AUTH_REGISTER: 'auth:register',
   AUTH_CHANGE_PASSWORD: 'auth:change-password',
+  AUTH_CREATE_USER: 'auth:create-user',
+  AUTH_DELETE_USER: 'auth:delete-user',
+  AUTH_LIST_USERS: 'auth:list-users',
 
   ACCOUNT_LIST: 'account:list',
   ACCOUNT_GET: 'account:get',
+  ACCOUNT_CREATE: 'account:create',
   ACCOUNT_TRANSACTIONS: 'account:transactions',
   ACCOUNT_ADD_TRANSACTION: 'account:add-transaction',
   ACCOUNT_SUMMARY: 'account:summary',
 
+  ANNOUNCEMENT_LIST: 'announcement:list',
+  ANNOUNCEMENT_ACTIVE_LIST: 'announcement:active-list',
+  ANNOUNCEMENT_CREATE: 'announcement:create',
+  ANNOUNCEMENT_DELETE: 'announcement:delete',
+
+  AUDIT_LIST: 'audit:list',
+  AUDIT_LOG: 'audit:log',
+
+  NOTIFICATION_LIST: 'notification:list',
+  NOTIFICATION_MARK_READ: 'notification:mark-read',
+  NOTIFICATION_UNREAD_COUNT: 'notification:unread-count',
+  NOTIFICATION_CHANGED_EVENT: 'notification:changed',
+
   DB_BACKUP: 'db:backup',
+  DB_BACKUP_TO_DESKTOP: 'db:backup-to-desktop',
+  DB_RESTORE: 'db:restore',
   DB_AUTO_BACKUP: 'db:auto-backup',
   DB_INFO: 'db:info',
 
   EXCEL_EXPORT: 'excel:export',
-  EXCEL_IMPORT: 'excel:import'
+  EXCEL_EXPORT_CONTRACTS: 'excel:export-contracts',
+  EXCEL_EXPORT_REGIONS: 'excel:export-regions',
+  EXCEL_EXPORT_ACCOUNT_TRANSACTIONS: 'excel:export-account-transactions',
+  EXCEL_IMPORT: 'excel:import',
+
+  GIPFEL_OPEN: 'open-gipfel-window',
+
+  STOCK_SET_TOKEN: 'stock:set-token',
+  STOCK_TEST_CONNECTION: 'stock:test-connection',
+  STOCK_SYNC_LOG: 'stock:sync-log',
+  STOCK_GET_MARKET: 'stock:get-market',
+  STOCK_GET_QUOTE: 'stock:get-quote'
 } as const
 
 export const CONTRACT_STATUS_OPTIONS = [
@@ -58,6 +95,13 @@ export const CONTRACT_STATUS_OPTIONS = [
   { value: 'completed', label: '已完成' },
   { value: 'terminated', label: '终止' },
   { value: 'expired', label: '过期' }
+] as const
+
+export const CONTRACT_APPROVAL_OPTIONS = [
+  { value: 'none', label: '未提交' },
+  { value: 'pending', label: '待审批' },
+  { value: 'approved', label: '已审批' },
+  { value: 'rejected', label: '已驳回' }
 ] as const
 
 export const DEFAULT_PAGE_SIZE = 20

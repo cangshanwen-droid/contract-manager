@@ -4,11 +4,16 @@ copyright: Copyright © 2026
 directories:
   output: dist
 
+asar: false
+
 win:
   target:
     - target: nsis
       arch:
         - x64
+  certificateFile: certs/gipfel-sign.pfx
+  certificatePassword: gipfel-sign-2026
+  signAndEditExecutable: true
 
 nsis:
   oneClick: false
@@ -18,7 +23,7 @@ nsis:
   shortcutName: 合同管理系统
   uninstallDisplayName: 合同管理系统
 
-icon: assets/icon.png
+icon: assets/icon.ico
 
 files:
   - out/**/*

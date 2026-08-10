@@ -1,0 +1,309 @@
+/**
+ * UserManagementPage — 用户管理（仅 admin 可访问）
+ *
+ * 管理员可在此页面：
+ * - 查看所有用户列表
+ * - 新建用户（指定用户名、密码、角色）
+ * - 删除用户（不可删除自己，不可删除最后一个 admin）
+ */
+
+import React, { useEffect, useState } from 'react'
+import {
+  Table, Button, Modal, Form, Input, Select, Space,
+  Typography, message, Tag, Popconfirm, Empty
+} from 'antd'
+import { PlusOutlined, UserOutlined } from '@ant-design/icons'
+import { IPC_CHANNELS } from '../../../shared/constants'
+import { invoke } from '../api/cloudApi'
+import dayjs from 'dayjs'
+import { tokens as T } from '../styles/design-tokens'
+
+const ROLE_LABELS: Record<string, string> = {
+  rep: '代表端',
+  operator: '操作端',
+  admin: '管理端',
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  rep: '#94A3B8',
+  operator: '#D4AF37',
+  admin: '#D4AF37',
+}
+
+interface UserRow {
+  id: number
+  username: string
+  role: string
+  created_at?: string
+  last_login?: string | null
+}
+
+interface Props {
+  currentUserId?: number
+  currentUserRole?: string
+}
+
+const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole }) => {
+  const [users, setUsers] = useState<UserRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createForm] = Form.useForm()
+  const [deleteConfirming, setDeleteConfirming] = useState<number | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
+      if (r?.success && Array.isArray(r.users)) {
+        setUsers(r.users)
+      }
+    } catch (err: any) {
+      message.error('加载用户列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  // ── 快捷键：Escape 关闭弹窗 ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && createOpen) { createForm.resetFields(); setCreateOpen(false); e.preventDefault() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [createOpen])
+
+  const handleCreate = async () => {
+    try {
+      const vals = await createForm.validateFields()
+      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, vals.role) as any
+      if (!r.success) {
+        message.error(r.message || '创建失败')
+        return
+      }
+      message.success('用户创建成功')
+      createForm.resetFields()
+      setCreateOpen(false)
+      load()
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.message || '创建失败')
+    }
+  }
+
+  const handleDelete = async (userId: number) => {
+    setDeleteConfirming(userId)
+    try {
+      // 不能删自己
+      if (currentUserId && userId === currentUserId) {
+        message.error('不能删除自己的账号')
+        return
+      }
+      const r = await invoke(IPC_CHANNELS.AUTH_DELETE_USER, userId) as any
+      if (!r.success) {
+        message.error(r.message || '删除失败')
+        return
+      }
+      message.success('用户已删除')
+      load()
+    } catch (err: any) {
+      message.error(err?.message || '删除失败')
+    } finally {
+      setDeleteConfirming(null)
+    }
+  }
+
+  const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      render: (v: number) => <span style={{ color: T.textMuted, fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>,
+    },
+    {
+      title: '用户名',
+      dataIndex: 'username',
+      key: 'username',
+      render: (v: string, row: UserRow) => (
+        <Space>
+          <UserOutlined style={{ color: T.textSecondary }} />
+          <span style={{ color: T.textPrimary, fontWeight: 500 }}>
+            {v}
+            {currentUserId && row.id === currentUserId && (
+              <Tag color="#D4AF37" style={{ marginLeft: 8, fontSize: 11, lineHeight: '16px' }}>当前</Tag>
+            )}
+          </span>
+        </Space>
+      ),
+    },
+    {
+      title: '角色',
+      dataIndex: 'role',
+      key: 'role',
+      width: 120,
+      render: (v: string) => (
+        <Tag color={ROLE_COLORS[v] || '#64748B'} style={{ fontSize: 12 }}>
+          {ROLE_LABELS[v] || v}
+        </Tag>
+      ),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (v: string) => (
+        <span style={{ color: T.textMuted, fontSize: 12 }}>
+          {v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'}
+        </span>
+      ),
+    },
+    {
+      title: '最后登录',
+      dataIndex: 'last_login',
+      key: 'last_login',
+      width: 180,
+      render: (v: string | null) => (
+        v ? (
+          <span style={{ color: T.textSecondary, fontSize: 12 }}>
+            {dayjs(v).format('YYYY-MM-DD HH:mm')}
+          </span>
+        ) : (
+          <span style={{ color: T.textMuted, fontSize: 12 }}>从未登录</span>
+        )
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_: unknown, row: UserRow) => {
+        const isSelf = currentUserId && row.id === currentUserId
+        const isLastAdmin = row.role === 'admin' && users.filter(u => u.role === 'admin').length <= 1
+        const disabled = isSelf || isLastAdmin
+        return (
+          <Popconfirm
+            title={isSelf ? '不能删除自己的账号' : isLastAdmin ? '不能删除最后一个管理员' : '确认删除该用户？'}
+            onConfirm={() => handleDelete(row.id)}
+            disabled={disabled}
+            okText="删除"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              disabled={disabled}
+              loading={deleteConfirming === row.id}
+              style={{ padding: 0, fontSize: 12 }}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        )
+      },
+    },
+  ]
+
+  return (
+    <div className="page-fade-in">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="section-title" style={{ margin: 0, border: 'none', padding: 0 }}>用户管理</div>
+        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+          新建用户
+        </Button>
+      </div>
+
+      <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4 }}>
+          <Table
+            dataSource={users}
+            rowKey="id"
+            columns={columns}
+            pagination={false}
+            size="small"
+            loading={loading}
+            locale={{ emptyText:
+              <div style={{ padding: '24px 0' }}>
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <div>
+                      <span style={{ color: T.textPrimary, fontSize: 14, fontWeight: 500 }}>
+                        暂无用户
+                      </span>
+                      <br />
+                      <span style={{ color: T.textMuted, fontSize: 12 }}>
+                        创建新用户以管理系统访问权限
+                      </span>
+                    </div>
+                  }
+                >
+                  <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+                    新建用户
+                  </Button>
+                </Empty>
+              </div>
+            }}
+          />
+        </div>
+
+      {/* Create User Modal */}
+      <Modal
+        title="新建用户"
+        open={createOpen}
+        onCancel={() => { createForm.resetFields(); setCreateOpen(false) }}
+        onOk={handleCreate}
+        okText="创建"
+        width={420}
+        destroyOnClose
+      >
+        <Form form={createForm} layout="vertical" size="small">
+          <Form.Item
+            name="username"
+            label="用户名"
+            rules={[
+              { required: true, message: '请输入用户名' },
+              { min: 2, message: '用户名至少 2 个字符' },
+            ]}
+          >
+            <Input placeholder="输入用户名" />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="密码"
+            rules={[
+              { required: true, message: '请输入密码' },
+              { min: 6, message: '密码至少 6 个字符' },
+              {
+                pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
+                message: '密码需包含字母和数字',
+              },
+            ]}
+          >
+            <Input.Password placeholder="输入密码（至少6位，含字母和数字）" />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="角色"
+            rules={[{ required: true, message: '请选择角色' }]}
+            initialValue="rep"
+          >
+            <Select
+              placeholder="选择角色"
+              options={[
+                { value: 'rep', label: '代表端' },
+                { value: 'operator', label: '操作端' },
+                { value: 'admin', label: '管理端' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  )
+}
+
+export default UserManagementPage

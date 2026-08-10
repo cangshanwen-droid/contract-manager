@@ -11,6 +11,13 @@ import { registerGipfelHandlers } from './gipfel.handler'
 import { registerAccountHandlers } from './account.handler'
 import { registerBackupHandlers } from './backup.handler'
 import { registerExcelHandlers } from './excel.handler'
+import { registerStockHandlers } from './stock.handler'
+import { registerStockQuoteHandlers } from './stock-quote.handler'
+import { registerAnnouncementHandlers } from './announcement.handler'
+import { registerAuditHandlers } from './audit.handler'
+import { registerNotificationHandlers } from './notification.handler'
+import { registerSystemHandlers } from './system.handler'
+import { registerCredentialHandlers } from './credential.handler'
 
 export function registerAllHandlers(): void {
   registerRegionHandlers()
@@ -26,4 +33,10 @@ export function registerAllHandlers(): void {
   registerAccountHandlers()
   registerBackupHandlers()
   registerExcelHandlers()
+  registerStockHandlers()
+  registerStockQuoteHandlers()
+  registerAnnouncementHandlers()
+  registerAuditHandlers()
+  registerNotificationHandlers()
+  registerSystemHandlers()
 }

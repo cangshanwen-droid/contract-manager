@@ -5,3 +5,8 @@ dist/
 .env
 .DS_Store
 Thumbs.db
+certs/
+.agents/
+.claude/
+.hermes/
+skills-lock.json

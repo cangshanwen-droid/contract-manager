@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component<Props, State> {
           justifyContent: 'center', height: '100vh', background: '#0a0e17',
           color: '#e8edf5', padding: 24
         }}>
-          <Typography.Title level={4} style={{ color: '#ef4444' }}>页面出现错误</Typography.Title>
+          <Typography.Title level={4} style={{ color: '#C44040' }}>页面出现错误</Typography.Title>
           <Typography.Text style={{ color: '#94a3b8', marginBottom: 16, maxWidth: 400, textAlign: 'center' }}>
             {this.state.error?.message}
           </Typography.Text>

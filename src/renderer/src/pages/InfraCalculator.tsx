@@ -4,14 +4,13 @@ import {
   Tag, message, Space, Alert
 } from 'antd'
 import {
-  CalculatorOutlined, FileAddOutlined, ArrowUpOutlined,
-  DollarOutlined, ToolOutlined, BuildOutlined
+  FileAddOutlined
 } from '@ant-design/icons'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { api } from '../api/dashboard.api'
+import { invoke } from '../api/cloudApi'
 import type { Region } from '../../../shared/types'
-
-const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
+import { tokens as T } from '../styles/design-tokens'
 
 interface InfraCalcItem {
   name: string
@@ -69,6 +68,8 @@ const InfraCalculator: React.FC = () => {
     try {
       const result = await invoke(IPC_CHANNELS.INFRA_CALC_LOAD, regionId) as CalcSummary
       setData(result)
+    } catch {
+      message.error('加载基建数据失败')
     } finally {
       setLoading(false)
     }
@@ -122,15 +123,15 @@ const InfraCalculator: React.FC = () => {
     { title: '基建类型', dataIndex: 'name', width: 120, fixed: 'left' as const },
     {
       title: '类别', dataIndex: 'category', width: 70,
-      render: (v: string) => <Tag color={v === '民生配套' ? 'blue' : 'purple'}>{v}</Tag>
+      render: (v: string) => <Tag color="blue">{v}</Tag>
     },
     { title: '当前数量', dataIndex: 'current_qty', width: 70 },
     { title: '建议数量', dataIndex: 'suggested_qty', width: 70 },
     {
       title: '差额', dataIndex: 'gap', width: 60,
       render: (v: number) =>
-        v > 0 ? <span style={{ color: '#cf1322', fontWeight: 600 }}>+{v}</span> :
-          v < 0 ? <span style={{ color: '#3f8600' }}>{v}</span> : <span>-</span>
+        v > 0 ? <span style={{ color: T.red, fontWeight: 600 }}>+{v}</span> :
+          v < 0 ? <span style={{ color: T.green }}>{v}</span> : <span>-</span>
     },
     { title: '单价', dataIndex: 'price', width: 70, render: (v: number) => v >= 10000 ? (v/10000).toFixed(0)+'万' : v.toLocaleString() },
     { title: '建造成本', dataIndex: 'build_cost', width: 80, render: (v: number) => v > 0 ? <Tag color="red">{(v/10000).toFixed(0)}万</Tag> : '-' },
@@ -142,151 +143,125 @@ const InfraCalculator: React.FC = () => {
     { title: '引才', dataIndex: 'talent_addition', width: 40, render: (v: number) => v > 0 ? v : '' },
     {
       title: '使用费/年', dataIndex: 'annual_usage_fee', width: 80,
-      render: (v: number) => v > 0 ? <span style={{color:'#f59e0b'}}>{(v/10000).toFixed(0)}万</span> : ''
+      render: (v: number) => v > 0 ? <span style={{color:T.accent}}>{(v/10000).toFixed(0)}万</span> : ''
     },
     {
       title: '经营净成本', dataIndex: 'net_operating_cost', width: 80,
-      render: (v: number) => v > 0 ? <span style={{color:'#ef4444'}}>+{(v/10000).toFixed(0)}万</span> : v < 0 ? <span style={{color:'#10b981'}}>{(v/10000).toFixed(0)}万</span> : '-'
+      render: (v: number) => v > 0 ? <span style={{color:T.red}}>+{(v/10000).toFixed(0)}万</span> : v < 0 ? <span style={{color:T.green}}>{(v/10000).toFixed(0)}万</span> : '-'
     },
-    { title: '减排/年', dataIndex: 'actual_carbon_reduction', width: 70, render: (v: number) => v > 0 ? <span style={{color:'#10b981'}}>{v}吨</span> : '' },
+    { title: '减排/年', dataIndex: 'actual_carbon_reduction', width: 70, render: (v: number) => v > 0 ? <span style={{color:T.green}}>{v}吨</span> : '' },
   ]
 
   return (
     <div>
-      {/* 顶栏：标题 + 区域选择 + 操作按钮 */}
-      <div
-        style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: 16, gap: 16
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Typography.Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>
-            基建辅助计算器
-          </Typography.Title>
-          <Select
-            placeholder="选择区域"
-            style={{ width: 200 }}
-            value={selectedRegion}
-            onChange={handleRegionChange}
-            options={regions.map((r) => ({ value: r.id, label: r.name }))}
-            size="middle"
-          />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="section-title" style={{ margin: 0, border: 'none', padding: 0 }}>基建计算</div>
+          <Select placeholder="选择区域" style={{ width: 180 }} size="small"
+            value={selectedRegion} onChange={handleRegionChange}
+            options={regions.map((r) => ({ value: r.id, label: r.name }))} />
         </div>
-        <Button
-          type="primary"
-          icon={<FileAddOutlined />}
-          onClick={handleGenerateContract}
-          loading={generating}
-          disabled={!data || needBuild.length === 0}
-          size="middle"
-        >
-          一键生成补建合同 {needBuild.length > 0 ? `(${needBuild.length}项)` : ''}
+        <Button type="primary" size="small" icon={<FileAddOutlined />} onClick={handleGenerateContract}
+          loading={generating} disabled={!data || needBuild.length === 0}>
+          补建合同{needBuild.length > 0 ? ` (${needBuild.length})` : ''}
         </Button>
       </div>
 
+      {!selectedRegion && (
+        <div style={{ maxWidth: 420, margin: '100px auto', textAlign: 'center' }}>
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ marginBottom: 16, opacity: 0.4 }}>
+            <rect x="2" y="2" width="76" height="76" rx="4" stroke={T.silver3} strokeWidth="1.5" />
+            <rect x="18" y="46" width="12" height="30" rx="2" fill={T.silver3} opacity="0.5" />
+            <rect x="34" y="28" width="12" height="48" rx="2" fill={T.silver3} opacity="0.5" />
+            <rect x="50" y="36" width="12" height="40" rx="2" fill={T.silver3} opacity="0.5" />
+            <line x1="4" y1="62" x2="76" y2="62" stroke={T.silver3} strokeWidth="1" opacity="0.3" />
+          </svg>
+          <div style={{ fontSize: 16, fontWeight: 600, color: T.silver, marginBottom: 8 }}>选择区域以开始计算</div>
+          <div style={{ color: T.silver2, fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
+            选择一个区域后，系统将根据人口、基建数据和碳排模型，<br />自动计算基建补建方案与财务指标
+          </div>
+        </div>
+      )}
+
       <Spin spinning={loading}>
+        {selectedRegion && !data && !loading && (
+          <div style={{ maxWidth: 420, margin: '100px auto', textAlign: 'center' }}>
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ marginBottom: 16, opacity: 0.4 }}>
+              <rect x="2" y="2" width="76" height="76" rx="4" stroke={T.silver3} strokeWidth="1.5" />
+              <rect x="10" y="10" width="60" height="16" rx="2" fill={T.silver3} opacity="0.3" />
+              <rect x="10" y="32" width="45" height="10" rx="2" fill={T.silver3} opacity="0.25" />
+              <rect x="10" y="48" width="35" height="10" rx="2" fill={T.silver3} opacity="0.2" />
+              <rect x="10" y="64" width="25" height="10" rx="2" fill={T.silver3} opacity="0.15" />
+            </svg>
+            <div style={{ fontSize: 16, fontWeight: 600, color: T.silver, marginBottom: 8 }}>暂无基建数据</div>
+            <div style={{ color: T.silver2, fontSize: 13, lineHeight: 1.6 }}>
+              该区域暂无基建计算数据，请先录入基建合同
+            </div>
+          </div>
+        )}
         {data && (
           <>
-            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="区域人口" value={data.population} prefix={<CalculatorOutlined />} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="基建总数" value={data.total_current} prefix={<BuildOutlined />} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="年收益" value={data.total_revenue} prefix={<DollarOutlined />}
-                    precision={0} valueStyle={{ color: '#3f8600' }} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="年维护费" value={data.total_maintenance} prefix={<ToolOutlined />}
-                    precision={0} valueStyle={{ color: '#cf1322' }} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="需投入" value={data.total_build_cost} prefix={<ArrowUpOutlined />}
-                    precision={0} valueStyle={{ color: data.total_build_cost > 0 ? '#cf1322' : '#3f8600' }} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="净收益" value={data.total_revenue - data.total_maintenance}
-                    prefix={<DollarOutlined />} precision={0}
-                    valueStyle={{ color: (data.total_revenue - data.total_maintenance) >= 0 ? '#3f8600' : '#cf1322' }} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="基础碳排放" value={data.baseline_carbon}
-                    suffix="吨" precision={0}
-                    valueStyle={{ color: '#ef4444' }} />
-                </Card>
-              </Col>
-              <Col span={3}>
-                <Card size="small">
-                  <Statistic title="实际减排(下限2000)" value={data.effective_carbon_reduction}
-                    suffix="吨" precision={0}
-                    valueStyle={{ color: '#10b981' }} />
-                </Card>
-              </Col>
-            </Row>
-            <Card title="基建明细" size="small" extra={
-              <Space>
-                <Tag color="red">需新建</Tag>
-                <Tag color="green">已达标</Tag>
-              </Space>
-            }>
+            {/* 统计卡片 — 暖色数字高亮 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6, marginBottom: 16 }}>
+              {[
+                { l: '人口', v: data.population.toLocaleString(), c: T.silver },
+                { l: '基建数', v: data.total_current, c: T.accent },
+                { l: '年收益', v: (data.total_revenue/10000).toFixed(0)+'万', c: T.green },
+                { l: '维护费', v: (data.total_maintenance/10000).toFixed(0)+'万', c: T.warmGold },
+                { l: '需投入', v: (data.total_build_cost/10000).toFixed(0)+'万', c: data.total_build_cost>0?T.red:T.green },
+                { l: '净收益', v: ((data.total_revenue-data.total_maintenance)/10000).toFixed(0)+'万', c: (data.total_revenue-data.total_maintenance)>=0?T.green:T.red },
+                { l: '碳排', v: data.baseline_carbon+'吨', c: T.red },
+                { l: '减排', v: data.effective_carbon_reduction+'吨', c: T.green },
+              ].map((k, i) => (
+                <div key={i} style={{
+                  background: T.card,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 4,
+                  padding: '8px 10px',
+                }}>
+                  <div style={{ fontSize: 11, color: T.silver3 }}>{k.l}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", fontSize: 13, fontWeight: 600, color: k.c, marginTop: 2 }}>{k.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 表格 — 面板包裹 */}
+            <div style={{
+              background: T.panel,
+              border: `1px solid ${T.border}`,
+              borderRadius: 4,
+            }}>
+              <div className="section-title" style={{ padding: '10px 14px', margin: 0 }}>基建明细</div>
               <Table
-                dataSource={data.items}
-                rowKey="name"
-                columns={columns}
-                pagination={false}
-                size="small"
-                scroll={{ x: 1000 }}
+                dataSource={data.items} rowKey="name" columns={columns}
+                pagination={false} size="small" scroll={{ x: 1000 }} className="dense-table"
                 rowClassName={(r) => r.gap > 0 ? 'row-need-build' : 'row-ok'}
               />
-            </Card>
+            </div>
 
-            {/* 底部汇总条 */}
-            <div
-              style={{
-                marginTop: 12,
-                padding: '12px 16px',
-                borderRadius: 6,
-                background: '#1a2332',
-                border: '1px solid #2d3a4e',
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 12,
-                color: '#94a3b8'
-              }}
-            >
-              <span>建议数量 = 人口 × 建议比例  |  差额为正 = 需新建</span>
+            {/* 底栏 */}
+            <div style={{
+              marginTop: 8, padding: '8px 14px', borderRadius: 4,
+              background: T.panel,
+              border: `1px solid ${T.border}`,
+              display: 'flex', justifyContent: 'space-between',
+              fontSize: 11, color: T.silver3,
+            }}>
+              <span>建议 = 人口 × 建议比例  |  差额正 = 需新建</span>
               <span>
-                共 {data.items.filter(i => i.gap > 0).length} 项需新建 ·
-                总投资 <span style={{ color: '#f59e0b', fontWeight: 600 }}>{(data.total_build_cost / 10000).toFixed(0)}万</span> ·
-                年减排 <span style={{ color: '#10b981', fontWeight: 600 }}>{data.total_carbon_reduction}吨</span>
+                需建 {data.items.filter(i => i.gap > 0).length} 项 ·
+                总投资 <span style={{ color: T.warmGold, fontWeight: 600 }}>{(data.total_build_cost / 10000).toFixed(0)}万</span> ·
+                年减排 <span style={{ color: T.green, fontWeight: 600 }}>{data.total_carbon_reduction}吨</span>
               </span>
             </div>
             <style>{`
-              .row-need-build { background-color: rgba(239,68,68,0.08); }
-              .row-ok { background-color: rgba(16,185,129,0.06); }
+              .row-need-build { background-color: rgba(239,68,68,0.05); }
+              .row-ok { background-color: rgba(16,185,129,0.04); }
+              .dense-table .ant-table-row:hover td {
+                background-color: rgba(180,140,80,0.06) !important;
+              }
             `}</style>
           </>
-        )}
-        {!data && !loading && selectedRegion && (
-          <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
-            已选择区域，暂无合同数据。请先录入基建合同。
-          </div>
         )}
       </Spin>
     </div>

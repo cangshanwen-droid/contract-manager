@@ -1,7 +1,6 @@
 import { IPC_CHANNELS } from '../../../shared/constants'
 import type { DashboardSummary, InfrastructureType, FormulaInput, FormulaOutput, FormulaLog } from '../../../shared/types'
-
-const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
+import { invoke } from './cloudApi'
 
 export const dashboardApi = {
   summary: () => invoke(IPC_CHANNELS.DASHBOARD_SUMMARY) as Promise<DashboardSummary>,

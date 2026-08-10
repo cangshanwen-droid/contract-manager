@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Outer hexagonal ring -->
+  <polygon points="24,4 41.569,14.144 41.569,34.288 24,44.432 6.431,34.288 6.431,14.144"
+           stroke="#5e6ad2" stroke-width="0.8" stroke-opacity="0.25" fill="none"/>
+
+  <!-- Top rhombus (brightest facet) -->
+  <polygon points="24,24 6.431,14.144 24,4 41.569,14.144"
+           fill="#5e6ad2" fill-opacity="0.90"/>
+
+  <!-- Bottom-right rhombus (mid facet) -->
+  <polygon points="24,24 41.569,14.144 41.569,34.288 24,44.432"
+           fill="#5e6ad2" fill-opacity="0.55"/>
+
+  <!-- Bottom-left rhombus (darkest facet) -->
+  <polygon points="24,24 24,44.432 6.431,34.288 6.431,14.144"
+           fill="#5e6ad2" fill-opacity="0.32"/>
+
+  <!-- Division lines for crisp edges -->
+  <line x1="24" y1="24" x2="24" y2="4"    stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+  <line x1="24" y1="24" x2="41.569" y2="14.144" stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+  <line x1="24" y1="24" x2="41.569" y2="34.288" stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+  <line x1="24" y1="24" x2="24" y2="44.432" stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+  <line x1="24" y1="24" x2="6.431" y2="34.288" stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+  <line x1="24" y1="24" x2="6.431" y2="14.144" stroke="#5e6ad2" stroke-width="0.5" stroke-opacity="0.5"/>
+</svg>

@@ -1,208 +1,467 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/*
+ * ═══════════════════════════════════════════════════════════════
+ * Gipfel 终极设计系统 — 排版精度 + 色彩微差 + 空间比例 + 精选特效
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * 排版层级: 24/18/14/12  — 字间距 -0.02em / normal
+ * 数字字体: Inter / SF Pro Display + tabular-nums
+ * 行高:     标题 1.2  /  正文 1.55
+ *
+ * 色彩系统:
+ *   背景: #0B1120 → #111B2D → #162032 (3层, ~4%亮度差)
+ *   边框: #1E2D40 → #253548 → #2E4058 (弱→中→强)
+ *   文字: #E2E8F0 → #94A3B8 → #64748B (主→次→弱)
+ *   accent: #3B82F6
+ *
+ * 空间:
+ *   内容 padding: 32px
+ *   KPI 卡片: 左 3px accent 色条
+ *   表格行高: 40px
+ *   侧栏选中: 左 2px 指示条
+ *
+ * 精选特效 (精品克制):
+ *   ✅ 页面淡入 200ms
+ *   ✅ 卡片单层柔阴影: 0 2px 8px rgba(0,0,0,0.3)
+ *   ✅ 按钮 hover 亮度提升 150ms
+ *   ✅ 按钮 active scale(0.97) 100ms
+ *   ✅ 侧栏选中态指示条
+ *   ✅ 表格行 hover 微背景变化
+ *   ❌ 毛玻璃/blur / 渐变发光 / 粒子波纹 / 计数动画
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+ * 1. 页面淡入 — 200ms
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+ * 0. 字体栈 CSS 变量 — Inter / SF Pro Display
+ * ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg-base: #0a0e17;
-  --bg-surface: #111827;
-  --bg-elevated: #1a2332;
-  --bg-card: #1e293b;
-  --border-color: #334155;
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --accent-gold: #f59e0b;
-  --accent-gold-hover: #d97706;
-  --accent-gold-glow: rgba(245, 158, 11, 0.15);
-  --accent-cyan: #06b6d4;
-  --accent-green: #10b981;
-  --accent-red: #ef4444;
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 20px rgba(245, 158, 11, 0.08);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* ═══════════════════════════════════════════════════════════════
+   * Design Tokens — CSS Variables
+   * 金融金主题：深海蓝黑背景 + 暖金 accent
+   * 对齐 src/renderer/src/styles/design-tokens.ts
+   * ═══════════════════════════════════════════════════════════════ */
+
+  /* Colors */
+  --gipfel-primary:      #D4AF37;
+  --gipfel-bg:           #061A33;
+  --gipfel-surface:      #0F2748;
+  --gipfel-elevated:     #1A1F2E;
+  --gipfel-border:       rgba(212, 175, 55, 0.12);
+  --gipfel-text-primary: #F5F7FA;
+  --gipfel-text-secondary: #8A9BB5;
+  --gipfel-text-muted:   rgba(138, 155, 181, 0.5);
+  --gipfel-success:      #22C55E;
+  --gipfel-warning:      #F59E0B;
+  --gipfel-error:        #EF4444;
+
+  /* Legacy alias */
+  --gipfel-gold:         #D4AF37;
+  --gipfel-accent:       #D4AF37;
+
+  /* Radii */
+  --gipfel-radius-sm:  4px;
+  --gipfel-radius-md:  8px;
+  --gipfel-radius-lg:  12px;
+  --gipfel-radius-xl:  16px;
+  --gipfel-radius-xxl: 20px;
+
+  /* Space */
+  --gipfel-space-xs:   4px;
+  --gipfel-space-sm:   8px;
+  --gipfel-space-md:   12px;
+  --gipfel-space-lg:   16px;
+  --gipfel-space-xl:   20px;
+  --gipfel-space-xxl:  24px;
+  --gipfel-space-xxxl: 32px;
+  --gipfel-space-huge: 40px;
+  --gipfel-space-xhuge:48px;
+
+  /* Font size */
+  --gipfel-fs-caption:    11px;
+  --gipfel-fs-body:       13px;
+  --gipfel-fs-body-large: 14px;
+  --gipfel-fs-subtitle:   15px;
+  --gipfel-fs-title:      18px;
+  --gipfel-fs-h3:         20px;
+  --gipfel-fs-h2:         24px;
+  --gipfel-fs-h1:         28px;
+  --gipfel-fs-display:    36px;
+
+  /* Typography */
+  --gipfel-font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont,
+                     'Segoe UI', system-ui, 'Helvetica Neue', 'HarmonyOS Sans', sans-serif;
+  --gipfel-font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Cascadia Code',
+                      'Fira Code', monospace;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-body {
-  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  overflow: hidden;
+.page-fade-in {
+  animation: pageFadeIn 200ms ease-out;
 }
 
-#root {
-  height: 100vh;
+/* ═══════════════════════════════════════════════════════════════
+ * 2. 排版工具类
+ *    字号层级 24/18/14/12
+ *    标题: letter-spacing -0.02em, line-height 1.2
+ *    正文: letter-spacing normal,   line-height 1.55
+ * ═══════════════════════════════════════════════════════════════ */
+
+.gipfel-h1 {
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-weight: 600;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-/* Ant Design overrides */
-.ant-layout { background: var(--bg-base) !important; }
-.ant-layout-header { background: var(--bg-surface) !important; }
-
-/* Card glass effect */
-.glass-card {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--radius-md) !important;
-  backdrop-filter: blur(12px);
-  transition: var(--transition);
-}
-.glass-card:hover {
-  border-color: rgba(245, 158, 11, 0.2);
-  box-shadow: var(--shadow-glow);
+.gipfel-h2 {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-weight: 600;
 }
 
-/* Stat card with gold accent */
-.stat-card {
-  position: relative;
-  overflow: hidden;
-}
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 3px;
-  height: 100%;
-  background: linear-gradient(180deg, var(--accent-gold), var(--accent-cyan));
-  border-radius: 0 2px 2px 0;
+.gipfel-body {
+  font-size: 14px;
+  letter-spacing: normal;
+  line-height: 1.55;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+.gipfel-caption {
+  font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.55;
 }
-.animate-in {
-  animation: fadeInUp 0.4s ease-out both;
-}
-.animate-in:nth-child(1) { animation-delay: 0.05s; }
-.animate-in:nth-child(2) { animation-delay: 0.1s; }
-.animate-in:nth-child(3) { animation-delay: 0.15s; }
-.animate-in:nth-child(4) { animation-delay: 0.2s; }
-.animate-in:nth-child(5) { animation-delay: 0.25s; }
-.animate-in:nth-child(6) { animation-delay: 0.3s; }
 
-/* Table styling */
-.ant-table-wrapper .ant-table {
+/* 数字专用 — Inter + tabular-nums */
+.gipfel-num {
+  font-family: var(--gipfel-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.gipfel-num-mono {
+  font-family: var(--gipfel-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 3. 卡片 — 亮度层级代替阴影 (Bloomberg 克制风格)
+ *    不加阴影，靠 3 层背景色差创造层次
+ * ═══════════════════════════════════════════════════════════════ */
+
+.gipfel-card {
+  box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 4. 按钮特效 — hover 150ms 亮度提升 + active scale(0.97)
+ *    全局覆盖 Ant Design Button
+ * ═══════════════════════════════════════════════════════════════ */
+
+.ant-btn {
+  transition: filter 150ms ease, transform 100ms ease, background-color 150ms ease,
+              border-color 150ms ease, color 150ms ease, box-shadow 200ms ease;
+}
+
+.ant-btn:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.18);
+}
+
+.ant-btn:active {
+  transform: scale(0.97);
+}
+
+/* 主按钮 active 保持品牌色不偏 */
+.ant-btn-primary:active {
+  background-color: var(--gipfel-primary) !important;
+  border-color: var(--gipfel-primary) !important;
+}
+
+/* 主按钮 hover 金色发光增强 */
+.ant-btn-primary:not(:disabled):hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.28);
+}
+
+/* 链接按钮不做 scale，避免文字扭曲 */
+.ant-btn-link:active {
+  transform: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 4.5 输入框全局金色 focus — 所有 ant-input 聚焦时金色边框+光晕
+ * ═══════════════════════════════════════════════════════════════ */
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-picker {
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-input-number-focused,
+.ant-picker-focused,
+.ant-select-focused .ant-select-selector,
+.ant-select-selector:focus-within {
+  border-color: #d4af37 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 5. 表格 — 行高 40px + hover 微背景亮化
+ *    斑马纹在前，hover 在后——避免 !important 叠加冲突
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* 表格行高: 40px */
+.ant-table-tbody > tr > td {
+  height: 40px;
+  line-height: 1.55 !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+
+/* 表头行高对齐 */
+.ant-table-thead > tr > th {
+  line-height: 1.2 !important;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 6. 表格表头 — 11px（中文表头禁 uppercase/letter-spacing）
+ * ═══════════════════════════════════════════════════════════════ */
+
+.ant-table-thead > tr > th {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 7. 斑马纹 — 极淡交替行背景（在 hover 之前）
+ * ═══════════════════════════════════════════════════════════════ */
+
+.ant-table-tbody > tr.ant-table-row:nth-child(even) > td {
+  background: rgba(255, 255, 255, 0.015) !important;
+}
+
+.ant-table-tbody > tr.ant-table-row:nth-child(odd) > td {
   background: transparent !important;
 }
-.ant-table-wrapper .ant-table-thead > tr > th {
-  background: var(--bg-elevated) !important;
-  color: var(--text-secondary) !important;
-  border-bottom: 1px solid var(--border-color) !important;
-  font-weight: 500 !important;
-  font-size: 12px !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.ant-table-wrapper .ant-table-tbody > tr > td {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(45, 58, 78, 0.5) !important;
-  color: var(--text-primary) !important;
-}
-.ant-table-wrapper .ant-table-tbody > tr:hover > td {
-  background: rgba(245, 158, 11, 0.04) !important;
+
+/* hover 微亮 — 在斑马纹之后，优先级更高 */
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background-color: rgba(255, 255, 255, 0.025) !important;
 }
 
-/* Tag styling */
-.ant-tag {
-  border-radius: 4px !important;
-  font-weight: 500 !important;
-  border: none !important;
+/* hover 覆盖斑马纹 — 偶数行 hover 稍亮 */
+.ant-table-tbody > tr.ant-table-row:nth-child(even):hover > td {
+  background-color: rgba(255, 255, 255, 0.035) !important;
 }
 
-/* Input / Select */
-.ant-input, .ant-input-number, .ant-select-selector {
-  background: var(--bg-elevated) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-primary) !important;
-  border-radius: var(--radius-sm) !important;
-}
-.ant-input:hover, .ant-input-number:hover, .ant-select-selector:hover {
-  border-color: var(--accent-gold) !important;
-}
-.ant-input:focus, .ant-input-number-focused, .ant-select-focused .ant-select-selector {
-  border-color: var(--accent-gold) !important;
-  box-shadow: 0 0 0 2px var(--accent-gold-glow) !important;
+/* ═══════════════════════════════════════════════════════════════
+ * 8. 页面根背景色 — 用于 body/html
+ * ═══════════════════════════════════════════════════════════════ */
+
+html, body {
+  background: var(--gipfel-bg);
+  color: var(--gipfel-text-primary);
+  font-family: var(--gipfel-font-sans);
 }
 
-/* Button */
-.ant-btn-primary {
-  background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-hover)) !important;
-  border: none !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25) !important;
-}
-.ant-btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35) !important;
+/* ═══════════════════════════════════════════════════════════════
+ * 9. 温暖专业派 — Warm Professional
+ *    卡片厚度 + 暖色hover + 私人银行质感
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* 卡片厚度 */
+.card-warm {
+  background: var(--gipfel-elevated) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important;
+  border: 1px solid var(--gipfel-border) !important;
 }
 
-/* Modal */
-.ant-modal-content {
-  background: var(--bg-surface) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: var(--radius-lg) !important;
-}
-.ant-modal-header {
-  background: transparent !important;
-  border-bottom: 1px solid var(--border-color) !important;
-}
-.ant-modal-title {
-  color: var(--text-primary) !important;
+/* 暖色hover */
+.warm-hover:hover {
+  background: rgba(180,140,80,0.04) !important;
 }
 
-/* Statistic */
-.ant-statistic-title {
-  color: var(--text-secondary) !important;
-  font-size: 12px !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+/* ═══════════════════════════════════════════════════════════════
+ * 10. 5个签名微交互
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* 1. 按钮压感 */
+@keyframes btn-press-in {
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(1px) scale(0.97); }
 }
-.ant-statistic-content {
-  color: var(--text-primary) !important;
-  font-family: 'JetBrains Mono', monospace;
+@keyframes btn-release-out {
+  from { transform: translateY(1px) scale(0.97); }
+  to   { transform: translateY(0) scale(1); }
+}
+.btn-pressure { transition: transform 100ms ease; }
+.btn-pressure:active { animation: btn-press-in 100ms ease forwards; }
+
+/* 2. KPI 呼吸 */
+.kpi-breathing { transition: color 200ms ease; color: #E2E8F0; }
+.kpi-breathing:hover { color: #FFFFFF; }
+
+/* 3. 侧栏锁定 */
+.sidebar-lock {
+  transition: font-weight 150ms ease, letter-spacing 150ms ease;
+  font-weight: 400; letter-spacing: normal;
+}
+.sidebar-lock.active {
+  font-weight: 500; letter-spacing: -0.02em;
 }
 
-/* Tabs */
-.ant-tabs-tab {
-  color: var(--text-secondary) !important;
+/* 4. 表格标尺 */
+.data-row { position: relative; }
+.data-row::after {
+  content: ''; position: absolute; bottom: 0; left: 8px; right: 8px;
+  height: 1px; background: #1E2D40;
+  transition: height 150ms ease, background 150ms ease;
 }
-.ant-tabs-tab-active {
-  color: var(--accent-gold) !important;
+.data-row:hover::after { height: 1.5px; background: #D4AF37; }
+
+/* 5. 导航确认 — 页面标题提前淡入 */
+@keyframes nav-ripple {
+  0%   { opacity: 0; transform: translateY(2px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
-.ant-tabs-ink-bar {
-  background: var(--accent-gold) !important;
+.page-enter {
+  animation: nav-ripple 300ms ease-out both;
+  animation-delay: 50ms;
 }
 
-/* Empty state */
-.ant-empty-description {
-  color: var(--text-muted) !important;
+/* ═══════════════════════════════════════════════════════════════
+ * 11. 金融级登录页增强 — Gold+Glass
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* Login-only financial palette overrides. */
+.gipfel-login__input.ant-input-affix-wrapper,
+.gipfel-login__input.ant-input {
+  background: rgba(11, 39, 72, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f5f7fa !important;
 }
 
-/* Spin */
-.ant-spin-dot-item { background-color: var(--accent-gold) !important; }
-
-/* Alert */
-.ant-alert {
-  border-radius: var(--radius-sm) !important;
+/* Login input placeholder — 暗灰 muted */
+.gipfel-login__input.ant-input-affix-wrapper input::placeholder,
+.gipfel-login__input.ant-input::placeholder {
+  color: rgba(138, 155, 181, 0.45) !important;
 }
-.ant-alert-info {
-  background: rgba(6, 182, 212, 0.1) !important;
-  border: 1px solid rgba(6, 182, 212, 0.2) !important;
+
+.gipfel-login__input.ant-input-affix-wrapper:focus,
+.gipfel-login__input.ant-input-affix-wrapper-focused,
+.gipfel-login__input.ant-input:focus {
+  border-color: #d4af37 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.14) !important;
+}
+
+/* Login button arrow micro-movement */
+@keyframes arrowShift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+.gipfel-login__arrow {
+  display: inline-block;
+  animation: arrowShift 2s ease-in-out infinite;
+  transition: transform 150ms ease;
+}
+
+.gipfel-login .ant-btn-primary:hover .gipfel-login__arrow {
+  animation: none;
+  transform: translateX(4px);
+}
+
+.gipfel-login .ant-btn-primary,
+.gipfel-login .ant-btn-primary:hover,
+.gipfel-login .ant-btn-primary:active {
+  background: linear-gradient(110deg, #c79f29 0%, #d4af37 45%, #f5d76e 100%) !important;
+  border: 0 !important;
+  color: #061a33 !important;
+}
+
+.gipfel-login .ant-btn-primary:hover {
+  box-shadow: 0 8px 32px rgba(212, 175, 55, 0.42) !important;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 820px) {
+  .gipfel-login { flex-direction: column; }
+  .gipfel-login__brand { flex: 0 0 34vh; min-height: 260px; }
+  .gipfel-login__panel { width: 100% !important; padding: 0 24px 36px; box-sizing: border-box; }
+  .gipfel-login__card { max-width: 440px !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * 12. 响应式布局 — 全局
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* 表格容器在小屏上水平滚动 */
+@media (max-width: 960px) {
+  .responsive-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .responsive-table-wrap .ant-table {
+    min-width: 600px;
+  }
+
+  /* KPI 网格 — 4列变2列 */
+  .kpi-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 区域卡片 — 4列变2列 */
+  .region-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 图表行 — 3列变1列 */
+  .chart-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 600px) {
+  /* KPI 网格 — 2列变1列 */
+  .kpi-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 区域卡片 — 2列变1列 */
+  .region-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 表单行 — 并排变堆叠 */
+  .form-row-responsive {
+    flex-direction: column !important;
+  }
+  .form-row-responsive > * {
+    width: 100% !important;
+    flex: none !important;
+  }
+}
+
+/* ── Toast 通知动画 ── */
+.gipfel-toast-enter {
+  animation: gipfelToastIn 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes gipfelToastIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

@@ -114,14 +114,14 @@ export function seedDefaultData(): void {
 
   // 示例公司
   const companies = [
-    ['建设集团一公司', 'A区', '施工方', '张三'],
-    ['市政工程公司', 'B区', '施工方', '李四'],
-    ['设计研究院', 'A区', '设计方', '王五'],
-    ['设备供应公司', 'C区', '供应商', '赵六']
+    ['建设集团一公司', 'A区', 1, '施工方', '张三'],
+    ['市政工程公司', 'B区', 2, '施工方', '李四'],
+    ['设计研究院', 'A区', 1, '设计方', '王五'],
+    ['设备供应公司', 'C区', 3, '供应商', '赵六']
   ]
   for (const comp of companies) {
     db.run(
-      `INSERT OR IGNORE INTO companies (name, region, company_type, contact) VALUES (?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO companies (name, region, region_id, company_type, contact) VALUES (?, ?, ?, ?, ?)`,
       comp
     )
   }
@@ -177,7 +177,7 @@ export function seedDefaultData(): void {
       const rname = regRows[0].values[i][1] as string
       db.run(
         'INSERT INTO region_accounts (region_id, account_name, balance) VALUES (?, ?, ?)',
-        [rid, `${rname}财务账户`, 1000000]
+        [rid, `${rname}财务账户`, 0]
       )
     }
     db.run(

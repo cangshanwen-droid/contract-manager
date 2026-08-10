@@ -1,7 +1,6 @@
 import { IPC_CHANNELS } from '../../../shared/constants'
 import type { Company } from '../../../shared/types'
-
-const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
+import { invoke } from './cloudApi'
 
 export const companyApi = {
   list: () => invoke(IPC_CHANNELS.COMPANY_LIST) as Promise<Company[]>,
