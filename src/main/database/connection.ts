@@ -282,9 +282,17 @@ export function restoreDatabaseFromFile(filePath: string): void {
   if (!fs.existsSync(filePath)) throw new Error('备份文件不存在')
   const buffer = fs.readFileSync(filePath)
   const candidate = new SQLModule.Database(buffer)
-  if (candidate.checkIntegrity() !== 'ok') {
+  // 同 tryLoadDatabase 修复：sql.js 无 checkIntegrity() 方法，用 PRAGMA 校验
+  try {
+    const res = candidate.exec('PRAGMA integrity_check')
+    const ok = Array.isArray(res) && res.length > 0 && res[0]?.values?.[0]?.[0] === 'ok'
+    if (!ok) {
+      try { candidate.close() } catch { /* ignore */ }
+      throw new Error('备份文件完整性校验失败，请确认是有效的数据库备份')
+    }
+  } catch (err: any) {
     try { candidate.close() } catch { /* ignore */ }
-    throw new Error('备份文件完整性校验失败，请确认是有效的数据库备份')
+    throw new Error(`备份文件完整性校验失败：${err?.message || String(err)}`)
   }
   if (db) {
     try { db.close() } catch { /* ignore */ }
