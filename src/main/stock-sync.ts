@@ -13,9 +13,9 @@ import { net, app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import { getDatabase } from './database/connection'
+import { getAdminKey } from './credential-store'
 
 const STOCK_API = 'https://106.54.26.86'
-const ADMIN_KEY = 'gipfel-admin-prod-2026'
 const MAX_LOG_LINES = 200
 
 function logPath() { return path.join(app.getPath('userData'), 'stock-sync.log') }
@@ -71,9 +71,15 @@ interface StockUpdatePayload {
 
 async function callStockAPI(symbol: string, payload: StockUpdatePayload): Promise<{ accepted: boolean; error?: string }> {
   try {
+    // 管理端密钥：环境变量 GIPFEL_ADMIN_KEY → userData/admin-key.txt（绝不硬编码）
+    const adminKey = getAdminKey()
+    if (!adminKey) {
+      appendLog('未配置管理端密钥（GIPFEL_ADMIN_KEY / admin-key.txt），跳过股票同步')
+      return { accepted: false, error: '未配置管理端密钥' }
+    }
     const res = await net.fetch(`${STOCK_API}/admin/stocks/${symbol.toUpperCase()}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
       body: JSON.stringify(payload),
     })
     const text = await res.text()

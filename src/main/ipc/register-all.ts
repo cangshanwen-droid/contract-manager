@@ -39,4 +39,5 @@ export function registerAllHandlers(): void {
   registerAuditHandlers()
   registerNotificationHandlers()
   registerSystemHandlers()
+  registerCredentialHandlers()
 }

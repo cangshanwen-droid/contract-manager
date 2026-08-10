@@ -86,7 +86,11 @@ export const IPC_CHANNELS = {
   STOCK_TEST_CONNECTION: 'stock:test-connection',
   STOCK_SYNC_LOG: 'stock:sync-log',
   STOCK_GET_MARKET: 'stock:get-market',
-  STOCK_GET_QUOTE: 'stock:get-quote'
+  STOCK_GET_QUOTE: 'stock:get-quote',
+
+  CREDENTIAL_SET: 'credential:set',
+  CREDENTIAL_GET: 'credential:get',
+  ADMIN_GET_KEY: 'admin:get-key'
 } as const
 
 export const CONTRACT_STATUS_OPTIONS = [

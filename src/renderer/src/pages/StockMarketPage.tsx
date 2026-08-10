@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-import { Button, Spin, Result, Card, Tag, Empty } from 'antd'
+import { Button, Spin, Result, Card, Tag, Empty, message } from 'antd'
 import {
   ArrowLeftOutlined, StockOutlined, ReloadOutlined,
   GlobalOutlined, LoadingOutlined, RiseOutlined, FallOutlined,
@@ -37,32 +37,33 @@ const PAGE_HEIGHT = 'calc(100vh - 52px - 64px)'
 const QUOTE_REFRESH_MS = 30000
 
 /** 统一登录：桌面端登录后自动获取云端股票 token，iframe 免登录 */
-async function fetchArenaUrl(): Promise<string> {
+async function fetchArenaUrl(): Promise<{ url: string; usingDefault: boolean }> {
   try {
-    const saved = localStorage.getItem('gipfel_local_credentials')
+    // 凭据由主进程 safeStorage 加密存储（credential:get），不再读 localStorage 明文
     let username = 'admin'
     let password = 'admin123'
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (parsed?.username) username = parsed.username
-        if (parsed?.password) password = parsed.password
-      } catch { /* 非 JSON 则用默认 */ }
+    let usingDefault = true
+    const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+    const saved = r?.success ? r.credentials : null
+    if (saved?.username && saved?.password) {
+      username = saved.username
+      password = saved.password
+      usingDefault = false
     }
     const res = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     })
-    if (!res.ok) return CLOUD_ARENA_URL
+    if (!res.ok) return { url: CLOUD_ARENA_URL, usingDefault }
     const data = await res.json()
     const token = data?.token || ''
     const role = data?.user?.role || ''
-    if (!token) return CLOUD_ARENA_URL
+    if (!token) return { url: CLOUD_ARENA_URL, usingDefault }
     const qs = new URLSearchParams({ token, username, role })
-    return `${CLOUD_ARENA_URL}?${qs.toString()}`
+    return { url: `${CLOUD_ARENA_URL}?${qs.toString()}`, usingDefault }
   } catch {
-    return CLOUD_ARENA_URL
+    return { url: CLOUD_ARENA_URL, usingDefault: true }
   }
 }
 
@@ -143,7 +144,14 @@ const StockMarketPage: React.FC = () => {
   useEffect(() => {
     if (role === 'rep') return
     let alive = true
-    fetchArenaUrl().then(url => { if (alive) setArenaSrc(url) })
+    fetchArenaUrl().then(({ url, usingDefault }) => {
+      if (!alive) return
+      setArenaSrc(url)
+      if (usingDefault) {
+        // 无已保存凭据时回退默认账号并提示用户（安全审计 P1-7）
+        message.warning('未找到已保存的登录凭据，正在使用默认账号（admin/admin123），如需自定义请先在登录页重新登录')
+      }
+    })
     return () => { alive = false }
   }, [role])
 

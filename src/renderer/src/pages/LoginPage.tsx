@@ -118,8 +118,8 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         if (result.success) {
           // 本地 token 兜底 + 联机同步
           setAuthToken(JSON.stringify({ u: result.user.username, t: Date.now() }))
-          // 统一登录：保存凭据供股票系统免登录（桌面单机内部应用）
-          localStorage.setItem('gipfel_local_credentials', JSON.stringify({ username: v.username, password: v.password }))
+          // 统一登录：凭据经主进程 safeStorage 加密保存（供股票系统免登录），不再写 localStorage 明文
+          try { await invoke(IPC_CHANNELS.CREDENTIAL_SET, { username: v.username, password: v.password }) } catch { /* 保存失败不影响登录 */ }
           // 后台请求云端 token（不阻塞登录流程，失败静默降级）
           cloudLogin(v.username, v.password)
           onLogin(result.user)
@@ -129,8 +129,8 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         if (result.success) {
           // 本地 token 兜底 + 联机同步
           setAuthToken(JSON.stringify({ u: result.user.username, t: Date.now() }))
-          // 统一登录：保存凭据供股票系统免登录（桌面单机内部应用）
-          localStorage.setItem('gipfel_local_credentials', JSON.stringify({ username: v.username, password: v.password }))
+          // 统一登录：凭据经主进程 safeStorage 加密保存（供股票系统免登录），不再写 localStorage 明文
+          try { await invoke(IPC_CHANNELS.CREDENTIAL_SET, { username: v.username, password: v.password }) } catch { /* 保存失败不影响登录 */ }
           // 后台请求云端 token（不阻塞登录流程，失败静默降级）
           cloudLogin(v.username, v.password)
           onLogin(result.user)
