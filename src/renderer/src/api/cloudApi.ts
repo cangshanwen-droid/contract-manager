@@ -16,22 +16,20 @@ const CLOUD_MODE_KEY = 'cloudMode'
 /** 云端请求超时（P0-2 修复）：断网时 10s 内中止，避免请求悬挂 30s+ */
 const REQUEST_TIMEOUT_MS = 10000
 
-// ── 云端模式开关 ──
+// ── 云端模式（固定开启）──
+//
+// 产品决策：多办公点共享同一云端，固定云端模式，不提供本地模式切换。
+// 本地模式会导致"数据不互通"（本地 SQLite 与云端 REST 两套存储），
+// 用户误切换后录的数据在云端不可见，体验陷阱。故 isCloudMode 恒 true，
+// setCloudMode 保留签名但不再生效（兼容旧调用）。
 
 export function isCloudMode(): boolean {
-  try {
-    // 默认云端模式：多用户实时共享（登录走本地 IPC 直连，数据读写走云端 API）
-    // 离线/无网时可在设置页手动切回本地模式
-    const v = localStorage.getItem(CLOUD_MODE_KEY)
-    if (v === null) return true
-    return v === 'true'
-  } catch {
-    return true
-  }
+  return true
 }
 
-export function setCloudMode(v: boolean): void {
-  localStorage.setItem(CLOUD_MODE_KEY, String(v))
+export function setCloudMode(_v: boolean): void {
+  // 固定云端模式：忽略切换请求（不再写入 localStorage）
+  return
 }
 
 // ── token 管理 ──

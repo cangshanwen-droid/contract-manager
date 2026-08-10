@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Card, Typography, Button, Space, message, Switch, Divider, Input, Alert, Modal } from 'antd'
 import { DownloadOutlined, UploadOutlined, DatabaseOutlined, ClockCircleOutlined, CloudOutlined, FileExcelOutlined, RollbackOutlined, SaveOutlined, ApiOutlined, ReloadOutlined } from '@ant-design/icons'
 import { IPC_CHANNELS } from '../../../shared/constants'
-import { isCloudMode, setCloudMode, invoke } from '../api/cloudApi'
+import { invoke } from '../api/cloudApi'
 import { tokens as T } from '../styles/design-tokens'
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
 
@@ -15,7 +15,6 @@ const SettingsPage: React.FC = () => {
   const [excelExporting, setExcelExporting] = useState<string | null>(null)
   const [autoBackup, setAutoBackup] = useState(() => localStorage.getItem('autoBackup') === 'true')
   const [dbInfo, setDbInfo] = useState<{ path: string; size_formatted: string } | null>(null)
-  const [cloudMode, setCloudModeState] = useState(isCloudMode)
   // ── 服务器状态 ──
   const [health, setHealth] = useState<any>(null)
   const [healthLoading, setHealthLoading] = useState(false)
@@ -192,42 +191,30 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div>
-      {/* 云端模式 */}
+      {/* 云端模式（固定开启） */}
       <div style={cardStyle}>
         <div style={cardTitleStyle}>
           <CloudOutlined style={{ marginRight: 6 }} />云端模式
         </div>
         <div style={{ fontSize: 12, color: T.silver2, marginBottom: 12 }}>
-          开启后，所有数据页面直接从 <code style={{ color: T.accent }}>{CLOUD_API_BASE}</code> 云端读取数据，绕过本地 SQLite
+          系统固定使用云端数据源：所有数据实时共享于 <code style={{ color: T.accent }}>{CLOUD_API_BASE}</code>，多办公点数据互通
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Switch
-            checked={cloudMode}
-            onChange={(v) => {
-              setCloudModeState(v)
-              setCloudMode(v)
-              // 切换后自动刷新页面，使所有数据页面立即切换到新数据源（无需手动刷新）
-              setTimeout(() => window.location.reload(), 200)
-            }}
-          />
-          <span style={{ fontSize: 13, color: cloudMode ? T.accent : T.silver3, fontWeight: 500 }}>
-            {cloudMode ? '● 云端模式' : '○ 本地模式'}
-          </span>
+          <span style={{ fontSize: 13, color: T.accent, fontWeight: 500 }}>● 云端模式（固定）</span>
+          <span style={{ fontSize: 11, color: T.silver2 }}>为保证多办公点数据互通，不提供本地模式切换</span>
         </div>
-        {cloudMode && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginTop: 12, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}
-            message="当前使用云端数据源"
-            description={
-              <span style={{ fontSize: 11 }}>
-                所有 region / company / contract / dashboard 数据将从 <code>${CLOUD_API_BASE}</code> 读取。
-                认证使用 Gipfel 统一登录凭证，无需单独配置。
-              </span>
-            }
-          />
-        )}
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginTop: 12, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}
+          message="当前使用云端数据源"
+          description={
+            <span style={{ fontSize: 11 }}>
+              所有 region / company / contract / dashboard 数据从 {CLOUD_API_BASE} 读取，
+              各办公点看到同一份数据。认证使用 Gipfel 统一登录凭证，无需单独配置。
+            </span>
+          }
+        />
       </div>
 
       {/* 数据管理 */}
