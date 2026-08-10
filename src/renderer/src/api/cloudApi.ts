@@ -58,7 +58,7 @@ export async function cloudLogin(username: string, password: string): Promise<st
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await window.fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -91,7 +91,7 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal })
+    const res = await window.fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
       throw new Error(`云端 API 错误 ${res.status}: ${body || res.statusText}`)
@@ -112,8 +112,11 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
 }
 
 // ── 公开导出 fetch 供直接调用（股票页面使用）──
-
-export const fetch = cloudFetch
+// ⚠️ 修复（v1.3.0 严重 bug）：此前 `export const fetch = cloudFetch` 在模块作用域
+// 覆盖了全局 fetch——cloudFetch 内部 `await fetch(...)` 因此调用自身 → 无限递归
+// → 每次云端请求 Maximum call stack size exceeded（用户看到"加载失败"）。
+// 无人 import 此导出，直接移除；cloudFetch 内部显式用 window.fetch。
+// export const fetch = cloudFetch
 
 /** 云端完整版地址（股票交易 Arena） */
 export const CLOUD_ARENA_URL = `${CLOUD_API_BASE}`
