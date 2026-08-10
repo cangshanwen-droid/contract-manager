@@ -158,9 +158,18 @@ function createWindow(): void {
 
   // 导航拦截：禁止渲染进程导航到任意外部页面（安全审计 P0-1）
   // 防止 XSS 后 location.href 跳到恶意站点并携带 preload 桥
+  // v1.3.0 修复（安全审计 P1-1）：与 setWindowOpenHandler 一致改用 URL.hostname
+  // 精确匹配，杜绝 startsWith 前缀绕过（https://106.54.26.86.evil.com）
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = url.startsWith('file://') || url.startsWith('http://localhost') ||
-      url.startsWith('https://106.54.26.86') || url.startsWith('http://106.54.26.86')
+    let allowed = false
+    try {
+      const u = new URL(url)
+      const hostOk = u.hostname === 'localhost' || u.hostname === '127.0.0.1' ||
+        TRUSTED_CERT_HOSTS.some(h => u.hostname === h || u.hostname.endsWith(`.${h}`))
+      allowed = (u.protocol === 'file:' && !u.hostname) ||
+        (u.protocol === 'http:' && hostOk) ||
+        (u.protocol === 'https:' && hostOk)
+    } catch { /* 非 URL 一律拒绝 */ }
     if (!allowed) {
       console.warn(`[will-navigate] 已拦截导航: ${url.slice(0, 80)}`)
       event.preventDefault()

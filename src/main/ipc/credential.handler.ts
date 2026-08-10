@@ -34,6 +34,11 @@ export function registerCredentialHandlers(): void {
   // ── credential:get：读取已加密保存的凭据 ──
   ipcMain.handle(IPC_CHANNELS.CREDENTIAL_GET, () => {
     try {
+      // v1.3.0 安全加固（审计 P1-2）：与 credential:set 对称，仅已登录会话可读
+      // 明文凭据（safeStorage 解密），防止未授权渲染上下文窃取用户名/密码
+      if (!getSessionUser()) {
+        return { success: false, code: 'UNAUTHORIZED', message: '未登录，无法读取凭据' }
+      }
       return { success: true, credentials: getCredentials() }
     } catch (e: any) {
       console.error('CREDENTIAL_GET failed:', e)
