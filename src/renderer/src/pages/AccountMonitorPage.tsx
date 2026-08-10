@@ -146,7 +146,7 @@ const AccountMonitorPage: React.FC = () => {
     accountsInFlightRef.current = true
     setLoading(true)
     try {
-      const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}admin/accounts`)
+      const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}/admin/accounts`)
       setAccounts(Array.isArray(data) ? data : [])
       cloudFailedRef.current = false
       setCloudDisconnected(false)
@@ -203,7 +203,7 @@ const AccountMonitorPage: React.FC = () => {
     setDetailLoading(true)
     setDetail(null)
     try {
-      const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}admin/accounts/${id}`)
+      const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}/admin/accounts/${id}`)
       setDetail(data)
     } catch (e: any) {
       message.error(`详情加载失败：${e?.message || '网络错误'}`)
