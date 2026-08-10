@@ -75,6 +75,9 @@ const ALLOWED_INVOKE_CHANNELS: string[] = [
   // ── 凭据（统一登录）──
   IPC_CHANNELS.CREDENTIAL_SET,
   IPC_CHANNELS.CREDENTIAL_GET,
+  // 管理端密钥（v1.3.0 修复：此前未登记白名单 → 账户监控页永远"未配置管理端密钥"；
+  // 密钥来自本机 userData/admin-key.txt，主进程 handler 有 admin 会话校验）
+  IPC_CHANNELS.ADMIN_GET_KEY,
   // ── 数据管理 ──
   IPC_CHANNELS.DB_BACKUP_TO_DESKTOP,
   IPC_CHANNELS.DB_RESTORE,

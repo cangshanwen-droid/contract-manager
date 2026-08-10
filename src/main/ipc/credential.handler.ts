@@ -43,6 +43,13 @@ export function registerCredentialHandlers(): void {
 
   // ── admin:get-key：管理端密钥（env → admin-key.txt → null）──
   ipcMain.handle(IPC_CHANNELS.ADMIN_GET_KEY, () => {
+    // v1.3.0 安全加固：仅 admin 会话可获取管理密钥（rep/operator 不可）
+    try {
+      const session = getSessionUser()
+      if (!session || session.role !== 'admin') {
+        return { success: false, code: 'FORBIDDEN', message: '无管理权限' }
+      }
+    } catch { /* 会话模块不可用时放行（保持原有行为） */ }
     const key = getAdminKey()
     if (!key) {
       return {
