@@ -420,11 +420,19 @@ export function registerContractHandlers(): void {
       const perm = requirePermission(PERMISSIONS.CONTRACT_EDIT, '没有删除合同的权限')
       if (!perm.ok) return perm.response
       const contract = repo.getById(id)
+      // 交付验收修复：已入账合同禁止删除（防 id 复用后流水误判幂等）
+      // 已执行/已完成的合同资金已入账，删除会导致余额与流水脱钩；应走「终止」而非删除
+      if (contract && (contract.status === 'active' || contract.status === 'completed')) {
+        return { success: false, message: '已执行或已完成的合同不能删除，请使用「终止合同」' }
+      }
       const oldSnapshot = contract ? JSON.stringify({
         contract_no: contract.contract_no,
         contract_name: contract.contract_name,
         status: contract.status
       }) : null
+      const db = getDatabase()
+      // 同步清理关联流水（防 AUTOINCREMENT 重置后新合同复用 id 命中旧流水）
+      db.run('DELETE FROM account_transactions WHERE contract_id = ? AND source_type = ?', [id, 'contract'])
       repo.delete(id)
       insertAuditLog({
         username: auditIdentity().username,
