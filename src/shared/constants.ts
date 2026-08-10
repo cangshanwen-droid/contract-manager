@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   CONTRACT_UPDATE: 'contract:update',
   CONTRACT_DELETE: 'contract:delete',
   CONTRACT_APPROVE: 'contract:approve',
+  CONTRACT_BATCH_APPROVE: 'contract:batch-approve',
   CONTRACT_SUMMARIZE: 'contract:summarize',
   CONTRACT_LIST_VERSIONS: 'contract:list-versions',
 
@@ -46,6 +47,7 @@ export const IPC_CHANNELS = {
   AUTH_CHANGE_PASSWORD: 'auth:change-password',
   AUTH_CREATE_USER: 'auth:create-user',
   AUTH_DELETE_USER: 'auth:delete-user',
+  AUTH_RESET_PASSWORD: 'auth:reset-password',
   AUTH_LIST_USERS: 'auth:list-users',
 
   ACCOUNT_LIST: 'account:list',

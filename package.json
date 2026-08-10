@@ -1,6 +1,6 @@
 {
   "name": "contract-manager",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "基础设施合同管理 + 区域模拟系统",
   "main": "./out/main/index.js",
   "scripts": {

@@ -12,9 +12,11 @@ import {
   Table, Button, Modal, Form, Input, Select, Space,
   Typography, message, Tag, Popconfirm, Empty
 } from 'antd'
-import { PlusOutlined, UserOutlined } from '@ant-design/icons'
+import { PlusOutlined, UserOutlined, KeyOutlined } from '@ant-design/icons'
 import { IPC_CHANNELS } from '../../../shared/constants'
+import { PERMISSIONS, hasPermission } from '../../../shared/permissions'
 import { invoke } from '../api/cloudApi'
+import { useAuth } from '../context/AuthContext'
 import dayjs from 'dayjs'
 import { tokens as T } from '../styles/design-tokens'
 
@@ -44,11 +46,19 @@ interface Props {
 }
 
 const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole }) => {
+  const user = useAuth()
+  // 仅 admin / 拥有 user.manage 权限者可重置密码
+  const canManage = hasPermission(user, PERMISSIONS.USER_MANAGE)
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm] = Form.useForm()
   const [deleteConfirming, setDeleteConfirming] = useState<number | null>(null)
+  // ── 重置密码弹窗 ──
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetForm] = Form.useForm()
 
   const load = async () => {
     setLoading(true)
@@ -112,6 +122,45 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
       message.error(err?.message || '删除失败')
     } finally {
       setDeleteConfirming(null)
+    }
+  }
+
+  // ── 重置密码：打开弹窗（仅 admin）──
+  const openReset = (row: UserRow) => {
+    setResetTarget(row)
+    resetForm.resetFields()
+    setResetOpen(true)
+  }
+
+  const handleReset = async () => {
+    if (!resetTarget) return
+    try {
+      const vals = await resetForm.validateFields()
+      setResetSubmitting(true)
+      const r = await invoke(
+        IPC_CHANNELS.AUTH_RESET_PASSWORD,
+        resetTarget.id,
+        vals.password,
+        user?.username || '',
+        user?.role || ''
+      ) as any
+      if (!r.success) {
+        message.error(r.message || '重置失败')
+        return
+      }
+      // 允许重置自己，但给出提示
+      if (r.isSelf) {
+        message.info(`已重置「${resetTarget.username}」的密码（当前登录账号，下次登录请使用新密码）`)
+      } else {
+        message.success(`已重置「${resetTarget.username}」的密码`)
+      }
+      setResetOpen(false)
+      load()
+    } catch (err: any) {
+      if (err?.errorFields) return
+      message.error(err?.message || '重置失败')
+    } finally {
+      setResetSubmitting(false)
     }
   }
 
@@ -179,30 +228,43 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 170,
       render: (_: unknown, row: UserRow) => {
         const isSelf = currentUserId && row.id === currentUserId
         const isLastAdmin = row.role === 'admin' && users.filter(u => u.role === 'admin').length <= 1
         const disabled = isSelf || isLastAdmin
         return (
-          <Popconfirm
-            title={isSelf ? '不能删除自己的账号' : isLastAdmin ? '不能删除最后一个管理员' : '确认删除该用户？'}
-            onConfirm={() => handleDelete(row.id)}
-            disabled={disabled}
-            okText="删除"
-            cancelText="取消"
-          >
-            <Button
-              type="link"
-              size="small"
-              danger
+          <Space size={0} split={null}>
+            {canManage && (
+              <Button
+                type="link"
+                size="small"
+                icon={<KeyOutlined />}
+                style={{ padding: '0 6px', fontSize: 12, color: T.primary }}
+                onClick={() => openReset(row)}
+              >
+                重置密码
+              </Button>
+            )}
+            <Popconfirm
+              title={isSelf ? '不能删除自己的账号' : isLastAdmin ? '不能删除最后一个管理员' : '确认删除该用户？'}
+              onConfirm={() => handleDelete(row.id)}
               disabled={disabled}
-              loading={deleteConfirming === row.id}
-              style={{ padding: 0, fontSize: 12 }}
+              okText="删除"
+              cancelText="取消"
             >
-              删除
-            </Button>
-          </Popconfirm>
+              <Button
+                type="link"
+                size="small"
+                danger
+                disabled={disabled}
+                loading={deleteConfirming === row.id}
+                style={{ padding: '0 6px', fontSize: 12 }}
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
         )
       },
     },
@@ -300,6 +362,57 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
               ]}
             />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        title={resetTarget ? `重置密码 — ${resetTarget.username}` : '重置密码'}
+        open={resetOpen}
+        onCancel={() => { resetForm.resetFields(); setResetOpen(false) }}
+        onOk={handleReset}
+        okText="重置"
+        confirmLoading={resetSubmitting}
+        width={420}
+        destroyOnClose
+      >
+        <Form form={resetForm} layout="vertical" size="small">
+          <Form.Item
+            name="password"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 6, message: '密码至少 6 个字符' },
+              {
+                pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
+                message: '密码需包含字母和数字',
+              },
+            ]}
+          >
+            <Input.Password placeholder="输入新密码（至少6位，含字母和数字）" />
+          </Form.Item>
+          <Form.Item
+            name="confirm"
+            label="确认新密码"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: '请再次输入新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve()
+                  }
+                  return Promise.reject(new Error('两次输入的密码不一致'))
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="再次输入新密码" />
+          </Form.Item>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            管理员重置密码无需原密码；重置后该用户需使用新密码登录。
+            {currentUserId && resetTarget?.id === currentUserId && '（当前为重置自己的账号，请牢记新密码）'}
+          </Typography.Text>
         </Form>
       </Modal>
     </div>

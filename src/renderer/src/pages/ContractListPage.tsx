@@ -95,6 +95,10 @@ const ContractListPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [editSubmitting, setEditSubmitting] = useState(false)
+  // ── 批量操作：行选择 + 批量栏 ──
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [batchAction, setBatchAction] = useState<'' | 'submit' | 'approve' | 'delete'>('')
+  const batchBusy = batchAction !== ''
   const [formOpen, setFormOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -343,6 +347,49 @@ const ContractListPage: React.FC = () => {
       message.success('删除成功')
     } catch {
       message.error('删除失败')
+    }
+  }
+
+  // ── 批量操作：批量提交审批 / 批量批准 / 批量删除 ──
+  const selectedContracts = contracts.filter(c => selectedRowKeys.includes(c.id))
+  // 各操作的可选条件：submit 仅草稿/已驳回；approve 仅待审批；delete 任意
+  const canBatchSubmit = selectedContracts.length > 0 && selectedContracts.every(c => c.approval_status === 'none' || c.approval_status === 'rejected')
+  const canBatchApprove = selectedContracts.length > 0 && selectedContracts.every(c => c.approval_status === 'pending')
+  const batchBarVisible = (canApprove || canEdit) && selectedRowKeys.length > 0
+
+  const handleBatch = async (action: 'submit' | 'approve' | 'delete') => {
+    if (selectedRowKeys.length === 0) return
+    setBatchAction(action)
+    try {
+      const res = await invoke(
+        IPC_CHANNELS.CONTRACT_BATCH_APPROVE,
+        selectedRowKeys.map(Number),
+        action,
+        user?.username || '',
+        user?.role || ''
+      ) as any
+      if (res && res.success === false) { message.error(res.message || '批量操作失败'); return }
+      const results = Array.isArray(res?.results) ? res.results : []
+      const okCount = results.filter((r: any) => r.success).length
+      const failCount = results.length - okCount
+      // 刷新列表：删除的移除，审批的更新状态
+      if (action === 'delete') {
+        const deletedIds = new Set(results.filter((r: any) => r.success).map((r: any) => r.id))
+        setContracts(prev => prev.filter(c => !deletedIds.has(c.id)))
+      } else {
+        load()
+      }
+      setSelectedRowKeys([])
+      if (failCount === 0) {
+        message.success(`批量${action === 'submit' ? '提交审批' : action === 'approve' ? '批准' : '删除'}成功：${okCount} 条`)
+      } else {
+        message.warning(`批量操作完成：成功 ${okCount} 条，失败 ${failCount} 条` +
+          (results.filter((r: any) => !r.success).map((r: any) => `#${r.id} ${r.message || ''}`).join('；')))
+      }
+    } catch (err: any) {
+      message.error(err?.message || '批量操作失败')
+    } finally {
+      setBatchAction('')
     }
   }
 
@@ -685,6 +732,72 @@ const ContractListPage: React.FC = () => {
             {filteredContracts.length} 条 / {contracts.length} 总计{canEdit ? '  ·  Ctrl+N 新建' : ' （只读模式）'}
           </span>
         </div>
+        {batchBarVisible && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
+            padding: '8px 12px', background: T.bgCard,
+            border: `1px solid ${T.border}`, borderRadius: 4, flexWrap: 'wrap'
+          }}>
+            <span style={{ fontSize: 12, color: T.textSecondary }}>
+              已选 <span style={{ color: T.primary, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>{selectedRowKeys.length}</span> 项
+            </span>
+            <Divider type="vertical" />
+            {canApprove && (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  disabled={!canBatchSubmit || batchBusy}
+                  loading={batchAction === 'submit'}
+                  onClick={() => handleBatch('submit')}
+                >
+                  批量提交审批
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  icon={<CheckCircleOutlined />}
+                  disabled={!canBatchApprove || batchBusy}
+                  loading={batchAction === 'approve'}
+                  onClick={() => handleBatch('approve')}
+                >
+                  批量批准
+                </Button>
+              </>
+            )}
+            {canEdit && (
+              <Popconfirm
+                title={`确认删除选中的 ${selectedRowKeys.length} 个合同？`}
+                description="删除后不可恢复"
+                onConfirm={() => handleBatch('delete')}
+                okText="删除"
+                okButtonProps={{ danger: true }}
+                disabled={batchBusy}
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={batchBusy}
+                  loading={batchAction === 'delete'}
+                >
+                  批量删除
+                </Button>
+              </Popconfirm>
+            )}
+            <span style={{ flex: 1 }} />
+            <Button
+              size="small"
+              type="link"
+              style={{ fontSize: 12, color: T.textSecondary }}
+              disabled={batchBusy}
+              onClick={() => setSelectedRowKeys([])}
+            >
+              清空选择
+            </Button>
+          </div>
+        )}
         <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4 }}>
           <Table
           dataSource={filteredContracts}
@@ -695,6 +808,11 @@ const ContractListPage: React.FC = () => {
           size="small"
           className="dense-table"
           showSorterTooltip={{ title: '点击排序' }}
+          rowSelection={canApprove || canEdit ? {
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys),
+            getCheckboxProps: () => ({ disabled: batchBusy })
+          } : undefined}
           locale={{ emptyText:
               <div style={{ padding: '24px 0' }}>
                 <Empty

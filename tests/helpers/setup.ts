@@ -29,6 +29,7 @@ vi.mock('electron', () => ({
     getPath: (name: string): string => electronMock.getPath(name),
     getAppPath: (): string => electronMock.getAppPath()
   },
+  ipcMain: { handle: vi.fn() },
   net: { fetch: vi.fn() },
   safeStorage: {
     isEncryptionAvailable: (): boolean => false,

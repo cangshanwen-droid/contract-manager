@@ -379,6 +379,104 @@ export function registerContractHandlers(): void {
     }
   })
 
+  // ── 批量操作：批量提交审批 / 批量批准 / 批量删除 ──
+  // 逐条 try/catch + 事务保护：单条失败回滚该条，不影响其他条；返回每条的成功/失败明细
+  ipcMain.handle(
+    IPC_CHANNELS.CONTRACT_BATCH_APPROVE,
+    (_e, ids: number[], action: 'submit' | 'approve' | 'delete', operator?: string, operatorRole?: string) => {
+      try {
+        const idList = Array.isArray(ids) ? ids.filter((n) => Number.isFinite(n)) : []
+        if (idList.length === 0) return { success: false, message: '未选择任何合同' }
+        if (!['submit', 'approve', 'delete'].includes(action)) {
+          return { success: false, message: '无效的批量操作类型' }
+        }
+
+        // 权限校验：批量审批（submit/approve）需要 contract.approve；批量删除需要 contract.edit（rep 无权限）
+        const perm = requirePermission(
+          action === 'delete' ? PERMISSIONS.CONTRACT_EDIT : PERMISSIONS.CONTRACT_APPROVE,
+          action === 'delete' ? '没有删除合同的权限' : '没有合同审批的权限'
+        )
+        if (!perm.ok) return perm.response
+
+        const db = getDatabase()
+        const results: { id: number; success: boolean; message: string }[] = []
+
+        for (const id of idList) {
+          // 每条独立事务：保证单条原子性，失败回滚不影响批次其他条目
+          db.run('BEGIN TRANSACTION')
+          try {
+            const before = repo.getById(id)
+            if (!before) {
+              db.run('ROLLBACK')
+              results.push({ id, success: false, message: '合同不存在' })
+              continue
+            }
+
+            if (action === 'delete') {
+              const oldSnapshot = JSON.stringify({
+                contract_no: before.contract_no,
+                contract_name: before.contract_name,
+                status: before.status
+              })
+              repo.delete(id)
+              insertAuditLog({
+                username: operator || 'system',
+                role: operatorRole || 'admin',
+                action: 'delete',
+                target: 'contract',
+                target_id: id,
+                old_value: oldSnapshot,
+                result: 'success'
+              })
+              db.run('COMMIT')
+              results.push({ id, success: true, message: '删除成功' })
+            } else {
+              const result = repo.transitionApproval(id, action, operator || '')
+              // 版本留痕：批量审批同样记录历史
+              saveVersionSnapshot(id, before, [action === 'submit' ? '提交审批' : '审批通过'], operator || '')
+              // 审计日志
+              insertAuditLog({
+                username: operator || 'system',
+                role: operatorRole || 'admin',
+                action,
+                target: 'contract',
+                target_id: id,
+                old_value: before ? JSON.stringify({ status: before.status, approval_status: before.approval_status }) : null,
+                new_value: JSON.stringify({ status: result.status, approval_status: result.approval_status }),
+                result: 'success'
+              })
+              // 通知中心触发（复用单条逻辑）
+              try {
+                if (action === 'submit') {
+                  notificationRepo.notifyContractSubmitted(result)
+                } else if (action === 'approve' && result.approval_status === 'approved') {
+                  notificationRepo.notifyContractDecision(result, 'approve')
+                }
+              } catch (err) {
+                console.error('batch notification trigger failed:', err)
+              }
+              db.run('COMMIT')
+              results.push({ id, success: true, message: action === 'submit' ? '已提交审批' : '审批通过' })
+            }
+          } catch (err: any) {
+            try { db.run('ROLLBACK') } catch { /* 回滚失败忽略（单条事务） */ }
+            results.push({ id, success: false, message: err?.message || '操作失败' })
+          }
+        }
+
+        const okCount = results.filter((r) => r.success).length
+        return {
+          success: true,
+          results,
+          summary: { total: results.length, ok: okCount, failed: results.length - okCount }
+        }
+      } catch (err: any) {
+        console.error('CONTRACT_BATCH_APPROVE failed:', err)
+        return { success: false, message: `批量操作失败：${err.message || '未知错误'}` }
+      }
+    }
+  )
+
   ipcMain.handle(IPC_CHANNELS.CONTRACT_SUMMARIZE, (_e, regionId: number) => {
     try {
       const perm = requirePermission(PERMISSIONS.CONTRACT_VIEW)

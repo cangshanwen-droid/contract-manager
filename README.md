@@ -1,23 +1,58 @@
-# Gipfel 管理系统 v1.1.0
+# Gipfel 管理系统 v1.2.1
 
-基础设施合同管理与区域商业模拟系统
+基础设施合同管理与区域商业模拟系统（Electron 桌面应用）
 
 ## 功能
 
 - 📊 仪表盘 — 决策驾驶舱，核心指标一览
 - 🗺️ 区域管理 — 多区域人口/碳排/增长模拟
 - 📝 合同管理 — 8种合同类型，搜索/筛选/编辑
+- ✅ 审批流 — 提交 / 审批 / 驳回，驳回后可重新提交，决策结果自动通知
+- 🕘 版本历史 — 合同修改记录可追溯
+- 🔐 权限矩阵（RBAC）— 按角色控制页面与操作权限
+- 🔔 通知中心 — 审批决策与合同状态变更提醒
+- 👁️ 账户监控 — 登录与账户活动监控
 - 🏢 公司管理 — 卡片视图，类型筛选
 - 🧮 模拟计算 — 步骤化公式引擎，幸福度/就业率/人口/价格
 - 🏗️ 基建计算 — 32种基础设施需求分析与补建
 - 📐 占地面积 — 排行分析图表
 - 🔗 股票联动 — 与 Gipfel Trading Arena 实时同步股价
+- ☁️ 云端同步 — 默认开启，无需手动配置
+- 🧪 测试套件 — vitest 单元测试 43 例（审批流 / 权限 / 格式化 / 股票联动）
+
+## 快速开始
+
+### 开发
+
+```bash
+npm install
+npm run dev
+```
+
+### 构建安装包
+
+```bash
+npm run build            # 仅编译
+npm run package          # 编译 + 生成 Windows 安装包 (NSIS)
+npm run package:portable # 生成便携版 (免安装)
+```
+
+### 测试与校验
+
+```bash
+npm test                 # 运行 vitest 单元测试（43 例）
+npm run verify           # 运行完整验证套件（本地 API + 云端 + UI）
+npm run verify:local     # 仅本地验证
+npm run verify:cloud     # 仅云端验证
+npm run verify:ui        # 仅 UI 验证
+npm run typecheck        # TypeScript 类型检查
+```
 
 ## 首次使用
 
-1. 双击安装包安装
+1. 双击安装包安装（或使用便携版）
 2. 启动后使用默认账号登录：
-   - 用户名: **admin**  
+   - 用户名: **admin**
    - 密码: **admin**
 3. 建议首次登录后立即创建新管理员账号
 
@@ -56,6 +91,7 @@ P_sell = P_base × (1+H/100) × (1+(Qd-Qs)/Qd_max)
 - Ant Design 5 (深色主题)
 - SQLite (sql.js) — 数据文件位于 `%APPDATA%/contract-manager/`
 - Recharts 图表库
+- Vitest 单元测试
 
 ## 数据备份
 
@@ -68,3 +104,9 @@ P_sell = P_base × (1+H/100) × (1+(Qd-Qs)/Qd_max)
 - 登录限流 (5 次/分钟)
 - IPC 错误处理全覆盖
 - 数据库操作事务保护
+- 凭据安全存储（safeStorage 加密 + adminKey 环境变量化）
+- HTTPS 支持
+
+## 许可
+
+[MIT](LICENSE) © 2026 Gipfel Institutional Platform

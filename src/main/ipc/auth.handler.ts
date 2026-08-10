@@ -250,6 +250,47 @@ export function registerAuthHandlers(): void {
     }
   })
 
+  // admin 重置任意用户密码（无需旧密码；可重置自己但前端提示；目标用户不存在时报错）
+  ipcMain.handle(
+    IPC_CHANNELS.AUTH_RESET_PASSWORD,
+    (_e, userId: number, newPwd: string, _operator?: string, _operatorRole?: string) => {
+      try {
+        // user.manage 权限校验（基于主进程会话，不信任渲染进程传入的角色）
+        const perm = requirePermission(PERMISSIONS.USER_MANAGE, '没有重置密码的权限')
+        if (!perm.ok) return perm.response
+
+        if (newPwd.length < 6) return { success: false, message: '新密码至少6个字符' }
+        if (!/[A-Za-z]/.test(newPwd) || !/[0-9]/.test(newPwd)) {
+          return { success: false, message: '新密码需包含字母和数字' }
+        }
+
+        const user = queryOne('SELECT id, username, role FROM users WHERE id = ?', [userId])
+        if (!user) return { success: false, message: '用户不存在' }
+
+        const hash = bcrypt.hashSync(newPwd, BCRYPT_ROUNDS)
+        getDatabase().run('UPDATE users SET password = ? WHERE id = ?', [hash, userId])
+
+        // 审计日志（记录被重置用户与操作者）
+        insertAuditLog({
+          username: _operator || (user.username as string),
+          role: _operatorRole || (user.role as string) || 'user',
+          action: 'reset_password',
+          target: 'user',
+          target_id: userId,
+          new_value: JSON.stringify({ username: user.username, role: user.role }),
+          result: 'success'
+        })
+
+        // 允许重置自己，但向前端返回提示标记
+        const isSelf = getSessionUser()?.id === userId
+        return { success: true, isSelf }
+      } catch (err: any) {
+        console.error('AUTH_RESET_PASSWORD failed:', err)
+        return { success: false, message: `重置密码失败：${err.message || '未知错误'}` }
+      }
+    }
+  )
+
   // 列出所有用户（登录页首次使用检测需要匿名放行；会话存在时要求 user.manage）
   ipcMain.handle(IPC_CHANNELS.AUTH_LIST_USERS, () => {
     try {
