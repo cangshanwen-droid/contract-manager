@@ -5,7 +5,7 @@ import { getDatabase } from '../database/connection'
 import { queryAll, queryOne } from '../database/helpers'
 import { insertAuditLog } from '../database/repositories/audit.repo'
 import { notificationRepo } from '../database/repositories/notification.repo'
-import { requirePermission } from '../session'
+import { requirePermission, auditIdentity } from '../session'
 
 export function registerAccountHandlers(): void {
   // 创建账户
@@ -17,14 +17,21 @@ export function registerAccountHandlers(): void {
       const perm = requirePermission(PERMISSIONS.ACCOUNT_CREATE, '没有新建账户的权限')
       if (!perm.ok) return perm.response
       const db = getDatabase()
+      // P1-3：初始余额不允许为负（负数余额会破坏资金链路一致性）
+      const initialBalance = Number(data.initial_balance ?? 0)
+      if (!Number.isFinite(initialBalance) || initialBalance < 0) {
+        return { success: false, message: '初始余额必须为不小于 0 的数字' }
+      }
       db.run(
         'INSERT INTO region_accounts (region_id, account_name, is_master, balance) VALUES (?, ?, ?, ?)',
-        [data.region_id, data.account_name, data.is_master ?? 0, data.initial_balance ?? 0]
+        [data.region_id, data.account_name, data.is_master ?? 0, initialBalance]
       )
       const id = (queryOne as any)('SELECT last_insert_rowid() as id') as { id: number }
+      // P1-7 审计归属可信化：操作者取自主进程会话，忽略渲染进程透传的 _operator/_operatorRole
+      const operator = auditIdentity()
       insertAuditLog({
-        username: data._operator || 'system',
-        role: data._operatorRole || 'admin',
+        username: operator.username,
+        role: operator.role,
         action: 'create',
         target: 'account',
         target_id: id?.id,
@@ -126,31 +133,59 @@ export function registerAccountHandlers(): void {
       // 后端权限校验：资金交易需要 account.transact
       const perm = requirePermission(PERMISSIONS.ACCOUNT_TRANSACT, '没有资金交易的权限')
       if (!perm.ok) return perm.response
+
+      // P1-3：交易类型与金额校验——amount 必须为正数且有上限，杜绝负金额/零金额刷流水
+      if (data.trans_type !== 'income' && data.trans_type !== 'expense') {
+        return { success: false, message: `非法交易类型：${String(data.trans_type)}（仅支持 income / expense）` }
+      }
+      const amount = Number(data.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { success: false, message: '交易金额必须为大于 0 的数字' }
+      }
+      if (amount > 100000000) {
+        return { success: false, message: '交易金额不能超过 100000000' }
+      }
+
       db.run('BEGIN TRANSACTION')
+
+      // P1-3：支出前在事务内校验余额，不足则回滚并返回「余额不足」，不允许余额为负
+      const account = queryOne(
+        'SELECT id, balance FROM region_accounts WHERE id = ?',
+        [data.account_id]
+      ) as { id: number; balance: number } | null
+      if (!account) {
+        db.run('ROLLBACK')
+        return { success: false, message: '账户不存在' }
+      }
+      if (data.trans_type === 'expense' && (Number(account.balance) || 0) < amount) {
+        db.run('ROLLBACK')
+        return { success: false, message: `余额不足：账户余额 ${(Number(account.balance) || 0).toFixed(2)}` }
+      }
 
       db.run(
         `INSERT INTO account_transactions (account_id, trans_type, category, amount, description, fiscal_year, operator, contract_id, source_type)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [data.account_id, data.trans_type, data.category ?? '', data.amount, data.description ?? '', data.fiscal_year ?? null, data.operator ?? '', data.contract_id ?? null, data.source_type ?? 'manual']
+        [data.account_id, data.trans_type, data.category ?? '', amount, data.description ?? '', data.fiscal_year ?? null, auditIdentity().username, data.contract_id ?? null, data.source_type ?? 'manual']
       )
       const sign = data.trans_type === 'income' ? 1 : -1
       db.run(
         `UPDATE region_accounts SET balance = balance + ?, updated_at = datetime('now','localtime') WHERE id = ?`,
-        [sign * data.amount, data.account_id]
+        [sign * amount, data.account_id]
       )
 
       db.run('COMMIT')
 
-      // 审计日志
+      // 审计日志（P1-7：操作者取自主进程会话，忽略渲染进程透传的 operator/_operatorRole）
+      const operator = auditIdentity()
       insertAuditLog({
-        username: data.operator || 'system',
-        role: (data as any)._operatorRole || 'operator',
+        username: operator.username,
+        role: operator.role,
         action: data.trans_type === 'income' ? 'income' : 'expense',
         target: 'transaction',
         target_id: data.account_id,
         new_value: JSON.stringify({
           trans_type: data.trans_type,
-          amount: data.amount,
+          amount,
           category: data.category,
           description: data.description,
           contract_id: data.contract_id
@@ -163,7 +198,7 @@ export function registerAccountHandlers(): void {
         notificationRepo.notifyTransaction(
           data.account_id,
           data.trans_type,
-          data.amount,
+          amount,
           data.description,
           data.category
         )

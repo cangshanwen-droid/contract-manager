@@ -129,11 +129,14 @@ const ContractListPage: React.FC = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const [ctList, comps, regs, contractsList] = await Promise.all([
+      // P1-1：云端列表支持分页后返回 {items, total}；列表页保持客户端分页，
+      // 显式传大 limit 兼容全量（本地 IPC 返回裸数组，两种格式统一解包）
+      const contractsRaw = await invoke(IPC_CHANNELS.CONTRACT_LIST, undefined, { limit: 10000 }) as any
+      const contractsList: Contract[] = Array.isArray(contractsRaw) ? contractsRaw : (contractsRaw?.items || [])
+      const [ctList, comps, regs] = await Promise.all([
         api.contractType.list(),
         api.company.list(),
         api.region.list(),
-        invoke(IPC_CHANNELS.CONTRACT_LIST) as Promise<Contract[]>
       ])
       setContractTypes(ctList as ContractType[])
       setCompanies(comps as Company[])

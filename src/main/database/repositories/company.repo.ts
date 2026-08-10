@@ -2,6 +2,17 @@ import { getDatabase } from '../connection'
 import { queryAll, queryOne } from '../helpers'
 import type { Company } from '../../../shared/types'
 
+/**
+ * update() 字段白名单（P1-4 修复，与 contract.repo 一致）：
+ * 仅允许更新业务列；id / created_at / updated_at / is_active（软删除标记）等系统列禁止透传，
+ * 防止调用方通过 Object.keys(data) 任意拼 SET 列（值已参数化无注入，但字段可被乱改）。
+ */
+const UPDATE_ALLOWED_FIELDS = [
+  'name', 'region', 'region_id', 'company_type', 'contact', 'phone', 'email',
+  'address', 'notes', 'employee_count', 'annual_output', 'carbon_emission',
+  'is_listed', 'stock_symbol', 'stock_initial_price'
+]
+
 export class CompanyRepository {
   list(): Company[] {
     return queryAll(
@@ -49,7 +60,7 @@ export class CompanyRepository {
   }
 
   update(id: number, data: Partial<Company>): Company | undefined {
-    const fields = Object.keys(data).filter((k) => k !== 'id' && k !== 'created_at' && k !== 'region_name')
+    const fields = Object.keys(data).filter((k) => UPDATE_ALLOWED_FIELDS.includes(k))
     if (fields.length === 0) return this.getById(id)
     const setClause = fields.map((k) => `${k} = ?`).join(', ')
     const values = fields.map((k) => (data as Record<string, unknown>)[k])

@@ -175,6 +175,17 @@ export interface DashboardSummary {
   total_contract_amount: number
   total_account_balance: number
   total_accounts: number
+  // P1-1 扩展：Dashboard 不再拉 CONTRACT_LIST 全表，改由 summary 一次返回
+  // 合同状态分布（GROUP BY status）+ 待审批计数 + 最近 6 条合同
+  contract_status_counts?: Record<string, number>
+  contract_approval_pending?: number
+  recent_contracts?: {
+    id: number
+    contract_no: string
+    contract_name: string
+    status: string
+    created_at: string
+  }[]
 }
 
 /** 系统概览（仅 admin）：用户构成 + 活跃度 + 最近创建用户 */

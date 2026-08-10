@@ -8,6 +8,11 @@ let dbPath: string = ''
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let SQLModule: SqlJsStatic | null = null
 
+// ── .bak 复制限频（P1-4）：tmp+rename 已保证原子性，.bak 只是额外历史快照，
+// 无需每次写盘都复制。限制 ≤1 次/分钟，DB 增长到数十 MB 后避免主进程每写阻塞一次全量文件复制。
+const BAK_COPY_INTERVAL_MS = 60_000
+let lastBakCopyTime = 0
+
 // ── 立即持久化（P0-8 断电丢失修复）──────────────────────────────
 // sql.js 是内存数据库，原实现仅靠 2 秒 debounce 定时器落盘，
 // 断电/崩溃会丢失最近 2 秒的写入。现在改为：
@@ -236,8 +241,16 @@ function _flushSave(): void {
   // 替换前将上一份完整文件保留为 .bak，崩溃后可人工恢复。
   const tmpPath = `${dbPath}.tmp`
   fs.writeFileSync(tmpPath, Buffer.from(data))
+  // .bak 限频（P1-4）：仅当距上次复制超过 1 分钟才保留一份历史快照。
+  // 崩溃恢复依赖的是 tmp+rename 原子性 + backups/ 自动备份，.bak 非每次写必需。
   if (fs.existsSync(dbPath)) {
-    try { fs.copyFileSync(dbPath, `${dbPath}.bak`) } catch { /* .bak 失败不影响主流程 */ }
+    const now = Date.now()
+    if (now - lastBakCopyTime >= BAK_COPY_INTERVAL_MS) {
+      try {
+        fs.copyFileSync(dbPath, `${dbPath}.bak`)
+        lastBakCopyTime = now
+      } catch { /* .bak 失败不影响主流程 */ }
+    }
   }
   fs.renameSync(tmpPath, dbPath)
 }

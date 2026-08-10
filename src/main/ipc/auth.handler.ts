@@ -7,7 +7,7 @@ import { getDatabase } from '../database/connection'
 import { insertAuditLog } from '../database/repositories/audit.repo'
 import {
   setSessionUser, getSessionUser, resolveUserPermissions,
-  requirePermission, forbiddenResponse
+  requirePermission, forbiddenResponse, auditIdentity
 } from '../session'
 
 // bcrypt 加盐轮数
@@ -122,12 +122,14 @@ export function registerAuthHandlers(): void {
         [username, hash, userRole]
       )
       const newUserId = (getDatabase().exec('SELECT last_insert_rowid() as id')[0].values[0][0]) as number
+      // P1-7 审计归属可信化：操作者取自主进程会话（无会话时兜底 system）
       insertAuditLog({
-        username,
-        role: userRole,
+        username: auditIdentity().username,
+        role: auditIdentity().role,
         action: 'register',
         target: 'user',
         target_id: newUserId,
+        new_value: JSON.stringify({ username }),
         result: 'success'
       })
       return { success: true }
@@ -158,8 +160,8 @@ export function registerAuthHandlers(): void {
           hash, user.id
         ])
         insertAuditLog({
-          username: _operator || username,
-          role: _operatorRole || (user.role as string) || 'user',
+          username: auditIdentity().username,
+          role: auditIdentity().role,
           action: 'change_password',
           target: 'user',
           target_id: user.id as number,

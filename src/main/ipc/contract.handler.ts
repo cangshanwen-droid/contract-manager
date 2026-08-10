@@ -1,12 +1,12 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { PERMISSIONS } from '../../shared/permissions'
-import { ContractRepository } from '../database/repositories/contract.repo'
+import { ContractRepository, computeContractAmounts, validateContractStatusTransition } from '../database/repositories/contract.repo'
 import { notificationRepo } from '../database/repositories/notification.repo'
 import { getDatabase } from '../database/connection'
 import { queryOne, queryAll } from '../database/helpers'
 import { insertAuditLog } from '../database/repositories/audit.repo'
-import { requirePermission } from '../session'
+import { requirePermission, auditIdentity } from '../session'
 
 export function registerContractHandlers(): void {
   const repo = new ContractRepository()
@@ -85,7 +85,31 @@ export function registerContractHandlers(): void {
     return changed
   }
 
-  // 合同金额变动 → 自动记录到对应区域的资金账户
+  // ── 区域主账户定位（P1-9：收入/支出统一使用同一查询逻辑）──
+  // 一律按 is_master=1 定位主账户；缺失时创建主账户（支出/收入同账户，避免多账户区域账目分裂）
+  function findRegionMasterAccount(regionId: number): Record<string, unknown> | undefined {
+    return queryOne(
+      `SELECT id, balance FROM region_accounts WHERE region_id = ? AND is_master = 1 LIMIT 1`,
+      [regionId]
+    ) as Record<string, unknown> | undefined
+  }
+
+  function getOrCreateRegionMasterAccount(regionId: number, regionName?: string): Record<string, unknown> | undefined {
+    const existing = findRegionMasterAccount(regionId)
+    if (existing) return existing
+    const db = getDatabase()
+    const name = `${regionName || `区域${regionId}`}主账户`
+    db.run(
+      `INSERT INTO region_accounts (account_name, region_id, balance, is_master, created_at, updated_at)
+       VALUES (?, ?, 0, 1, datetime('now','localtime'), datetime('now','localtime'))`,
+      [name, regionId]
+    )
+    const created = findRegionMasterAccount(regionId)
+    console.warn(`[合同资金联动] 区域「${regionName || regionId}」无主账户，已自动创建「${name}」`)
+    return created
+  }
+
+  // 合同金额变动 → 自动记录到对应区域的主账户（P1-2：金额取合同级 total_cost，已含税）
   function syncContractCostToAccount(contractId: number, amount: number, description: string, operator: string): void {
     const db = getDatabase()
     // 找到合同所属区域的主账户
@@ -96,29 +120,18 @@ export function registerContractHandlers(): void {
     ) as Record<string, unknown> | undefined
     if (!contract || !contract.region_id) return
 
-    let account = queryOne(
-      `SELECT id FROM region_accounts WHERE region_id = ? LIMIT 1`,
-      [contract.region_id]
-    ) as Record<string, unknown> | undefined
-
-    // 区域无账户时自动创建主账户（避免静默跳过导致资金链路断裂）
-    if (!account) {
-      const regionName = (contract.region_name as string) || `区域${contract.region_id}`
-      const accountName = `${regionName}主账户`
-      db.run(
-        `INSERT INTO region_accounts (name, region_id, balance, created_at, updated_at)
-         VALUES (?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))`,
-        [accountName, contract.region_id]
-      )
-      account = queryOne(
-        `SELECT id FROM region_accounts WHERE region_id = ? LIMIT 1`,
-        [contract.region_id]
-      ) as Record<string, unknown> | undefined
-      console.warn(`[合同资金联动] 区域「${regionName}」无主账户，已自动创建「${accountName}」`)
-    }
+    const account = getOrCreateRegionMasterAccount(
+      contract.region_id as number,
+      (contract.region_name as string) || undefined
+    )
     if (!account) return
 
     const accountId = account.id as number
+    // P1-3：支出前校验余额，不足则拒绝入账（不允许余额为负）
+    const balance = Number(account.balance) || 0
+    if (balance < amount) {
+      throw new Error(`余额不足：账户余额 ${balance.toFixed(2)} 不足以支付合同支出 ${Number(amount).toFixed(2)}`)
+    }
     const year = new Date().getFullYear()
 
     db.run(
@@ -149,11 +162,11 @@ export function registerContractHandlers(): void {
     return !!row
   }
 
-  ipcMain.handle(IPC_CHANNELS.CONTRACT_LIST, (_e, regionId?: number) => {
+  ipcMain.handle(IPC_CHANNELS.CONTRACT_LIST, (_e, regionId?: number, opts?: { limit?: number; offset?: number }) => {
     try {
       const perm = requirePermission(PERMISSIONS.CONTRACT_VIEW)
       if (!perm.ok) return perm.response
-      return repo.list(regionId)
+      return repo.list(regionId, opts)
     } catch (err: any) {
       console.error('CONTRACT_LIST failed:', err)
       return { success: false, message: `获取合同列表失败：${err.message || '未知错误'}` }
@@ -175,15 +188,17 @@ export function registerContractHandlers(): void {
     try {
       const perm = requirePermission(PERMISSIONS.CONTRACT_CREATE, '没有新建合同的权限')
       if (!perm.ok) return perm.response
-      const result = repo.create({ ...data as any, created_by: data.created_by || '' })
+      // P1-7 审计归属可信化：created_by 取自主进程会话，忽略渲染进程透传值
+      const operator = auditIdentity().username
+      const result = repo.create({ ...data as any, created_by: operator })
 
       // 版本历史 v1：保存创建时的初始快照（留痕起点）
-      saveVersionSnapshot(result.id, result, ['创建合同'], (data as any).created_by || '')
+      saveVersionSnapshot(result.id, result, ['创建合同'], operator)
 
       // 审计日志
       insertAuditLog({
-        username: (data as any).created_by || 'system',
-        role: (data as any)._operatorRole || 'user',
+        username: operator,
+        role: auditIdentity().role,
         action: 'create',
         target: 'contract',
         target_id: result.id,
@@ -216,34 +231,67 @@ export function registerContractHandlers(): void {
 
       // 记录更新前旧值
       const oldContract = repo.getById(id)
-      const oldSnapshot = oldContract ? JSON.stringify({
-        contract_name: oldContract.contract_name,
-        status: oldContract.status,
-        party_a: oldContract.party_a,
-        party_b_name: oldContract.party_b_name,
-        notes: oldContract.notes
-      }) : null
 
-      // 状态机约束（先校验、后写库）：未审批通过的合同不可变更执行状态（草稿 → 执行中 等），
-      // 防止未审批合同被直接改为 active 绕过审批并伪造资金流水
-      if (data.status && oldContract && data.status !== oldContract.status && !isContractApproved(id)) {
-        return { success: false, message: '合同未审批通过，无法变更执行状态' }
+      // P1-6 后端状态机强制（先校验、后写库）：
+      // 非法枚举 / 任意跳转（如 draft→completed）/ 未审批进执行 一律拒绝
+      if (data.status !== undefined && oldContract && String(data.status) !== String(oldContract.status)) {
+        const stateErr = validateContractStatusTransition(
+          oldContract.status as string,
+          data.status as string,
+          oldContract.approval_status as string
+        )
+        if (stateErr) return { success: false, message: stateErr }
       }
+
+      // P1-3 支出前余额预检：draft→active 且该合同尚未登记支出流水时，
+      // 先确认主账户余额足以覆盖合同级 total_cost（含税），不足则拒绝变更，避免余额为负
+      if (
+        data.status === 'active' &&
+        oldContract &&
+        String(oldContract.status) !== 'active' &&
+        !hasContractTransaction(id, 'expense', '合同支出')
+      ) {
+        const cost = Number(
+          data.total_cost ??
+          computeContractAmounts(
+            data.contract_type_id ?? (oldContract.contract_type_id as number),
+            (data.items ?? oldContract.items) as any
+          ).total_cost
+        ) || 0
+        if (cost > 0 && oldContract.region_id) {
+          const acct = findRegionMasterAccount(oldContract.region_id as number)
+          const balance = acct ? Number(acct.balance) || 0 : 0
+          if (balance < cost) {
+            return { success: false, message: `余额不足：账户余额 ${balance.toFixed(2)} 不足以支付合同支出 ${cost.toFixed(2)}，无法进入执行状态` }
+          }
+        }
+      }
+
+      // P1-10 审计快照对称：old_value 与 new_value 取同一组字段（本次变更键 + 名称/状态），
+      // 保证金额/进度等字段在 old 侧同样可见，审计比对完整
+      const oldSnapshot = oldContract ? JSON.stringify(
+        Object.fromEntries(
+          [...new Set([...Object.keys(pickChanges(data)), 'contract_name', 'status'])]
+            .map((k) => [k, (oldContract as any)[k] ?? null])
+        )
+      ) : null
 
       // 编辑留痕：先保存旧快照到 contract_versions，再执行更新
+      // P1-7 审计归属可信化：operator 取自主进程会话，忽略渲染进程透传的 updated_by
+      const operator = auditIdentity().username
       if (oldContract) {
-        saveVersionSnapshot(id, oldContract, computeChangedFields(oldContract, data), (data as any).updated_by || '')
+        saveVersionSnapshot(id, oldContract, computeChangedFields(oldContract, data), operator)
       }
 
-      const result = repo.update(id, { ...data as any, updated_by: data.updated_by || '' })
+      const result = repo.update(id, { ...data as any, updated_by: operator })
       if (!result) {
         return { success: false, message: '合同不存在' }
       }
 
       // 审计日志
       insertAuditLog({
-        username: (data as any).updated_by || 'system',
-        role: (data as any)._operatorRole || 'user',
+        username: operator,
+        role: auditIdentity().role,
         action: 'update',
         target: 'contract',
         target_id: id,
@@ -264,27 +312,28 @@ export function registerContractHandlers(): void {
         if (data.status === 'active' && !hasContractTransaction(id, 'expense', '合同支出')) {
           const totalCost = Number(result.total_cost) || 0
           if (totalCost > 0) {
-            syncContractCostToAccount(id, totalCost, '合同执行', (data as any).updated_by || '')
+            syncContractCostToAccount(id, totalCost, '合同执行', operator)
           }
         }
-        // 完成 → 登记合同收入
+        // 完成 → 登记合同收入（P1-9：与支出统一使用区域主账户，收入/支出落同一账户）
         if (data.status === 'completed' && result.expected_income > 0 && !hasContractTransaction(id, 'income', '合同收入')) {
           const db = getDatabase()
           const contract = queryOne(
-            `SELECT region_id, contract_name FROM contracts WHERE id = ?`,
+            `SELECT region_id, contract_name, r.name AS region_name FROM contracts c
+             LEFT JOIN regions r ON r.id = c.region_id WHERE c.id = ?`,
             [id]
           ) as Record<string, unknown> | undefined
           if (contract?.region_id) {
-            const account = queryOne(
-              `SELECT id FROM region_accounts WHERE region_id = ? LIMIT 1`,
-              [contract.region_id]
-            ) as Record<string, unknown> | undefined
+            const account = getOrCreateRegionMasterAccount(
+              contract.region_id as number,
+              (contract.region_name as string) || undefined
+            )
             if (account) {
               const year = new Date().getFullYear()
               db.run(
                 `INSERT INTO account_transactions (account_id, trans_type, category, amount, description, fiscal_year, operator, contract_id, source_type)
                  VALUES (?, 'income', '合同收入', ?, ?, ?, ?, ?, 'contract')`,
-                [account.id, result.expected_income, `合同 ${result.contract_name}: 已完成结算`, year, data.updated_by || '', id]
+                [account.id, result.expected_income, `合同 ${result.contract_name}: 已完成结算`, year, operator, id]
               )
               db.run(
                 `UPDATE region_accounts SET balance = balance + ?, updated_at = datetime('now','localtime') WHERE id = ?`,
@@ -311,18 +360,20 @@ export function registerContractHandlers(): void {
       const perm = requirePermission(PERMISSIONS.CONTRACT_APPROVE, '没有合同审批的权限')
       if (!perm.ok) return perm.response
       const before = repo.getById(id)
-      const result = repo.transitionApproval(id, action, operator || '')
+      // P1-7 审计归属可信化：审批 operator 取自主进程会话，忽略渲染进程透传的 operator/operatorRole
+      const operator = auditIdentity().username
+      const result = repo.transitionApproval(id, action, operator)
       if (!result) {
         return { success: false, message: '合同不存在' }
       }
       // 版本留痕：审批动作同样记录历史
       if (before) {
-        saveVersionSnapshot(id, before, [action === 'submit' ? '提交审批' : action === 'approve' ? '审批通过' : '审批驳回'], operator || '')
+        saveVersionSnapshot(id, before, [action === 'submit' ? '提交审批' : action === 'approve' ? '审批通过' : '审批驳回'], operator)
       }
       // 审计日志
       insertAuditLog({
-        username: operator || 'system',
-        role: operatorRole || 'admin',
+        username: operator,
+        role: auditIdentity().role,
         action,
         target: 'contract',
         target_id: id,
@@ -365,8 +416,8 @@ export function registerContractHandlers(): void {
       }) : null
       repo.delete(id)
       insertAuditLog({
-        username: _operator || 'system',
-        role: _operatorRole || 'admin',
+        username: auditIdentity().username,
+        role: auditIdentity().role,
         action: 'delete',
         target: 'contract',
         target_id: id,
@@ -401,6 +452,8 @@ export function registerContractHandlers(): void {
 
         const db = getDatabase()
         const results: { id: number; success: boolean; message: string }[] = []
+        // P1-7 审计归属可信化：批量操作 operator 统一取自主进程会话
+        const operator = auditIdentity().username
 
         for (const id of idList) {
           // 每条独立事务：保证单条原子性，失败回滚不影响批次其他条目
@@ -421,8 +474,8 @@ export function registerContractHandlers(): void {
               })
               repo.delete(id)
               insertAuditLog({
-                username: operator || 'system',
-                role: operatorRole || 'admin',
+                username: operator,
+                role: auditIdentity().role,
                 action: 'delete',
                 target: 'contract',
                 target_id: id,
@@ -432,13 +485,13 @@ export function registerContractHandlers(): void {
               db.run('COMMIT')
               results.push({ id, success: true, message: '删除成功' })
             } else {
-              const result = repo.transitionApproval(id, action, operator || '')
+              const result = repo.transitionApproval(id, action, operator)
               // 版本留痕：批量审批同样记录历史
-              saveVersionSnapshot(id, before, [action === 'submit' ? '提交审批' : '审批通过'], operator || '')
+              saveVersionSnapshot(id, before, [action === 'submit' ? '提交审批' : '审批通过'], operator)
               // 审计日志
               insertAuditLog({
-                username: operator || 'system',
-                role: operatorRole || 'admin',
+                username: operator,
+                role: auditIdentity().role,
                 action,
                 target: 'contract',
                 target_id: id,

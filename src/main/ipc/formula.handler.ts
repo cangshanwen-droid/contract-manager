@@ -49,11 +49,15 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
   const base_price = base_cost + base_profit
 
   // 商品成交价
-  const qd_max = population * 2
-  const sell_price =
+  const qd_max = Math.max(population * 2, 1)
+  // P1-4 供需因子下限 -0.9（供≫求×小人口时不再出现负价），上限 2 防止需求极端时价格失控；
+  // 最终成交价 clamp 到 [0.01, 99999]
+  const supplyDemandFactor = Math.max(-0.9, Math.min(2, (market_demand - supply_quantity) / Math.max(qd_max, 1)))
+  const sell_price = Math.min(99999, Math.max(0.01,
     base_price *
     (1 + clampedHappiness / 100) *
-    (1 + (market_demand - supply_quantity) / Math.max(qd_max, 1))
+    (1 + supplyDemandFactor)
+  ))
 
   // 就业率
   const base_employment_rate = 5 * Math.log10(population + 100)
@@ -66,11 +70,16 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
   const total_employment_rate = base_employment_rate + actual_infra_employment_bonus
 
   // 人口迭代
-  const natural_growth = population * base_growth_rate * (clampedHappiness / 100)
-  const raw_growth = natural_growth + infra_population_delta
-  const capacity_factor = Math.max(0, 1 - population / Math.max(population_capacity, 1))
+  // P1-5 下期人口下限 0：负增长率长期迭代不再产生负人口；增长率 clamp [-0.5, 0.5]；
+  // 容量为空/NULL 时兜底为 10000（Math.max(1, …) 防 0/NaN 容量导致人口被清空）
+  const pop = Number.isFinite(population) ? population : 0
+  const capacity = Number.isFinite(population_capacity) ? Math.max(1, population_capacity) : 10000
+  const growthRate = Number.isFinite(base_growth_rate) ? Math.max(-0.5, Math.min(0.5, base_growth_rate)) : 0
+  const natural_growth = pop * growthRate * (clampedHappiness / 100)
+  const raw_growth = natural_growth + (Number.isFinite(infra_population_delta) ? infra_population_delta : 0)
+  const capacity_factor = Math.max(0, 1 - pop / capacity)
   const population_change = raw_growth * capacity_factor
-  const next_population = Math.min(population + population_change, population_capacity)
+  const next_population = Math.max(0, Math.min(pop + population_change, capacity))
 
   return {
     consumer_satisfaction,

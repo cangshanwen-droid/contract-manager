@@ -2,7 +2,7 @@
  * vitest 共享测试环境：
  *  1. mock electron（app.getPath / app.getAppPath / net / safeStorage）
  *     -- 使主进程纯逻辑模块（contract.repo / stock-sync / session）可在 Node 下加载
- *  2. setupTestDb()：在临时目录初始化 sql.js 内存库 + 跑全部迁移（v1~v19）
+ *  2. setupTestDb()：在临时目录初始化 sql.js 内存库 + 跑全部迁移（v1~v21）
  */
 import { afterEach, vi } from 'vitest'
 import { mkdtempSync } from 'fs'

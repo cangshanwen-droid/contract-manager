@@ -39,11 +39,12 @@ const GlobalSearch: React.FC = () => {
     ;(async () => {
       try {
         const [c, r] = await Promise.all([
-          invoke(IPC_CHANNELS.CONTRACT_LIST) as Promise<any[]>,
+          invoke(IPC_CHANNELS.CONTRACT_LIST, undefined, { limit: 10000 }) as Promise<any>,
           invoke(IPC_CHANNELS.REGION_LIST) as Promise<any[]>,
         ])
         if (!mounted) return
-        setContracts(c || [])
+        // P1-1：云端分页返回 {items, total}，统一解包为数组
+        setContracts(Array.isArray(c) ? c : (c?.items || []))
         setRegions(r || [])
       } catch { /* 索引加载失败静默，下拉为空 */ }
     })()

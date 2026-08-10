@@ -100,11 +100,14 @@ const CompanyListPage: React.FC = () => {
         stock_symbol: isListingOpen ? stockSymbol : '',
         stock_initial_price: isListingOpen ? stockPrice : 100,
       }
-      if (editing) await companyApi.update(editing.id, data)
-      else await companyApi.create(data)
-      
+      // P1-7 修复：先保存公司，云端建股失败时回滚本地上市标记（is_listed=0 + 清空股票代码），
+      // 避免本地显示"已上市"但云端无股票的数据不一致
+      let savedId: number | undefined
+      if (editing) { await companyApi.update(editing.id, data); savedId = editing.id }
+      else { const saved = await companyApi.create(data); savedId = saved.id }
+
       // 如果开启了上市，同时创建股票
-      if (isListingOpen && stockSymbol) {
+      if (isListingOpen && stockSymbol && savedId) {
         try {
           await createStock({
             symbol: stockSymbol,
@@ -113,9 +116,20 @@ const CompanyListPage: React.FC = () => {
           })
           message.success(editing ? '更新成功，股票已同步' : '创建成功，股票已上市')
         } catch (stockErr: any) {
-          message.warning(editing 
-            ? '公司已更新，但股票同步失败: ' + (stockErr.message || '网络错误')
-            : '公司已创建，但股票上市失败: ' + (stockErr.message || '请确认股票服务已启动'))
+          // 云端建股失败 → 回滚本地上市状态，提示「上市失败已回滚」
+          try {
+            await companyApi.update(savedId, {
+              is_listed: 0,
+              stock_symbol: '',
+              stock_initial_price: 100,
+            })
+          } catch (rollbackErr: any) {
+            console.error('上市回滚失败:', rollbackErr)
+            message.error('上市失败，且本地回滚失败，请手动修改公司上市状态: ' + (rollbackErr?.message || '未知错误'))
+            setModalOpen(false); load()
+            return
+          }
+          message.warning('上市失败已回滚，公司保留但未上市: ' + (stockErr.message || '请确认股票服务已启动'))
         }
       } else {
         message.success(editing ? '更新成功' : '创建成功')

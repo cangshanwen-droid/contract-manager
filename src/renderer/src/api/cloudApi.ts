@@ -7,6 +7,7 @@
  */
 
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
+import { IPC_CHANNELS, type IpcChannel } from '../../../shared/constants'
 
 const API_BASE = `${CLOUD_API_BASE}`
 const AUTH_TOKEN_KEY = 'gipfel_auth_token'
@@ -169,7 +170,21 @@ export async function fetchWithAdminKey(url: string): Promise<any> {
 
 type PathResolver = (...args: unknown[]) => string
 
-const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }> = {
+interface RouteEntry {
+  method: string
+  path: string | PathResolver
+  /** 可选 body 构造器：无则沿用「最后一个对象参数作 body」的约定 */
+  body?: (args: unknown[]) => unknown
+}
+
+/**
+ * ROUTE_MAP（P1-1 修复）：
+ * - key 类型由 `keyof typeof IPC_CHANNELS` 派生（IpcChannel），编译期防双源漂移：
+ *   新增/改名通道若未在此登记映射，将不再静默降级本地 IPC。
+ * - 云端模式下：命中 ROUTE_MAP → 走云端 REST；命中 LOCAL_ONLY_CHANNELS → 明确报错「仅本地模式可用」；
+ *   两者皆未命中（新通道忘了归类）→ 同样报错，杜绝静默降级导致的数据分叉。
+ */
+const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'region:list':          { method: 'GET',    path: '/api/regions' },
   'region:get':           { method: 'GET',    path: (id: unknown) => `/api/regions/${id}` },
   'region:create':        { method: 'POST',   path: '/api/regions' },
@@ -182,11 +197,26 @@ const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }>
   'company:update':       { method: 'PUT',    path: (id: unknown) => `/api/companies/${id}` },
   'company:delete':       { method: 'DELETE', path: (id: unknown) => `/api/companies/${id}` },
 
-  'contract:list':        { method: 'GET',    path: (regionId?: unknown) => regionId != null ? `/api/contracts?region_id=${regionId}` : '/api/contracts' },
+  'contract:list': {
+    method: 'GET',
+    // P1-1 分页：默认 limit=200（防全表拖拽），显式传 opts.limit/offset 可覆盖
+    path: (regionId?: unknown, opts?: { limit?: number; offset?: number }) => {
+      const p = new URLSearchParams()
+      if (regionId != null) p.set('region_id', String(regionId))
+      const limit = opts?.limit ?? 200
+      const offset = opts?.offset ?? 0
+      p.set('limit', String(limit))
+      if (offset > 0) p.set('offset', String(offset))
+      return `/api/contracts?${p.toString()}`
+    }
+  },
   'contract:get':         { method: 'GET',    path: (id: unknown) => `/api/contracts/${id}` },
   'contract:create':      { method: 'POST',   path: '/api/contracts' },
   'contract:update':      { method: 'PUT',    path: (id: unknown) => `/api/contracts/${id}` },
   'contract:delete':      { method: 'DELETE', path: (id: unknown) => `/api/contracts/${id}` },
+  // P1-1 补全：审批写操作映射云端（不再静默降级本地 SQLite，避免与云端数据分叉）
+  'contract:approve':     { method: 'POST',   path: (id: unknown) => `/api/contracts/${id}/approve`, body: (args) => ({ action: args[1], operator: args[2] }) },
+  'contract:batch-approve': { method: 'POST', path: '/api/contracts/batch-approve', body: (args) => ({ ids: args[0], action: args[1], operator: args[2] }) },
   'contract:summarize':   { method: 'GET',    path: (id: unknown) => `/api/contracts/${id}/summarize` },
   'contract:list-versions': { method: 'GET', path: (id: unknown) => `/api/contracts/${id}/versions` },
 
@@ -195,6 +225,9 @@ const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }>
   'infra-type:list':      { method: 'GET',    path: '/api/infra-types' },
 
   'dashboard:summary':    { method: 'GET',    path: '/api/dashboard/summary' },
+  'dashboard:system-stats': { method: 'GET',  path: '/api/dashboard/system-stats' },
+
+  'system:health':        { method: 'GET',    path: '/api/health' },
 
   'formula:calculate':    { method: 'POST',   path: '/api/formula/calculate' },
   'formula:log-list':     { method: 'GET',    path: (regionId: unknown) => `/api/formula/logs?region_id=${regionId}` },
@@ -202,8 +235,10 @@ const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }>
   'infra-calc:load':      { method: 'GET',    path: (regionId: unknown) => `/api/infra-calc?region_id=${regionId}` },
 
   'auth:login':            { method: 'POST',   path: '/api/auth/login' },
+  'auth:logout':           { method: 'POST',   path: '/api/auth/logout' },
   'auth:register':         { method: 'POST',   path: '/api/auth/register' },
   'auth:change-password':  { method: 'POST',   path: '/api/auth/change-password' },
+  'auth:reset-password':   { method: 'POST',   path: (id: unknown) => `/api/auth/users/${id}/reset-password` },
 
   'account:summary':      { method: 'GET',    path: '/api/accounts/summary' },
   'account:list':         { method: 'GET',    path: '/api/accounts' },
@@ -211,6 +246,7 @@ const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }>
   'account:create':       { method: 'POST',   path: '/api/accounts' },
   'account:transactions': { method: 'GET',    path: (id: unknown) => `/api/accounts/${id}/transactions` },
   'account:add-transaction': { method: 'POST', path: (id: unknown) => `/api/accounts/${id}/transactions` },
+  'account:years':        { method: 'GET',    path: '/api/accounts/years' },
 
   'announcement:active-list': { method: 'GET', path: '/api/announcements/active' },
 
@@ -233,12 +269,39 @@ const ROUTE_MAP: Record<string, { method: string; path: string | PathResolver }>
   'auth:create-user':             { method: 'POST', path: '/api/auth/register' },
   'auth:delete-user':             { method: 'DELETE', path: (id: unknown) => `/api/auth/users/${id}` },
   'audit:list':                   { method: 'GET', path: '/api/audit' },
-  'db:backup':                    { method: 'POST', path: '/api/backup' },
+  'audit:log':                    { method: 'POST', path: '/api/audit/log' },
+
+  'notification:list':            { method: 'GET', path: '/api/notifications' },
+  'notification:unread-count':    { method: 'GET', path: '/api/notifications/unread-count' },
+  'notification:mark-read':       { method: 'POST', path: (id?: unknown) => id != null ? `/api/notifications/${id}/read` : '/api/notifications/read-all' },
+
   'db:auto-backup':               { method: 'GET', path: '/api/backup/auto' },
   'db:info':                      { method: 'GET', path: '/api/backup/info' },
   'excel:export':                 { method: 'GET', path: '/api/excel/export' },
   'excel:import':                 { method: 'POST', path: '/api/excel/import' },
 }
+
+/**
+ * 本地专属通道（P1-1）：依赖本地文件系统 / 本地数据库 / 系统窗口 / 凭据加密，
+ * 云端模式没有对应语义，一律显式报错，禁止静默降级本地 IPC。
+ */
+const LOCAL_ONLY_CHANNELS: ReadonlySet<IpcChannel> = new Set([
+  IPC_CHANNELS.FILE_SELECT,
+  IPC_CHANNELS.FILE_OPEN,
+  IPC_CHANNELS.DB_BACKUP,
+  IPC_CHANNELS.DB_BACKUP_TO_DESKTOP,
+  IPC_CHANNELS.DB_RESTORE,
+  IPC_CHANNELS.CREDENTIAL_SET,
+  IPC_CHANNELS.CREDENTIAL_GET,
+  IPC_CHANNELS.ADMIN_GET_KEY,
+  IPC_CHANNELS.STOCK_SET_TOKEN,
+  IPC_CHANNELS.STOCK_TEST_CONNECTION,
+  IPC_CHANNELS.STOCK_SYNC_LOG,
+  IPC_CHANNELS.GIPFEL_OPEN,
+  IPC_CHANNELS.EXCEL_EXPORT_CONTRACTS,
+  IPC_CHANNELS.EXCEL_EXPORT_REGIONS,
+  IPC_CHANNELS.EXCEL_EXPORT_ACCOUNT_TRANSACTIONS
+])
 
 function resolvePath(channel: string, args: unknown[]): { method: string; path: string } {
   const entry = ROUTE_MAP[channel]
@@ -249,6 +312,11 @@ function resolvePath(channel: string, args: unknown[]): { method: string; path: 
 }
 
 export async function cloudInvoke(channel: string, ...args: unknown[]): Promise<any> {
+  const entry = ROUTE_MAP[channel]
+  if (!entry) {
+    // P1-1 修复：云端模式无映射通道显式报错，绝不静默降级本地 IPC（防数据分叉）
+    throw new Error(`该功能仅本地模式可用（云端模式不支持通道 "${channel}"），请切换本地模式后重试`)
+  }
   const { method, path } = resolvePath(channel, args)
 
   switch (method) {
@@ -258,8 +326,8 @@ export async function cloudInvoke(channel: string, ...args: unknown[]): Promise<
       return cloudFetch(path, { method: 'DELETE' })
     case 'POST':
     case 'PUT': {
-      // 最后一个参数如果是对象，作为 body；否则 body 为空
-      const bodyArg = args.length > 0 ? args[args.length - 1] : undefined
+      // 优先使用条目声明的 body 构造器；否则取最后一个对象参数作为 body
+      const bodyArg = entry.body ? entry.body(args) : (args.length > 0 ? args[args.length - 1] : undefined)
       const body = bodyArg && typeof bodyArg === 'object' ? JSON.stringify(bodyArg) : undefined
       return cloudFetch(path, { method, body })
     }
@@ -271,10 +339,18 @@ export async function cloudInvoke(channel: string, ...args: unknown[]): Promise<
 // ── 统一 invoke：根据云端模式自动切换 ──
 
 export function invoke(channel: string, ...args: unknown[]): Promise<any> {
-  if (isCloudMode() && ROUTE_MAP[channel]) {
-    return cloudInvoke(channel, ...args)
+  if (isCloudMode()) {
+    // P1-1 修复：云端模式下仅接受已登记的 REST 映射通道；
+    // 无映射（含本地专属通道）显式抛错，不再静默降级 window.api.invoke
+    if (ROUTE_MAP[channel]) {
+      return cloudInvoke(channel, ...args)
+    }
+    const hint = LOCAL_ONLY_CHANNELS.has(channel as IpcChannel)
+      ? '该功能仅本地模式可用'
+      : `通道 "${channel}" 未配置云端映射`
+    return Promise.reject(new Error(`${hint}，请切换本地模式后重试`))
   }
-  // 降级到本地 IPC
+  // 本地模式：走 Electron IPC
   return window.api.invoke(channel, ...args)
 }
 

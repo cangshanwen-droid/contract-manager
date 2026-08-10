@@ -55,7 +55,6 @@ const DashboardPage: React.FC = () => {
   const user = useAuth()
   const [data, setData] = useState<any>(null)
   const [regions, setRegions] = useState<any[]>([])
-  const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [hints, setHints] = useState<any[]>([])
   const [systemStats, setSystemStats] = useState<any>(null)
@@ -116,15 +115,15 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const [s, r, c, h] = await Promise.all([
+        // P1-1：Dashboard 不再拉 CONTRACT_LIST 全表——
+        // 合同状态分布/待审批计数/最近活动由 dashboard:summary 扩展字段一次返回（GROUP BY status + 最近 6 条）
+        const [s, r, h] = await Promise.all([
           invoke(IPC_CHANNELS.DASHBOARD_SUMMARY) as Promise<any>,
           invoke(IPC_CHANNELS.REGION_LIST) as Promise<any[]>,
-          invoke(IPC_CHANNELS.CONTRACT_LIST) as Promise<any[]>,
           invoke(IPC_CHANNELS.ANNOUNCEMENT_ACTIVE_LIST) as Promise<any[]>,
         ])
         setData(s)
         setRegions(r || [])
-        setContracts(c || [])
         setHints(h || [])
       } catch {
         message.error('加载仪表盘数据失败')
@@ -248,21 +247,15 @@ const DashboardPage: React.FC = () => {
       population: r.population || 0,
     }))
 
-  // Contract status distribution
-  const statusCounts: Record<string, number> = {}
-  contracts.forEach((c) => {
-    const s = c.status || 'draft'
-    statusCounts[s] = (statusCounts[s] || 0) + 1
-  })
+  // Contract status distribution（P1-1：来自 dashboard:summary 扩展，不再遍历全表）
+  const statusCounts: Record<string, number> = (data?.contract_status_counts as Record<string, number>) || {}
   const contractStatusData = Object.entries(statusCounts).map(([status, count]) => ({
     status: STATUS_LABELS[status] || status,
     count,
   }))
 
-  // Recent activity - latest 6 contracts
-  const recentContracts = [...contracts]
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .slice(0, 6)
+  // Recent activity - latest 6 contracts（P1-1：summary 扩展字段）
+  const recentContracts = (data?.recent_contracts || []) as any[]
 
   // ═══════════════════════════════════════════════════════════
   // RENDER
@@ -410,19 +403,19 @@ const DashboardPage: React.FC = () => {
           <div style={{ display: 'flex', gap: 16 }}>
             <TodoCard
               label="待审批合同"
-              count={contracts.filter((c: any) => c.approval_status === 'pending').length}
+              count={data?.contract_approval_pending ?? 0}
               color={T.warning}
               onClick={() => navigate('/contracts?status=pending')}
             />
             <TodoCard
               label="执行中合同"
-              count={contracts.filter((c: any) => c.status === 'active').length}
+              count={statusCounts['active'] || 0}
               color={T.blue}
               onClick={() => navigate('/contracts?status=active')}
             />
             <TodoCard
               label="已过期合同"
-              count={contracts.filter((c: any) => c.status === 'expired').length}
+              count={statusCounts['expired'] || 0}
               color={T.red}
               onClick={() => navigate('/contracts?status=expired')}
             />

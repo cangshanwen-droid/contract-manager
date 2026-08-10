@@ -24,6 +24,17 @@ export function getSessionUser(): SessionUser | null {
   return currentUser
 }
 
+/**
+ * 审计归属唯一来源（P1-7 修复）：
+ * 审计日志的 username/role 一律取自主进程会话，忽略渲染进程透传的
+ * _operatorRole / created_by / updated_by / operator 等字段（可被伪造）。
+ * 无会话（如首次引导创建首个 admin）时兜底为 system，绝不采用渲染进程声明值。
+ */
+export function auditIdentity(): { username: string; role: string } {
+  const u = currentUser
+  return { username: u?.username || 'system', role: u?.role || 'user' }
+}
+
 /** 权限不足的统一 IPC 响应 */
 export function forbiddenResponse(message?: string): Record<string, unknown> {
   return {

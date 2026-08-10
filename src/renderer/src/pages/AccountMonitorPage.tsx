@@ -114,6 +114,9 @@ const AccountMonitorPage: React.FC = () => {
   // 合同
   const [contracts, setContracts] = useState<LocalContract[]>([])
   const [contractsLoading, setContractsLoading] = useState(false)
+  // P1-2：轮询只拉轻量 COUNT/汇总（dashboard:summary 纯标量聚合），表格列表数据仅首次加载 + 手动刷新
+  const [contractCount, setContractCount] = useState(0)
+  const [contractAmount, setContractAmount] = useState(0)
 
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)

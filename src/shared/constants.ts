@@ -90,11 +90,20 @@ export const IPC_CHANNELS = {
   STOCK_SYNC_LOG: 'stock:sync-log',
   STOCK_GET_MARKET: 'stock:get-market',
   STOCK_GET_QUOTE: 'stock:get-quote',
+  STOCK_GET_ORDERS: 'stock:get-orders',
+  STOCK_PLACE_ORDER: 'stock:place-order',
+  STOCK_CANCEL_ORDER: 'stock:cancel-order',
+  STOCK_GET_POSITIONS: 'stock:get-positions',
+  STOCK_GET_ACCOUNTS: 'stock:get-accounts',
+  STOCK_ACCOUNT_SUMMARY: 'stock:account-summary',
 
   CREDENTIAL_SET: 'credential:set',
   CREDENTIAL_GET: 'credential:get',
   ADMIN_GET_KEY: 'admin:get-key'
 } as const
+
+/** IPC 通道值联合：由 IPC_CHANNELS 唯一派生，ROUTE_MAP 的 key 以此约束（P1-1 防双源漂移） */
+export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]
 
 export const CONTRACT_STATUS_OPTIONS = [
   { value: 'draft', label: '草稿' },

@@ -3,6 +3,12 @@ import { getDatabase } from './connection'
 export function seedDefaultData(): void {
   const db = getDatabase()
 
+  // P1-4：seed 全量批量写入包事务（BEGIN…COMMIT 合并落盘）。
+  // 修复前 32 条基建 + 8 合同类型 + 3 区域 + 4 公司 + 若干合同/明细/账户
+  // 每条 db.run 都触发一次全量 export + 写盘（~80 次），改为事务内合并、COMMIT 后一次性落盘。
+  db.run('BEGIN TRANSACTION')
+  try {
+
   // 基建类型（民生配套22种 + 产业配套10种，来自基建影响指标表）
   const infraTypes: {
     name: string; cat: string; bonus: number; pop_add: number; talent: number;
@@ -187,5 +193,10 @@ export function seedDefaultData(): void {
     console.log('Accounts created for all regions')
   }
 
-  console.log('Seed data inserted')
+    console.log('Seed data inserted')
+    db.run('COMMIT')
+  } catch (err) {
+    try { db.run('ROLLBACK') } catch { /* ROLLBACK 失败不影响原始异常 */ }
+    throw err
+  }
 }

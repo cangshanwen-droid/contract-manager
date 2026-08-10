@@ -17,11 +17,12 @@ const UPDATE_ALLOWED_FIELDS = [
 /**
  * 合同级金额计算（P0-B 修复）：
  * - 明细显式录入的 total_cost / expected_income 优先（投资合同=投资总额/预期收益、拨款合同=拨款金额）；
- * - 未显式录入时按数量×单价×(1+税率) 推算成本（与 contract_items 的生成列 total 口径一致）；
+ * - 未显式录入时按数量×单价×(1+税率/100) 推算成本（P1-1：税率按百分比存储，13 表示 13%，
+ *   与 contract_items 的生成列 total 口径一致）；
  * - 预期收入仅销售合同(type_id=7)按数量×单价推算（销售收入），其余类型无显式收益则计 0。
  * 结果写入 contracts.total_cost / expected_income，供审批通过后登记资金流水（支出/收入）。
  */
-function computeContractAmounts(
+export function computeContractAmounts(
   contractTypeId: number | null | undefined,
   items: Partial<ContractItem>[]
 ): { total_cost: number; expected_income: number } {
@@ -31,7 +32,8 @@ function computeContractAmounts(
     const qty = item.quantity ?? 1
     const price = item.unit_price ?? 0
     const tax = item.tax_rate ?? 0
-    const itemCost = item.total_cost ?? qty * price * (1 + tax)
+    // P1-1 税率口径：tax_rate 为百分比（13=13%），含税成本 = 不含税 ×(1+tax/100)
+    const itemCost = item.total_cost ?? qty * price * (1 + tax / 100)
     const itemIncome = item.expected_income ?? (contractTypeId === 7 ? qty * price : 0)
     totalCost += itemCost
     expectedIncome += itemIncome
@@ -42,8 +44,49 @@ function computeContractAmounts(
   }
 }
 
+// P1-6 后端状态机：合同执行状态只允许按 draft→active→completed|terminated 顺序流转，
+// 拒绝任意跳转与非法枚举值；draft→active 必须已审批通过。
+// （completed/terminated/expired 为终态；expired 可由系统到期置位，也允许从 draft/active 显式置入）
+export const CONTRACT_STATUSES = ['draft', 'active', 'completed', 'terminated', 'expired'] as const
+
+const STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  draft: ['active', 'terminated', 'expired'],
+  active: ['completed', 'terminated', 'expired'],
+  completed: [],
+  terminated: [],
+  expired: []
+}
+
+/** 校验 status 流转合法性；合法返回 null，非法返回错误信息（中文） */
+export function validateContractStatusTransition(
+  oldStatus: string | null | undefined,
+  newStatus: string | null | undefined,
+  approvalStatus?: string | null
+): string | null {
+  if (newStatus === undefined || newStatus === null || String(newStatus) === String(oldStatus)) return null
+  const from = String(oldStatus ?? '')
+  const to = String(newStatus)
+  if (!(CONTRACT_STATUSES as readonly string[]).includes(to)) {
+    return `非法状态：${to}（允许：${CONTRACT_STATUSES.join(' / ')}）`
+  }
+  if (from && !(CONTRACT_STATUSES as readonly string[]).includes(from)) {
+    return `合同当前状态异常：${from}，无法流转`
+  }
+  if (!STATUS_TRANSITIONS[from]?.includes(to)) {
+    return `不允许的状态流转：${from || '（空）'} → ${to}（允许：draft→active→completed/terminated）`
+  }
+  if (to === 'active' && approvalStatus !== 'approved') {
+    return '合同未审批通过，无法进入执行状态'
+  }
+  return null
+}
+
 export class ContractRepository {
-  list(regionId?: number): Contract[] {
+  /**
+   * P1-1 分页支持：opts.limit/offset 可选，未传时保持全量返回（本地 IPC 兼容旧行为）。
+   * 云端模式经 cloudApi 默认带 limit=200。
+   */
+  list(regionId?: number, opts?: { limit?: number; offset?: number }): Contract[] {
     let sql = `SELECT c.*, ct.name as contract_type_name, r.name as region_name, comp.name as company_name
                FROM contracts c
                LEFT JOIN contract_types ct ON ct.id = c.contract_type_id
@@ -54,7 +97,16 @@ export class ContractRepository {
       sql += ' WHERE c.region_id = ?'
       params.push(regionId)
     }
+    // P2-3：idx_contracts_created_at 覆盖该排序，避免 TEMP B-TREE 全量排序
     sql += ' ORDER BY c.created_at DESC'
+    if (opts?.limit != null && opts.limit > 0) {
+      sql += ' LIMIT ?'
+      params.push(opts.limit)
+      if (opts.offset != null && opts.offset > 0) {
+        sql += ' OFFSET ?'
+        params.push(opts.offset)
+      }
+    }
     return queryAll(sql, params) as Contract[]
   }
 
@@ -180,6 +232,17 @@ export class ContractRepository {
     const db = getDatabase()
     const existing = this.getById(id)
     if (!existing) return undefined
+
+    // P1-6 后端状态机强制：status 变更（含任意枚举/任意跳转）在此拦截，
+    // 防止绕过审批直接置 active/completed 伪造资金流水；合法流转返回 null
+    if (data.status !== undefined && String(data.status) !== String(existing.status)) {
+      const err = validateContractStatusTransition(
+        existing.status as string,
+        data.status,
+        existing.approval_status as string
+      )
+      if (err) throw new Error(err)
+    }
 
     const fields: string[] = []
     const values: unknown[] = []

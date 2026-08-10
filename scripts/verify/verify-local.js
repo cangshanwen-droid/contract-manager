@@ -4,7 +4,7 @@
  *
  * 直接加载仓库真实的 migrations.ts / seed.ts（经 TypeScript 转译，SQL 与生产一致），
  * 在内存数据库中验证：
- *   1. 迁移 v1–v19 全部可执行（全新库）
+ *   1. 迁移 v1–v21 全部可执行（全新库）
  *   2. 迁移幂等（同库重跑 / 已有 DB 文件重开，均不重复应用）
  *   3. seed 数据正确（admin 用户存在、区域/合同类型/基建类型齐全）
  *   4. bcrypt 密码验证（admin/admin123 可通过，错误密码拒绝）
@@ -128,18 +128,18 @@ async function main() {
   const db = new SQL.Database()
 
   // 1. 迁移可执行（全新库）
-  test('迁移 v1–v19 全部可执行（全新库）', () => {
+  test('迁移 v1–v21 全部可执行（全新库）', () => {
     runMigrations(db)
     const versions = schemaVersions(db)
-    assertEq(versions.length, 19, 'schema_migrations 应恰好 19 条')
-    const expected = Array.from({ length: 19 }, (_, i) => i + 1)
-    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..19')
+    assertEq(versions.length, 21, 'schema_migrations 应恰好 21 条')
+    const expected = Array.from({ length: 21 }, (_, i) => i + 1)
+    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..21')
   })
 
   // 2. 迁移幂等（同库重跑）
   test('迁移幂等（同库重跑不重复应用）', () => {
     runMigrations(db)
-    assertEq(schemaVersions(db).length, 19, '重跑后仍应为 19 条')
+    assertEq(schemaVersions(db).length, 21, '重跑后仍应为 21 条')
   })
 
   // 3. 迁移幂等（已有 DB 文件重开）
@@ -150,7 +150,7 @@ async function main() {
     try {
       const db2 = new SQL.Database(fs.readFileSync(tmp))
       runMigrations(db2)
-      assertEq(schemaVersions(db2).length, 19, '重开已有库后仍应为 19 条')
+      assertEq(schemaVersions(db2).length, 21, '重开已有库后仍应为 21 条')
       db2.close()
     } finally {
       try { fs.unlinkSync(tmp) } catch { /* ignore */ }
@@ -221,14 +221,15 @@ async function main() {
     const c = H.queryOne('SELECT * FROM contracts WHERE contract_no = ?', [no])
     assert(c, '合同应能读回')
     assertEq(c.contract_name, '验证合同', 'contract_name 应一致')
+    // P1-1 修复后：tax_rate 按百分比存储（10 表示 10%），生成列按 /100 计算
     H.execute(
       'INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate) VALUES (?,?,?,?,?,?)',
-      [c.id, '路灯（组）', 2, 100, 50, 0.1]
+      [c.id, '路灯（组）', 2, 100, 50, 10]
     )
     const item = H.queryOne('SELECT * FROM contract_items WHERE contract_id = ?', [c.id])
     assert(item, '合同条目应能读回')
     assert(Math.abs(item.amount - 200) < 1e-9, `生成列 amount 应为 200，实际 ${item.amount}`)
-    assert(Math.abs(item.tax_amount - 20) < 1e-9, `生成列 tax_amount 应为 20，实际 ${item.tax_amount}`)
+    assert(Math.abs(item.tax_amount - 20) < 1e-9, `生成列 tax_amount 应为 20（2×100×10%），实际 ${item.tax_amount}`)
     assert(Math.abs(item.total - 220) < 1e-9, `生成列 total 应为 220，实际 ${item.total}`)
   })
 

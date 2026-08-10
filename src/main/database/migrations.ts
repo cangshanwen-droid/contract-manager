@@ -83,8 +83,9 @@ CREATE TABLE IF NOT EXISTS contract_items (
   land_area       REAL    NOT NULL DEFAULT 0,
   total_land_area REAL    GENERATED ALWAYS AS (quantity * land_area) STORED,
   tax_rate        REAL    DEFAULT 0,
-  tax_amount      REAL    GENERATED ALWAYS AS (ROUND(quantity * unit_price * tax_rate, 2)) STORED,
-  total           REAL    GENERATED ALWAYS AS (quantity * unit_price * (1 + tax_rate)) STORED,
+  -- P1-1 税率口径：tax_rate 按百分比存储（13 表示 13%），计算时除以 100
+  tax_amount      REAL    GENERATED ALWAYS AS (ROUND(quantity * unit_price * tax_rate / 100, 2)) STORED,
+  total           REAL    GENERATED ALWAYS AS (quantity * unit_price * (1 + tax_rate / 100)) STORED,
   sort_order      INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_contract_items_contract ON contract_items(contract_id);
@@ -386,6 +387,53 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read
     sql: `
 -- v19 用户最后登录时间：登录成功时写入，用于系统概览活跃用户统计
 ALTER TABLE users ADD COLUMN last_login TEXT;
+    `
+  },
+  {
+    version: 20,
+    name: 'fix_contract_items_tax_ratio',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v20 P1-1 修复税率口径：tax_rate 按百分比存储（13 表示 13%），
+-- 旧生成列把百分比当小数用（13% 被当成 1300%），必须重建表修正。
+-- SQLite 不支持 ALTER 修改生成列表达式，采用 建新表→复制→换名 方案；
+-- 事务由 executeMulti 自动包裹（勿在此写 BEGIN/COMMIT，sql.js 单语句
+-- 模式下注释+BEGIN 合体会吞掉事务开始，导致 COMMIT 报无事务错误）。
+-- ═══════════════════════════════════════════════════════════════
+DROP TABLE IF EXISTS contract_items_new;
+CREATE TABLE contract_items_new (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  contract_id     INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+  item_name       TEXT    NOT NULL,
+  quantity        REAL    NOT NULL DEFAULT 1,
+  unit_price      REAL    NOT NULL DEFAULT 0,
+  amount          REAL    GENERATED ALWAYS AS (quantity * unit_price) STORED,
+  land_area       REAL    NOT NULL DEFAULT 0,
+  total_land_area REAL    GENERATED ALWAYS AS (quantity * land_area) STORED,
+  tax_rate        REAL    DEFAULT 0,
+  tax_amount      REAL    GENERATED ALWAYS AS (ROUND(quantity * unit_price * tax_rate / 100, 2)) STORED,
+  total           REAL    GENERATED ALWAYS AS (quantity * unit_price * (1 + tax_rate / 100)) STORED,
+  sort_order      INTEGER DEFAULT 0,
+  skill_level     REAL    DEFAULT 0,
+  carbon_factor   REAL    DEFAULT 0,
+  expected_income REAL    DEFAULT 0,
+  total_cost      REAL    DEFAULT 0
+);
+INSERT INTO contract_items_new (id, contract_id, item_name, quantity, unit_price, land_area, tax_rate, sort_order, skill_level, carbon_factor, expected_income, total_cost)
+  SELECT id, contract_id, item_name, quantity, unit_price, land_area, tax_rate, sort_order, skill_level, carbon_factor, expected_income, total_cost FROM contract_items;
+DROP TABLE contract_items;
+ALTER TABLE contract_items_new RENAME TO contract_items;
+CREATE INDEX IF NOT EXISTS idx_contract_items_contract ON contract_items(contract_id);
+    `
+  },
+  {
+    version: 21,
+    name: 'add_contracts_created_at_index',
+    sql: `
+-- v21 性能审计 P2-3：合同列表按 created_at DESC 排序（contract.repo.list），
+-- 无索引时实测 EXPLAIN QUERY PLAN 出现 USE TEMP B-TREE FOR ORDER BY，
+-- 1000+ 合同每页列表查询全量临时排序直接卡主进程 IPC。加索引消除。
+CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON contracts(created_at);
     `
   },
 ]

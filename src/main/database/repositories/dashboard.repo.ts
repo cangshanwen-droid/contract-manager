@@ -25,7 +25,44 @@ export class DashboardRepository {
       total_contract_amount: Number(row?.total_contract_amount ?? 0),
       total_account_balance: Number(row?.total_account_balance ?? 0),
       total_accounts: Number(row?.total_accounts ?? 0),
+      // P1-1 扩展：Dashboard 合同状态分布/待审批/最近活动，不再由渲染端拉 CONTRACT_LIST 全表
+      contract_status_counts: this.getContractStatusCounts(),
+      contract_approval_pending: this.getApprovalPendingCount(),
+      recent_contracts: this.getRecentContracts(),
     }
+  }
+
+  /** P1-1：合同状态分布（GROUP BY status） */
+  private getContractStatusCounts(): Record<string, number> {
+    const rows = queryAll('SELECT status, COUNT(*) as cnt FROM contracts GROUP BY status')
+    const counts: Record<string, number> = {}
+    for (const r of rows) {
+      counts[String(r.status || 'draft')] = Number(r.cnt ?? 0)
+    }
+    return counts
+  }
+
+  /** P1-1：待审批合同数（operator 待办工作台） */
+  private getApprovalPendingCount(): number {
+    const row = queryOne(`SELECT COUNT(*) as cnt FROM contracts WHERE approval_status = 'pending'`)
+    return Number(row?.cnt ?? 0)
+  }
+
+  /** P1-1：最近 6 条合同（Dashboard 最近活动列表） */
+  private getRecentContracts(): DashboardSummary['recent_contracts'] {
+    const rows = queryAll(
+      `SELECT id, contract_no, contract_name, status, created_at
+         FROM contracts
+        ORDER BY created_at DESC, id DESC
+        LIMIT 6`
+    )
+    return rows.map((r) => ({
+      id: Number(r.id),
+      contract_no: String(r.contract_no ?? ''),
+      contract_name: String(r.contract_name ?? ''),
+      status: String(r.status ?? 'draft'),
+      created_at: String(r.created_at ?? ''),
+    }))
   }
 
   /**

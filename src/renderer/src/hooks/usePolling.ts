@@ -17,6 +17,8 @@ export interface UsePollingOptions {
   maxDelayMs?: number
   /** 轮询开关（默认 true） */
   enabled?: boolean
+  /** P1-2：页面隐藏（document.hidden，如切到其他标签/最小化）时暂停轮询，恢复可见后继续 */
+  pauseWhenHidden?: boolean
 }
 
 /**
@@ -28,7 +30,7 @@ export function usePolling(
   baseDelayMs: number,
   options: UsePollingOptions = {}
 ): void {
-  const { immediate = true, maxDelayMs = 5 * 60 * 1000, enabled = true } = options
+  const { immediate = true, maxDelayMs = 5 * 60 * 1000, enabled = true, pauseWhenHidden = false } = options
   const fnRef = useRef(fn)
   fnRef.current = fn
   const inFlightRef = useRef(false)
@@ -38,9 +40,11 @@ export function usePolling(
     if (!enabled) return
     let alive = true
     let timer: ReturnType<typeof setTimeout> | null = null
+    let scheduled = false
 
     const run = async (): Promise<void> => {
       if (!alive || inFlightRef.current) return
+      if (pauseWhenHidden && document.hidden) return
       inFlightRef.current = true
       try {
         const ok = await fnRef.current()
@@ -53,7 +57,10 @@ export function usePolling(
     }
 
     const schedule = (): void => {
-      if (!alive) return
+      if (!alive || scheduled) return
+      // P1-2：页面隐藏时不排期下一次；恢复可见由 visibilitychange 重新调度
+      if (pauseWhenHidden && document.hidden) return
+      scheduled = true
       // 指数退避：0 次失败 → base；1 次 → base×2；≥2 次 → maxDelayMs
       const delay = failCountRef.current === 0
         ? baseDelayMs
@@ -61,16 +68,24 @@ export function usePolling(
           ? baseDelayMs * 2
           : maxDelayMs
       timer = setTimeout(() => {
+        scheduled = false
         void run().then(() => { if (alive) schedule() })
       }, delay)
     }
 
+    const onVisibilityChange = (): void => {
+      // 从隐藏恢复可见：若当前没有排期的下一次，立即重新调度
+      if (!document.hidden && alive && !scheduled) schedule()
+    }
+
     if (immediate) void run()
     schedule()
+    if (pauseWhenHidden) document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       alive = false
       if (timer) clearTimeout(timer)
+      if (pauseWhenHidden) document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [fn, baseDelayMs, immediate, maxDelayMs, enabled])
+  }, [fn, baseDelayMs, immediate, maxDelayMs, enabled, pauseWhenHidden])
 }

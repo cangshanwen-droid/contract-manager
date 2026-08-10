@@ -2,6 +2,16 @@ import { getDatabase } from '../connection'
 import { queryAll, queryOne } from '../helpers'
 import type { Region } from '../../../shared/types'
 
+/**
+ * update() 字段白名单（P1-4 修复，与 contract.repo 一致）：
+ * 仅允许更新业务列；id / created_at / updated_at 等系统列禁止透传，
+ * 防止调用方通过 Object.keys(data) 任意拼 SET 列（值已参数化无注入，但字段可被乱改）。
+ */
+const UPDATE_ALLOWED_FIELDS = [
+  'name', 'population', 'talent_population', 'carbon_emissions',
+  'population_capacity', 'base_growth_rate', 'current_happiness', 'current_employment_rate'
+]
+
 export class RegionRepository {
   list(): Region[] {
     return queryAll('SELECT * FROM regions ORDER BY name') as Region[]
@@ -33,7 +43,7 @@ export class RegionRepository {
 
   update(id: number, data: Partial<Region>): Region | undefined {
     const fields = Object.keys(data)
-      .filter((k) => k !== 'id' && k !== 'created_at')
+      .filter((k) => UPDATE_ALLOWED_FIELDS.includes(k))
     if (fields.length === 0) return this.getById(id)
     const setClause = fields.map((k) => `${k} = ?`).join(', ')
     const values = fields.map((k) => (data as Record<string, unknown>)[k])

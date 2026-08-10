@@ -95,8 +95,9 @@ export function registerInfraCalcHandlers(): void {
         const totalCarbonReduction = result.reduce(
           (sum, r) => sum + r.actual_carbon_reduction, 0
         )
-        // 最低抵扣下限 2000
-        const effectiveCarbonReduction = Math.max(2000, totalCarbonReduction)
+        // P1-8 修复：不再设置 2000 吨最低抵扣下限（原来无基建也凭空送 2000 吨减排，净排放被错误归零）；
+        // 抵扣额 = 实际减排量（下限 0），净排放由 max(0, baseline - effective) 兜底
+        const effectiveCarbonReduction = Math.max(0, totalCarbonReduction)
         const netCarbonEmission = Math.max(0, baselineCarbon - effectiveCarbonReduction)
 
         const summary = {
