@@ -1,12 +1,14 @@
 /**
  * cloudApi.ts - 云端 API 直连模块
- * 当用户开启「云端模式」后，所有数据请求直接发往 https://106.54.26.86
+ * 当用户开启「云端模式」后，所有数据请求直接发往 ${CLOUD_API_BASE}
  * 否则走 Electron IPC（本地 SQLite）
  *
  * 认证：使用 Gipfel 统一登录 token（gipfel_auth_token），不再需要单独的 stock token
  */
 
-const API_BASE = 'https://106.54.26.86'
+import { CLOUD_API_BASE } from '../../../shared/cloud-config'
+
+const API_BASE = '${CLOUD_API_BASE}'
 const AUTH_TOKEN_KEY = 'gipfel_auth_token'
 const CLOUD_MODE_KEY = 'cloudMode'
 
@@ -91,7 +93,7 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
 export const fetch = cloudFetch
 
 /** 云端完整版地址（股票交易 Arena） */
-export const CLOUD_ARENA_URL = 'https://106.54.26.86'
+export const CLOUD_ARENA_URL = '${CLOUD_API_BASE}'
 
 /** 管理端密钥缓存（仅成功获取后缓存，未配置时不缓存以便重试） */
 let cachedAdminKey: string | null = null

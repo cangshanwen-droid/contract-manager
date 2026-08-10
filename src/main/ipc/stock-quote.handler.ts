@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron'
 import { net } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
+import { CLOUD_API_BASE } from '../../shared/cloud-config'
 
-const STOCK_API = 'https://106.54.26.86'
+const STOCK_API = '${CLOUD_API_BASE}'
 
 interface StockQuote {
   symbol: string

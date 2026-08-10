@@ -2,8 +2,8 @@
  * system.handler.ts - 系统健康检查
  *
  * 服务器状态（系统设置页"服务器状态"卡片 + 管理端概览）：
- *  - 云端 API 健康：GET https://106.54.26.86/api/regions（云端模式数据源）
- *  - 股票 API 健康：GET https://106.54.26.86/market/stocks（股票行情数据源）
+ *  - 云端 API 健康：GET ${CLOUD_API_BASE}/api/regions（云端模式数据源）
+ *  - 股票 API 健康：GET ${CLOUD_API_BASE}/market/stocks（股票行情数据源）
  *  - 本地数据库：SQLite 连通性与行数
  *
  * 采用 Electron net.fetch + AbortController 超时，不依赖浏览器 fetch。
@@ -15,8 +15,9 @@ import { PERMISSIONS } from '../../shared/permissions'
 import { queryOne } from '../database/helpers'
 import { requirePermission } from '../session'
 import type { SystemHealth } from '../../shared/types'
+import { CLOUD_API_BASE } from '../../shared/cloud-config'
 
-const API_BASE = 'https://106.54.26.86'
+const API_BASE = '${CLOUD_API_BASE}'
 const HEALTH_TIMEOUT_MS = 5000
 
 async function ping(url: string, name: string): Promise<{ ok: boolean; latency_ms: number | null; message?: string }> {

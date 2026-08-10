@@ -6,6 +6,7 @@ import { IPC_CHANNELS } from '../../shared/constants'
 import { PERMISSIONS } from '../../shared/permissions'
 import { readSyncLog } from '../stock-sync'
 import { requirePermission } from '../session'
+import { CLOUD_API_BASE } from '../../shared/cloud-config'
 
 const TOKEN_FILE = path.join(app.getPath('userData'), 'stock-token.txt')
 
@@ -40,7 +41,7 @@ export function registerStockHandlers(): void {
     if (!token) return { success: false, message: '未配置Token' }
 
     try {
-      const res = await net.fetch('https://106.54.26.86/market/stocks', {
+      const res = await net.fetch('${CLOUD_API_BASE}/market/stocks', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) return { success: false, message: `HTTP ${res.status}` }

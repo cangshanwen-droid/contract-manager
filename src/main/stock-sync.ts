@@ -14,8 +14,9 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { getDatabase } from './database/connection'
 import { getAdminKey } from './credential-store'
+import { CLOUD_API_BASE } from '../shared/cloud-config'
 
-const STOCK_API = 'https://106.54.26.86'
+const STOCK_API = '${CLOUD_API_BASE}'
 const MAX_LOG_LINES = 200
 
 function logPath() { return path.join(app.getPath('userData'), 'stock-sync.log') }

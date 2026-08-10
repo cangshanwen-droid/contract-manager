@@ -7,6 +7,7 @@ import { seedDefaultData } from './database/seed'
 import { registerAllHandlers } from './ipc/register-all'
 import path from 'path'
 import fs from 'fs'
+import { TRUSTED_CERT_HOSTS } from '../shared/cloud-config'
 
 // ── 安全 console：防止 EPIPE 崩溃（管道断开时 console 输出抛异常）──
 ;['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
@@ -116,10 +117,11 @@ app.whenReady().then(async () => {
     }
   })
 
-  // 信任自签名证书（仅限 Gipfel 云端 106.54.26.86；其他域证书错误仍拦截）
+  // 信任自签名证书（仅限 Gipfel 云端主机；其他域证书错误仍拦截）
   session.defaultSession.setCertificateVerifyProc((request, callback) => {
     const host = request.hostname
-    if (host === '106.54.26.86' || host.endsWith('.106.54.26.86')) {
+    const trusted = TRUSTED_CERT_HOSTS.some(h => host === h || host.endsWith(`.${h}`))
+    if (trusted) {
       callback(0)
     } else {
       callback(-3)

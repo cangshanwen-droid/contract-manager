@@ -4,6 +4,7 @@ import { DownloadOutlined, UploadOutlined, DatabaseOutlined, ClockCircleOutlined
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { isCloudMode, setCloudMode, invoke } from '../api/cloudApi'
 import { tokens as T } from '../styles/design-tokens'
+import { CLOUD_API_BASE } from '../../../shared/cloud-config'
 
 const SettingsPage: React.FC = () => {
   const [exporting, setExporting] = useState(false)
@@ -197,7 +198,7 @@ const SettingsPage: React.FC = () => {
           <CloudOutlined style={{ marginRight: 6 }} />云端模式
         </div>
         <div style={{ fontSize: 12, color: T.silver2, marginBottom: 12 }}>
-          开启后，所有数据页面直接从 <code style={{ color: T.accent }}>106.54.26.86</code> 云端读取数据，绕过本地 SQLite
+          开启后，所有数据页面直接从 <code style={{ color: T.accent }}>{CLOUD_API_BASE}</code> 云端读取数据，绕过本地 SQLite
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Switch
@@ -221,7 +222,7 @@ const SettingsPage: React.FC = () => {
             message="当前使用云端数据源"
             description={
               <span style={{ fontSize: 11 }}>
-                所有 region / company / contract / dashboard 数据将从 <code>https://106.54.26.86</code> 读取。
+                所有 region / company / contract / dashboard 数据将从 <code>${CLOUD_API_BASE}</code> 读取。
                 认证使用 Gipfel 统一登录凭证，无需单独配置。
               </span>
             }
@@ -303,7 +304,7 @@ const SettingsPage: React.FC = () => {
           <ApiOutlined style={{ marginRight: 6 }} />服务器状态
         </div>
         <div style={{ fontSize: 12, color: T.silver2, marginBottom: 12 }}>
-          云端数据 API 与股票行情 API 健康检查 · 本地数据库状态（主机 106.54.26.86）
+          云端数据 API 与股票行情 API 健康检查 · 本地数据库状态（主机 {CLOUD_API_BASE}）
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
           {statusRow('云端数据 API', health?.cloud_api)}
@@ -337,7 +338,7 @@ const SettingsPage: React.FC = () => {
               ['技术', 'Electron · React 18 · TypeScript · SQLite'],
               ['引擎', 'Gipfel 商业模拟 3.0'],
               ['安全', 'PBKDF2 + 登录限流'],
-              ['联动', '106.54.26.86'],
+              ['联动', CLOUD_API_BASE],
             ].map(([k, v], i) => (
               <tr key={k} style={{
                 background: i % 2 === 0 ? T.warmDim : 'transparent',

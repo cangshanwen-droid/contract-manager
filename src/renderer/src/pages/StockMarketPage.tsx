@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { CLOUD_API_BASE } from '../../../shared/cloud-config'
 import { Button, Spin, Result, Card, Tag, Empty, message } from 'antd'
 import {
   ArrowLeftOutlined, StockOutlined, ReloadOutlined,
@@ -25,7 +26,7 @@ import { invoke } from '../api/cloudApi'
 import { IPC_CHANNELS } from '../../../shared/constants'
 
 /** 云端完整版地址（Gipfel Trading Arena） */
-const CLOUD_ARENA_URL = 'https://106.54.26.86/'
+const CLOUD_ARENA_URL = '${CLOUD_API_BASE}/'
 
 /** 加载超时阈值 */
 const LOAD_TIMEOUT_MS = 20000
