@@ -99,7 +99,11 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
     return res.json()
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      throw new Error(`云端请求超时（${REQUEST_TIMEOUT_MS / 1000}s）：${path}`)
+      throw new Error(`网络连接异常（已等待 ${REQUEST_TIMEOUT_MS / 1000} 秒）：请检查网络后重试`)
+    }
+    // 网络不可达（DNS/连接被拒/离线）——统一翻译为用户能懂的语言
+    if (err instanceof TypeError || err?.message === 'Failed to fetch' || err?.message?.includes('fetch')) {
+      throw new Error('网络连接异常：请检查网络后重试')
     }
     throw err
   } finally {

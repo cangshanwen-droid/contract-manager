@@ -48,6 +48,11 @@ export function registerStockHandlers(): void {
       const data = await res.json() as any
       return { success: true, stock_count: Array.isArray(data) ? data.length : 0 }
     } catch (e: any) {
+      // 网络不可达统一友好提示（用户视角，不暴露底层错误）
+      const msg = (e?.message || '').toLowerCase()
+      if (e?.name === 'AbortError' || msg.includes('fetch') || msg.includes('network') || msg.includes('econnrefused') || msg.includes('etimedout')) {
+        return { success: false, message: '网络连接异常：请检查网络后重试' }
+      }
       return { success: false, message: e.message || '网络错误' }
     }
   })

@@ -31,6 +31,7 @@ import {
 } from '@ant-design/icons'
 import LOGO_ICON from '../../assets/logo-icon.txt?raw'
 import NotificationBell from './NotificationBell'
+import NetworkStatusBar from './NetworkStatusBar'
 import GlobalSearch from './GlobalSearch'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import type { MenuProps } from 'antd'
@@ -464,6 +465,9 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             <NotificationBell />
           </div>
         </Header>
+
+        {/* 全局网络状态条：断网时常驻警示，恢复自动消失 */}
+        <NetworkStatusBar />
 
         {/* Content - 32px padding, responsive */}
         <Content className="gipfel-main-content" style={{
