@@ -62,6 +62,8 @@ const DashboardPage: React.FC = () => {
 
   // ── 股票实时价格 ──
   const [stockQuotes, setStockQuotes] = useState<Record<string, {price:number, change:number, changePct:number}>>({})
+  // 行情获取失败标记：失败时区域卡片显示「行情暂不可用」降级提示，而非静默隐藏
+  const [quoteFailed, setQuoteFailed] = useState(false)
 
   useEffect(() => {
     const loadStockData = async () => {
@@ -73,8 +75,13 @@ const DashboardPage: React.FC = () => {
             quotes[s.symbol] = { price: s.price, change: s.change, changePct: s.changePct }
           }
           setStockQuotes(quotes)
+          setQuoteFailed(false)
+        } else {
+          setQuoteFailed(true)
         }
-      } catch {}
+      } catch {
+        setQuoteFailed(true)
+      }
     }
     loadStockData()
     const timer = setInterval(loadStockData, 30000)
@@ -452,6 +459,7 @@ const DashboardPage: React.FC = () => {
             region={r}
             isPlaceholder={regions.length === 0 || i >= regions.length}
             stockQuotes={stockQuotes}
+            quoteFailed={quoteFailed}
             onClick={() => navigate('/regions')}
           />
         ))}
@@ -683,7 +691,8 @@ const RegionInfoCard: React.FC<{
   isPlaceholder: boolean
   onClick: () => void
   stockQuotes: Record<string, {price:number, change:number, changePct:number}>
-}> = ({ region, isPlaceholder, onClick, stockQuotes }) => {
+  quoteFailed: boolean
+}> = ({ region, isPlaceholder, onClick, stockQuotes, quoteFailed }) => {
   const happiness = region.current_happiness != null
     ? region.current_happiness.toFixed(1)
     : '--'
@@ -731,19 +740,24 @@ const RegionInfoCard: React.FC<{
       {/* 股票实时价格 */}
       {REGION_STOCK[region.name]?.map((sym: string) => {
         const q = stockQuotes[sym]
-        if (!q) return null
         return (
           <div key={sym} style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             padding: '4px 0', borderTop: `1px solid ${T.border}`, marginTop: 4, fontSize: 12,
           }}>
             <span style={{ color: T.silverMut }}>{sym}</span>
-            <span style={{ fontFamily: 'tabular-nums' }}>
-              <span style={{ color: T.silver }}>{formatMoneyCNY(q.price)}</span>
-              <span style={{ color: q.change >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR, marginLeft: 8 }}>
-                {formatTrend(q.changePct)}{formatPercentWithSign(q.changePct)}
+            {q ? (
+              <span style={{ fontFamily: 'tabular-nums' }}>
+                <span style={{ color: T.silver }}>{formatMoneyCNY(q.price)}</span>
+                <span style={{ color: q.change >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR, marginLeft: 8 }}>
+                  {formatTrend(q.changePct)}{formatPercentWithSign(q.changePct)}
+                </span>
               </span>
-            </span>
+            ) : (
+              <span style={{ fontSize: 11, color: T.silverMut }}>
+                {quoteFailed ? '行情暂不可用' : '—'}
+              </span>
+            )}
           </div>
         )
       })}

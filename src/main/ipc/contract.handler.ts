@@ -73,7 +73,12 @@ export function registerContractHandlers(): void {
     const changed: string[] = []
     if (!oldContract) return changed
     for (const [k, v] of Object.entries(data)) {
-      if (v === undefined || k.startsWith('_') || k === 'updated_by' || k === 'created_by' || k === 'items') continue
+      if (v === undefined || k.startsWith('_') || k === 'updated_by' || k === 'created_by') continue
+      if (k === 'items') {
+        // 明细整体替换视为一次变更（明细内容不进快照，仅记录变更标签）
+        if (JSON.stringify(oldContract.items || []) !== JSON.stringify(v || [])) changed.push('items')
+        continue
+      }
       const oldV = oldContract[k]
       if (String(oldV ?? '') !== String(v ?? '')) changed.push(k)
     }
@@ -326,12 +331,15 @@ export function registerContractHandlers(): void {
       })
 
       // ── 通知中心触发 ──
-      // 提交审批 → 通知 admin；批准/驳回 → 通知创建人
+      // 提交审批 → 通知 admin；三级全部通过 → 通知创建人；任一环节驳回 → 通知创建人
       try {
         if (action === 'submit') {
           notificationRepo.notifyContractSubmitted(result)
-        } else if (action === 'approve' || action === 'reject') {
-          notificationRepo.notifyContractDecision(result, action)
+        } else if (action === 'reject') {
+          notificationRepo.notifyContractDecision(result, 'reject')
+        } else if (action === 'approve' && result.approval_status === 'approved') {
+          // 仅第 3 级（财务）通过、整体已审批时才通知创建人「已批准」
+          notificationRepo.notifyContractDecision(result, 'approve')
         }
       } catch (err) {
         console.error('notification trigger failed:', err)

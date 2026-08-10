@@ -175,7 +175,8 @@ const SettingsPage: React.FC = () => {
             onChange={(v) => {
               setCloudModeState(v)
               setCloudMode(v)
-              message.info(v ? '已切换到云端模式 — 数据将从 106.54.26.86 读取，请刷新页面生效' : '已切回本地模式 — 数据将从本地数据库读取，请刷新页面生效', 4)
+              // 切换后自动刷新页面，使所有数据页面立即切换到新数据源（无需手动刷新）
+              setTimeout(() => window.location.reload(), 200)
             }}
           />
           <span style={{ fontSize: 13, color: cloudMode ? T.accent : T.silver3, fontWeight: 500 }}>

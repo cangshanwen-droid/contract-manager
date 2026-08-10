@@ -268,7 +268,8 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
               <Input.Password prefix={<LockOutlined style={{ color: '#8A9BB5', fontSize: 14 }} />}
                 placeholder="密码"
                 style={{ height: 44, borderRadius: 8, fontSize: 13, background: 'rgba(5,18,38,.6)', borderColor: 'rgba(255,255,255,.05)', color: '#F5F7FA', caretColor: '#D4AF37' }}
-                onFocus={(e: any) => { e.target.style.borderColor = 'rgba(212,175,55,.3)'; e.target.style.boxShadow = '0 0 0 3px rgba(212,175,55,.03)' }} />
+                onFocus={(e: any) => { e.target.style.borderColor = 'rgba(212,175,55,.3)'; e.target.style.boxShadow = '0 0 0 3px rgba(212,175,55,.03)' }}
+                onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,.05)'; e.target.style.boxShadow = 'none' }} />
             </Form.Item>
             {isFirstUse && <Form.Item name="confirm" rules={[{ required: true, message: '请确认密码' }]} style={{ marginBottom: 22 }}>
               <Input.Password prefix={<LockOutlined style={{ color: '#8A9BB5', fontSize: 14 }} />} placeholder="确认密码"

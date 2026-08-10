@@ -303,37 +303,41 @@ const AccountPage: React.FC = () => {
             locale={{ emptyText: <span style={{color:T.textMuted,fontSize:11}}>暂无交易记录</span> }}
           />
         </Spin>
-        <Divider />
-        <div style={{ fontSize:13, fontWeight:500, color:T.textSecondary, marginBottom:8 }}>添加交易</div>
-        <Form form={txForm} layout="inline" size="small" onFinish={handleAddTx}>
-          <Form.Item name="trans_type" rules={[{required:true}]} style={{marginBottom:8}}>
-            <Select style={{width:80}} options={[{value:'income',label:'收入'},{value:'expense',label:'支出'}]} />
-          </Form.Item>
-          <Form.Item name="amount" rules={[{required:true}]} style={{marginBottom:8}}>
-            <InputNumber placeholder="金额" min={0} style={{width:100}} />
-          </Form.Item>
-          <Form.Item name="category" style={{marginBottom:8}}>
-            <Select placeholder="类别" style={{width:120}} allowClear
-              options={[
-                {value:'基建拨款',label:'基建拨款'},
-                {value:'投资支出',label:'投资支出'},
-                {value:'采购支出',label:'采购支出'},
-                {value:'劳动力支出',label:'劳动力支出'},
-                {value:'碳排交易',label:'碳排交易'},
-                {value:'税收收入',label:'税收收入'},
-                {value:'拨款收入',label:'拨款收入'},
-              ]} />
-          </Form.Item>
-          <Form.Item name="fiscal_year" style={{marginBottom:8}}>
-            <InputNumber placeholder="年度" min={2020} max={2030} style={{width:80}} />
-          </Form.Item>
-          <Form.Item name="description" style={{marginBottom:8}}>
-            <Input placeholder="备注" style={{width:140}} />
-          </Form.Item>
-          <Form.Item style={{marginBottom:8}}>
-            {canTransact && <Button type="primary" htmlType="submit" icon={<DollarOutlined />}>添加</Button>}
-          </Form.Item>
-        </Form>
+        {canTransact && (
+          <>
+            <Divider />
+            <div style={{ fontSize:13, fontWeight:500, color:T.textSecondary, marginBottom:8 }}>添加交易</div>
+            <Form form={txForm} layout="inline" size="small" onFinish={handleAddTx}>
+              <Form.Item name="trans_type" rules={[{required:true}]} style={{marginBottom:8}}>
+                <Select style={{width:80}} options={[{value:'income',label:'收入'},{value:'expense',label:'支出'}]} />
+              </Form.Item>
+              <Form.Item name="amount" rules={[{required:true}]} style={{marginBottom:8}}>
+                <InputNumber placeholder="金额" min={0} style={{width:100}} />
+              </Form.Item>
+              <Form.Item name="category" style={{marginBottom:8}}>
+                <Select placeholder="类别" style={{width:120}} allowClear
+                  options={[
+                    {value:'基建拨款',label:'基建拨款'},
+                    {value:'投资支出',label:'投资支出'},
+                    {value:'采购支出',label:'采购支出'},
+                    {value:'劳动力支出',label:'劳动力支出'},
+                    {value:'碳排交易',label:'碳排交易'},
+                    {value:'税收收入',label:'税收收入'},
+                    {value:'拨款收入',label:'拨款收入'},
+                  ]} />
+              </Form.Item>
+              <Form.Item name="fiscal_year" style={{marginBottom:8}}>
+                <InputNumber placeholder="年度" min={2020} max={2030} style={{width:80}} />
+              </Form.Item>
+              <Form.Item name="description" style={{marginBottom:8}}>
+                <Input placeholder="备注" style={{width:140}} />
+              </Form.Item>
+              <Form.Item style={{marginBottom:8}}>
+                <Button type="primary" htmlType="submit" icon={<DollarOutlined />}>添加</Button>
+              </Form.Item>
+            </Form>
+          </>
+        )}
       </Modal>
     </div>
   )

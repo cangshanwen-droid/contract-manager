@@ -36,6 +36,12 @@ const PAGE_HEIGHT = 'calc(100vh - 52px - 64px)'
 /** 行情刷新间隔（rep 只读视图，秒） */
 const QUOTE_REFRESH_MS = 30000
 
+/** 格式化为 HH:MM:SS */
+const fmtHHMMSS = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 /** 统一登录：桌面端登录后自动获取云端股票 token，iframe 免登录 */
 async function fetchArenaUrl(): Promise<{ url: string; usingDefault: boolean }> {
   try {
@@ -93,6 +99,8 @@ const StockMarketPage: React.FC = () => {
   const [myStocks, setMyStocks] = useState<CloudStock[]>([])
   const [repLoading, setRepLoading] = useState(true)
   const [repError, setRepError] = useState('')
+  // 最近一次行情刷新成功的时间（30s 轮询时更新）
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   // 本公司已上市股票代码集合（companies.is_listed=1 且有 stock_symbol）
   const [mySymbols, setMySymbols] = useState<Set<string>>(new Set())
 
@@ -113,7 +121,10 @@ const StockMarketPage: React.FC = () => {
         setRepError('')
         // 云端全部行情
         const market = await fetchMarket()
-        if (alive) setMyStocks(market)
+        if (alive) {
+          setMyStocks(market)
+          setLastUpdated(new Date())
+        }
       } catch (e: any) {
         if (alive) setRepError(e?.message || '加载失败')
       } finally {
@@ -225,6 +236,11 @@ const StockMarketPage: React.FC = () => {
                 background: 'rgba(212,175,55,0.25)', border: '1px solid #D4AF37',
               }} />
               <span style={{ color: '#D4AF37' }}>金色边框为本公司股票（{mySymbols.size} 只）</span>
+            </span>
+          )}
+          {lastUpdated && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#64748B', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+              更新于 {fmtHHMMSS(lastUpdated)} · 每 30 秒自动刷新
             </span>
           )}
         </div>

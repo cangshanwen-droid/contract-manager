@@ -39,13 +39,14 @@ export class ContractRepository {
        LEFT JOIN companies comp ON comp.id = c.party_b_id
        WHERE c.id = ?`,
       [id]
-    ) as ContractWithItems | undefined
+    ) as Record<string, unknown> | undefined
     if (!contract) return undefined
-    contract.items = queryAll(
+    const withItems = { ...contract } as unknown as ContractWithItems
+    withItems.items = queryAll(
       'SELECT * FROM contract_items WHERE contract_id = ? ORDER BY sort_order',
       [id]
     ) as ContractItem[]
-    return contract
+    return withItems
   }
 
   create(data: {
@@ -140,6 +141,7 @@ export class ContractRepository {
     status?: string
     notes?: string
     updated_by?: string
+    items?: Partial<ContractItem>[]
   }): ContractWithItems | undefined {
     const db = getDatabase()
     const existing = this.getById(id)
@@ -155,7 +157,45 @@ export class ContractRepository {
         values.push(v)
       }
     }
-    if (fields.length > 0) {
+
+    if (data.items !== undefined) {
+      // 明细同步：整体替换（事务保护，与 create() 的写入逻辑同构）
+      db.run('BEGIN TRANSACTION')
+      try {
+        if (fields.length > 0) {
+          db.run(
+            `UPDATE contracts SET ${fields.join(', ')}, updated_at = datetime('now','localtime') WHERE id = ?`,
+            [...values, id]
+          )
+        }
+        db.run('DELETE FROM contract_items WHERE contract_id = ?', [id])
+        if (data.items.length > 0) {
+          const stmt = db.prepare(
+            `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          for (const [idx, item] of data.items.entries()) {
+            stmt.bind([
+              id,
+              item.item_name || '',
+              item.quantity ?? 1,
+              item.unit_price ?? 0,
+              item.land_area ?? 0,
+              item.tax_rate ?? 0,
+              item.skill_level ?? 0,
+              item.carbon_factor ?? 0,
+              idx
+            ])
+            stmt.step()
+            stmt.reset()
+          }
+        }
+        db.run('COMMIT')
+      } catch (err) {
+        db.run('ROLLBACK')
+        throw err
+      }
+    } else if (fields.length > 0) {
       db.run(
         `UPDATE contracts SET ${fields.join(', ')}, updated_at = datetime('now','localtime') WHERE id = ?`,
         [...values, id]
@@ -171,10 +211,10 @@ export class ContractRepository {
   }
 
   /**
-   * 审批状态流转：
-   *  submit  → 草稿/已驳回 → 待审批 (提交审批)
+   * 审批状态流转（单级）：
+   *  submit  → 草稿/已驳回 → 待审批
    *  approve → 待审批 → 已审批
-   *  reject  → 待审批 → 已驳回
+   *  reject  → 待审批 → 已驳回（可重新提交）
    * 只有已审批(approval_status='approved')的合同才允许进入执行阶段、计入资金流水。
    */
   transitionApproval(id: number, action: 'submit' | 'approve' | 'reject', operator: string): ContractWithItems | undefined {
@@ -201,7 +241,7 @@ export class ContractRepository {
     } else {
       throw new Error('未知的审批操作')
     }
-    db.run(sql, [operator, id])
+    db.run(sql, [operator || '', id])
     return this.getById(id)
   }
 

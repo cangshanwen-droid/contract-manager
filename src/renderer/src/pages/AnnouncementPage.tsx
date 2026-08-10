@@ -50,7 +50,8 @@ const AnnouncementPage: React.FC = () => {
   const handleCreate = async () => {
     try {
       const vals = await form.validateFields()
-      await invoke(IPC_CHANNELS.ANNOUNCEMENT_CREATE, vals)
+      // 发布者强制取当前登录用户，防止前端伪造
+      await invoke(IPC_CHANNELS.ANNOUNCEMENT_CREATE, { ...vals, created_by: user?.username || 'admin' })
       message.success('公告发布成功')
       form.resetFields(); setCreateOpen(false); load()
     } catch (err: any) { if (err?.errorFields) return; message.error(err?.message || '发布失败') }
@@ -156,7 +157,7 @@ const AnnouncementPage: React.FC = () => {
             <Select options={[{value:'high',label:'紧急'},{value:'normal',label:'公告'},{value:'low',label:'通知'}]} />
           </Form.Item>
           <Form.Item name="created_by" label="发布者" initialValue={user?.username || 'admin'}>
-            <Input placeholder="发布者" />
+            <Input value={user?.username || 'admin'} disabled style={{ color: T.textSecondary }} />
           </Form.Item>
         </Form>
       </Modal>

@@ -14,12 +14,13 @@ const CLOUD_MODE_KEY = 'cloudMode'
 
 export function isCloudMode(): boolean {
   try {
-    // 默认本地模式：Electron桌面端本地优先，用户手动切换到云端
+    // 默认云端模式：多用户实时共享（登录走本地 IPC 直连，数据读写走云端 API）
+    // 离线/无网时可在设置页手动切回本地模式
     const v = localStorage.getItem(CLOUD_MODE_KEY)
-    if (v === null) return false
+    if (v === null) return true
     return v === 'true'
   } catch {
-    return false
+    return true
   }
 }
 

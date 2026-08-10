@@ -9,7 +9,7 @@
  *   30 秒自动刷新
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Table, Tag, Button, Card, Drawer, Descriptions, Empty, Spin, message, Tabs } from 'antd'
 import { ReloadOutlined, EyeOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
@@ -116,6 +116,10 @@ const AccountMonitorPage: React.FC = () => {
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
+  // ── 云端连接状态：30s 轮询失败去轰炸（首次弹一次 toast，之后静默重试）──
+  const [cloudDisconnected, setCloudDisconnected] = useState(false)
+  const cloudFailedRef = useRef(false)
+
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return
     setUsersLoading(true)
@@ -133,8 +137,15 @@ const AccountMonitorPage: React.FC = () => {
     try {
       const data = await fetchWithAdminKey(`${CLOUD_ARENA_URL}admin/accounts`)
       setAccounts(Array.isArray(data) ? data : [])
+      cloudFailedRef.current = false
+      setCloudDisconnected(false)
     } catch (e: any) {
-      message.error(`股票账户加载失败：${e?.message || '网络错误'}`)
+      // 云端故障：仅首次失败弹一次 toast，后续 30s 轮询静默重试
+      if (!cloudFailedRef.current) {
+        cloudFailedRef.current = true
+        message.error(`股票账户加载失败：${e?.message || '网络错误'}`)
+      }
+      setCloudDisconnected(true)
     } finally { setLoading(false) }
   }, [isAdmin])
 
@@ -261,6 +272,23 @@ const AccountMonitorPage: React.FC = () => {
           <Button size="small" icon={<ReloadOutlined />} onClick={() => { loadUsers(); loadAccounts(); loadFunds(); loadContracts() }}>刷新</Button>
         </div>
       </div>
+
+      {/* 云端连接中断状态条（轮询失败时显示，避免每 30s 重复弹 toast） */}
+      {cloudDisconnected && (
+        <div style={{
+          marginBottom: 12, padding: '8px 14px', borderRadius: 4,
+          background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.25)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 12, color: '#E2E8F0',
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%', background: '#D4AF37', flexShrink: 0,
+            boxShadow: '0 0 6px rgba(212,175,55,0.8)',
+          }} />
+          <span style={{ fontWeight: 500 }}>云端连接中断 · 重试中</span>
+          <span style={{ color: '#64748B' }}>股票账户数据每 30 秒自动重试，恢复后自动更新</span>
+        </div>
+      )}
 
       {/* 系统级指标卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
