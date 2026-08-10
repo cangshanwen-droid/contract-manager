@@ -9,9 +9,11 @@
  */
 import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { log as electronLog } from 'electron-log'
 
-autoUpdater.logger = electronLog
+// ⚠️ v1.3.0 修复：不设置自定义 logger——electron-log v5 的顶层 log 对象接口
+// 与 electron-updater 期望的 logger（.info/.error 方法）不兼容，
+// 导致启动 8s 后 checkForUpdates 抛 "this._logger.info is not a function"
+// 未捕获异常。electron-updater 使用内置默认 logger（写到用户目录）即可。
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
