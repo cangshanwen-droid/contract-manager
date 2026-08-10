@@ -495,7 +495,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             lineHeight: 1.55,
           }}>
             <span>© 2026 Gipfel 机构平台 · 基础设施合同管理 + 区域模拟</span>
-            <span>Institutional Platform · v1.1.0 · {authUser?.role === 'operator' ? '操作端' : authUser?.role === 'admin' ? '管理端' : '代表端只读视图'}</span>
+            <span>Institutional Platform · v1.3.0 · {authUser?.role === 'operator' ? '操作端' : authUser?.role === 'admin' ? '管理端' : '代表端只读视图'}</span>
           </div>
         </Content>
       </Layout>
