@@ -1,4 +1,4 @@
-# Gipfel 合同管理系统 — CI 流水线
+# Gipfel 合同管理系统 - CI 流水线
 # 触发：master 分支 push / 针对 master 的 PR
 name: CI
 
@@ -39,7 +39,7 @@ jobs:
         run: npm run typecheck
 
       # 注意：此处的 build 是 electron-vite build（纯 bundle，跨平台可跑），
-      # 不是 electron-builder 出安装包 —— electron-builder 的 nsis/certs 仅用于
+      # 不是 electron-builder 出安装包 -- electron-builder 的 nsis/certs 仅用于
       # Windows 本地的 package / package:portable 脚本，ubuntu CI 不涉及。
       # 若未来 electron 相关依赖在 ubuntu 上构建出问题，可拆为三个独立 job：
       # typecheck / verify:ui / verify:local，build 保持 electron-vite build。

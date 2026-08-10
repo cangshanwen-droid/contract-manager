@@ -17,7 +17,7 @@ export function registerDashboardHandlers(): void {
     }
   })
 
-  // 系统概览统计（用户构成/活跃用户/最近创建用户）— 仅管理端
+  // 系统概览统计（用户构成/活跃用户/最近创建用户）- 仅管理端
   ipcMain.handle(IPC_CHANNELS.DASHBOARD_SYSTEM_STATS, () => {
     try {
       const perm = requirePermission(PERMISSIONS.USER_MANAGE, '没有查看系统概览的权限')

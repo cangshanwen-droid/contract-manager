@@ -79,7 +79,7 @@ export class ContractRepository {
     let contractId = 0
     db.run('BEGIN TRANSACTION')
     try {
-      // P0-2 CREATE 白名单：status/approval_status 不允许透传——
+      // P0-2 CREATE 白名单：status/approval_status 不允许透传--
       // 新合同固定 status='draft'、approval_status='none'（未审批），
       // 执行状态与审批状态只能走 update 状态机校验 / CONTRACT_APPROVE
       db.run(

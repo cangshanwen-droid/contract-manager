@@ -1,5 +1,5 @@
 /**
- * credential.handler.ts — 凭据安全存储 IPC（安全审计 P1-7）
+ * credential.handler.ts - 凭据安全存储 IPC（安全审计 P1-7）
  *
  *  - credential:set   登录成功后保存凭据：主进程 safeStorage 加密写入
  *                     userData/credentials.enc（渲染进程不再接触明文持久化）

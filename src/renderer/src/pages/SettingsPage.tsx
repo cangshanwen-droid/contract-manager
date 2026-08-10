@@ -107,6 +107,36 @@ const SettingsPage: React.FC = () => {
     finally { setExcelExporting(null) }
   }
 
+  // Excel 导入：先弹确认框警告覆盖当前数据
+  const doImport = () => {
+    Modal.confirm({
+      title: '确认导入 Excel？',
+      icon: <UploadOutlined style={{ color: '#fa541c' }} />,
+      content: (
+        <div style={{ fontSize: 13 }}>
+          <p style={{ marginBottom: 8 }}>
+            <b style={{ color: '#fa541c' }}>导入将覆盖现有数据，且无法撤销。</b>
+          </p>
+          <p style={{ marginBottom: 0, color: T.silver3 }}>
+            请确认所选 Excel 文件包含需要的数据，建议导入前先做一次备份。
+          </p>
+        </div>
+      ),
+      okText: '继续导入',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        setImporting(true)
+        try {
+          const result = await invoke(IPC_CHANNELS.EXCEL_IMPORT) as any
+          if (result.success) message.success(result.message || '导入成功')
+          else message.info(result.message || '已取消')
+        } catch (e: any) { message.error('导入失败: ' + e.message) }
+        finally { setImporting(false) }
+      }
+    })
+  }
+
   const cardStyle: React.CSSProperties = {
     background: T.card,
     border: `1px solid ${T.border}`,
@@ -260,16 +290,7 @@ const SettingsPage: React.FC = () => {
               <div style={{ fontSize: 12, color: T.silver3, marginBottom: 6 }}>全部数据表（多工作表）：</div>
               <Space>
                 <Button type="primary" size="small" icon={<DownloadOutlined />} loading={exporting} onClick={doExport}>导出全部</Button>
-                <Button size="small" icon={<UploadOutlined />} loading={importing}
-                  onClick={async () => {
-                    setImporting(true)
-                    try {
-                      const result = await invoke(IPC_CHANNELS.EXCEL_IMPORT) as any
-                      if (result.success) message.success(result.message || '导入成功')
-                      else message.info(result.message || '已取消')
-                    } catch (e: any) { message.error('导入失败: ' + e.message) }
-                    finally { setImporting(false) }
-                  }}>导入</Button>
+                <Button size="small" icon={<UploadOutlined />} loading={importing} onClick={doImport}>导入</Button>
               </Space>
             </div>
           </div>

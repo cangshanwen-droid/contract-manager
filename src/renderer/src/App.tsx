@@ -24,24 +24,24 @@ import AnnouncementPage from './pages/AnnouncementPage'
 
 /*
  /* ═══════════════════════════════════════════════════════════════════════════════
-   * Gipfel Design System v6.0 — 统一金融金 Gold Unified
+   * Gipfel Design System v6.0 - 统一金融金 Gold Unified
    * ═══════════════════════════════════════════════════════════════════════════════
    *
-   * 设计方向：金融金统一 — 深海蓝黑基底 × 暖金 accent #D4AF37 × 单一来源 design-tokens.ts
+   * 设计方向：金融金统一 - 深海蓝黑基底 × 暖金 accent #D4AF37 × 单一来源 design-tokens.ts
    * 原则：design-tokens.ts 为全系统唯一颜色来源，禁止页面内联 T 对象。
    *
    * 色彩系统：
    *   ── 背景栈 (3 层) ──
-   *   #0B1120  画布 — 页面根背景，最深
-   *   #0F1729  面板 — 侧栏/顶栏
-   *   #1A1F2E  卡片 — 内容卡片/KPI卡片/弹窗
+   *   #0B1120  画布 - 页面根背景，最深
+   *   #0F1729  面板 - 侧栏/顶栏
+   *   #1A1F2E  卡片 - 内容卡片/KPI卡片/弹窗
    *
    *   ── Accent: #D4AF37 金融金 ──
    *
    *   ── 文字层级 (3 层) ──
-   *   #E2E8F0  主文字 — 标题、正文、KPI 数值
-   *   #94A3B8  次文字 — 标签、描述、辅助信息
-   *   #64748B  弱文字 — placeholder、禁用态、面包屑
+   *   #E2E8F0  主文字 - 标题、正文、KPI 数值
+   *   #94A3B8  次文字 - 标签、描述、辅助信息
+   *   #64748B  弱文字 - placeholder、禁用态、面包屑
    */
 
 const appTheme = {
@@ -91,8 +91,8 @@ const appTheme = {
     borderRadiusXS: 3,
 
     // ── Typography: 中文优先 Microsoft YaHei + 数字 SF Pro Display ──
-    //   字号层级 24/18/14/12 — 字间距 标题-0.02em / 正文normal
-    //   行高 — 标题1.2 / 正文1.55
+    //   字号层级 24/18/14/12 - 字间距 标题-0.02em / 正文normal
+    //   行高 - 标题1.2 / 正文1.55
     fontFamily: "'Microsoft YaHei', 'PingFang SC', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
     fontFamilyCode: "'JetBrains Mono', 'Consolas', 'Cascadia Code', 'SF Mono', monospace",
     fontSize: 14,
@@ -112,7 +112,7 @@ const appTheme = {
     paddingMD: 20,
     paddingLG: 24,
 
-    // ── Zero box-shadow — hierarchy via luminance only ──
+    // ── Zero box-shadow - hierarchy via luminance only ──
     boxShadow: 'none',
     boxShadowSecondary: 'none',
     boxShadowTertiary: 'none',

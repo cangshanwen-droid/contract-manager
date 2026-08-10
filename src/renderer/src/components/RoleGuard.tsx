@@ -1,5 +1,5 @@
 /**
- * RoleGuard — 路由权限守卫（角色 + 权限点双重校验）
+ * RoleGuard - 路由权限守卫（角色 + 权限点双重校验）
  *
  * 每个路由先按角色过滤（ROLE_ROUTES），再按权限点校验
  * （有权限点映射的路由必须同时通过两道检查）：
@@ -20,7 +20,7 @@ import { PERMISSIONS } from '../../../shared/permissions'
 
 /** 各角色可访问的路由前缀集合（第一道：角色） */
 const ROLE_ROUTES: Record<string, Set<string>> = {
-  // rep: 只读权限 — 仪表盘 + 合同总览(只读) + 资金总览(只读) + 本公司股票(只读)
+  // rep: 只读权限 - 仪表盘 + 合同总览(只读) + 资金总览(只读) + 本公司股票(只读)
   rep: new Set(['dashboard', 'contracts', 'accounts', 'stocks']),
   operator: new Set([
     'dashboard',
@@ -32,7 +32,7 @@ const ROLE_ROUTES: Record<string, Set<string>> = {
     'dashboard',
     'regions', 'contracts', 'companies',
     'calculate', 'infra-calc', 'land-area',
-    'infrastructure', 'accounts', 'gipfel', 'stocks', 'settings', 'users', 'announcements',
+    'infrastructure', 'accounts', 'stocks', 'settings', 'users', 'announcements',
     'account-monitor',
   ]),
 }

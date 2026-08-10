@@ -26,7 +26,7 @@ import {
 function insertUser(username: string, role: string): number {
   const db = getDatabase()
   db.run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, 'x', role])
-  // 注意：不能用 last_insert_rowid() —— 立即持久化(_flushSave→db.export)会把它重置为 0
+  // 注意：不能用 last_insert_rowid() -- 立即持久化(_flushSave→db.export)会把它重置为 0
   const row = db.exec('SELECT id FROM users WHERE username = ?', [username])
   return row[0].values[0][0] as number
 }
@@ -37,7 +37,7 @@ beforeEach(async () => {
 })
 
 describe('ROLE_PERMISSIONS 静态映射', () => {
-  it('rep：只读——有 contract.view/account.view，无任何写权限', () => {
+  it('rep：只读--有 contract.view/account.view，无任何写权限', () => {
     const perms = ROLE_PERMISSIONS.rep
     expect(perms).toContain(PERMISSIONS.CONTRACT_VIEW)
     expect(perms).toContain(PERMISSIONS.ACCOUNT_VIEW)

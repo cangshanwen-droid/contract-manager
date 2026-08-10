@@ -6,6 +6,7 @@ import {
 import { PlusOutlined, DeleteOutlined, NotificationOutlined, AuditOutlined } from '@ant-design/icons'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { invoke } from '../api/cloudApi'
+import { api } from '../api/dashboard.api'
 import { tokens as T } from '../styles/design-tokens'
 import { useAuth } from '../context/AuthContext'
 import AuditLogPanel from '../components/AuditLogPanel'
@@ -24,6 +25,7 @@ const AnnouncementPage: React.FC = () => {
   const [form] = Form.useForm()
   const [filterPriority, setFilterPriority] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<string>('announcement')
+  const [regions, setRegions] = useState<{ id: number; name: string }[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -34,6 +36,13 @@ const AnnouncementPage: React.FC = () => {
   }
 
   useEffect(() => { load() }, [filterPriority])
+
+  // 加载区域列表（公告「所属区域」下拉）
+  useEffect(() => {
+    api.region.list().then((rs) => {
+      if (Array.isArray(rs)) setRegions(rs as { id: number; name: string }[])
+    }).catch(() => { /* 区域加载失败静默，仅影响下拉 */ })
+  }, [])
 
   // ── 快捷键：Escape 关闭弹窗 ──
   useEffect(() => {
@@ -155,6 +164,13 @@ const AnnouncementPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="priority" label="优先级" initialValue="normal">
             <Select options={[{value:'high',label:'紧急'},{value:'normal',label:'公告'},{value:'low',label:'通知'}]} />
+          </Form.Item>
+          <Form.Item name="region_id" label="所属区域" tooltip="不选择则公告对全局可见">
+            <Select
+              placeholder="全局（不选）"
+              allowClear
+              options={regions.map(r => ({ value: r.id, label: r.name }))}
+            />
           </Form.Item>
           <Form.Item name="created_by" label="发布者" initialValue={user?.username || 'admin'}>
             <Input value={user?.username || 'admin'} disabled style={{ color: T.textSecondary }} />

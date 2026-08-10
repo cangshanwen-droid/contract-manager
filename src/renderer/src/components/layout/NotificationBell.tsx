@@ -1,5 +1,5 @@
 /**
- * NotificationBell — 通知中心铃铛组件（AppLayout 顶栏）
+ * NotificationBell - 通知中心铃铛组件（AppLayout 顶栏）
  *
  * - 铃铛图标 + 未读红点（Badge count）
  * - 点击展开下拉通知面板（Popover）

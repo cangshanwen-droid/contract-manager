@@ -201,7 +201,7 @@ const InfraCalculator: React.FC = () => {
         )}
         {data && (
           <>
-            {/* 统计卡片 — 暖色数字高亮 */}
+            {/* 统计卡片 - 暖色数字高亮 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6, marginBottom: 16 }}>
               {[
                 { l: '人口', v: data.population.toLocaleString(), c: T.silver },
@@ -225,7 +225,7 @@ const InfraCalculator: React.FC = () => {
               ))}
             </div>
 
-            {/* 表格 — 面板包裹 */}
+            {/* 表格 - 面板包裹 */}
             <div style={{
               background: T.panel,
               border: `1px solid ${T.border}`,

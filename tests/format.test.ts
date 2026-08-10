@@ -28,21 +28,21 @@ describe('金额格式化', () => {
     expect(formatMoney(-1234)).toBe('-1,234')
   })
 
-  it('formatMoney：null/undefined 返回占位符 —', () => {
-    expect(formatMoney(null)).toBe('—')
-    expect(formatMoney(undefined)).toBe('—')
+  it('formatMoney：null/undefined 返回占位符 -', () => {
+    expect(formatMoney(null)).toBe('-')
+    expect(formatMoney(undefined)).toBe('-')
   })
 
   it('formatMoneyCNY：正数带 ¥，负数 -¥，零为 ¥0', () => {
     expect(formatMoneyCNY(1234.5)).toBe('¥1,234.5')
     expect(formatMoneyCNY(-1234.5)).toBe('-¥1,234.5')
     expect(formatMoneyCNY(0)).toBe('¥0')
-    expect(formatMoneyCNY(null)).toBe('—')
+    expect(formatMoneyCNY(null)).toBe('-')
   })
 
   it('formatNumber：纯千分位', () => {
     expect(formatNumber(1234567)).toBe('1,234,567')
-    expect(formatNumber(null)).toBe('—')
+    expect(formatNumber(null)).toBe('-')
   })
 })
 
@@ -56,12 +56,12 @@ describe('日期格式化', () => {
     expect(formatDateTime('2026-08-10T10:30:00')).toBe('2026-08-10 10:30')
   })
 
-  it('空值/非法日期返回 —', () => {
-    expect(formatDate('')).toBe('—')
-    expect(formatDate(null)).toBe('—')
-    expect(formatDate(undefined)).toBe('—')
-    expect(formatDate('not-a-date')).toBe('—')
-    expect(formatDateTime('not-a-date')).toBe('—')
+  it('空值/非法日期返回 -', () => {
+    expect(formatDate('')).toBe('-')
+    expect(formatDate(null)).toBe('-')
+    expect(formatDate(undefined)).toBe('-')
+    expect(formatDate('not-a-date')).toBe('-')
+    expect(formatDateTime('not-a-date')).toBe('-')
   })
 })
 
@@ -69,7 +69,7 @@ describe('百分比格式化', () => {
   it('formatPercent：0-1 小数 → 百分比（2位小数）', () => {
     expect(formatPercent(0.035)).toBe('3.50%')
     expect(formatPercent(1)).toBe('100.00%')
-    expect(formatPercent(null)).toBe('—')
+    expect(formatPercent(null)).toBe('-')
   })
 
   it('formatPercentDirect：已是百分比数值', () => {
@@ -90,17 +90,17 @@ describe('百分比格式化', () => {
 })
 
 describe('趋势指示与正负色', () => {
-  it('formatTrend：涨▲ 跌▼ 平—', () => {
+  it('formatTrend：涨▲ 跌▼ 平-', () => {
     expect(formatTrend(1)).toBe('▲')
     expect(formatTrend(-1)).toBe('▼')
-    expect(formatTrend(0)).toBe('—')
-    expect(formatTrend(null)).toBe('—')
+    expect(formatTrend(0)).toBe('-')
+    expect(formatTrend(null)).toBe('-')
   })
 
   it('formatTrendWithValue：箭头 + 符号数值', () => {
     expect(formatTrendWithValue(12.5)).toBe('▲ +12.50')
     expect(formatTrendWithValue(-3.2)).toBe('▼ -3.20')
-    expect(formatTrendWithValue(0)).toBe('— +0.00')
+    expect(formatTrendWithValue(0)).toBe('- +0.00')
     expect(formatTrendWithValue(8.888, '%')).toBe('▲ +8.89%')
   })
 

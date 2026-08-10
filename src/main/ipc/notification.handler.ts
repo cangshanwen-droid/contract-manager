@@ -1,5 +1,5 @@
 /**
- * notification.handler.ts — 通知中心 IPC
+ * notification.handler.ts - 通知中心 IPC
  *
  * 所有接口基于主进程会话（getSessionUser）取当前用户 id，
  * 不信任渲染进程传入的 user_id，防止越权读取他人通知。

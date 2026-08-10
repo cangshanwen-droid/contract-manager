@@ -1,5 +1,5 @@
 /**
- * notification.repo.ts — 通知中心数据访问
+ * notification.repo.ts - 通知中心数据访问
  *
  * 通知为「按用户」存储：每条通知绑定 user_id，
  * 由业务触发点（审批/公告/交易）调用领域辅助方法批量写入。

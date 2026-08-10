@@ -1,5 +1,5 @@
 /**
- * UserManagementPage — 用户管理（仅 admin 可访问）
+ * UserManagementPage - 用户管理（仅 admin 可访问）
  *
  * 管理员可在此页面：
  * - 查看所有用户列表
@@ -367,7 +367,7 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId, currentUserRole })
 
       {/* Reset Password Modal */}
       <Modal
-        title={resetTarget ? `重置密码 — ${resetTarget.username}` : '重置密码'}
+        title={resetTarget ? `重置密码 - ${resetTarget.username}` : '重置密码'}
         open={resetOpen}
         onCancel={() => { resetForm.resetFields(); setResetOpen(false) }}
         onOk={handleReset}

@@ -1,5 +1,5 @@
 /**
- * AuditLogPanel — 操作审计日志（admin 可见）
+ * AuditLogPanel - 操作审计日志（admin 可见）
  *
  * 独立可复用组件：公告管理页"操作日志"Tab 与账户监控页"审计日志"Tab 共用。
  * 分页 + 操作类型过滤，数据来自 IPC AUDIT_LIST。

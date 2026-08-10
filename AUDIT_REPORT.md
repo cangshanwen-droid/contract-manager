@@ -1,7 +1,7 @@
 # Gipfel 后端审计报告：公式引擎 · 数据库 · 硬编码数据
 
 > 审计日期: 2026-08-08  
-> 项目: contract-manager (Electron桌面应用 — 基础设施合同管理 + 区域商业模拟)  
+> 项目: contract-manager (Electron桌面应用 - 基础设施合同管理 + 区域商业模拟)  
 > 备项目: gipfel-saas (Next.js前端移植项目, 同数据模型)
 
 ---
@@ -67,7 +67,7 @@ src/main/
 
 | # | 缺失公式 | 严重度 | 说明 |
 |---|---------|--------|------|
-| M1 | **碳排放对幸福度的倒数非线性** | 高 | F4中 `+0.2 * carbonPerCapita` 是正权重！碳排放越高幸福度越高 — 与设计意图（碳排应降低幸福度）矛盾。应为 `- 0.2 * carbonPerCapita` 或使用对数衰减 |
+| M1 | **碳排放对幸福度的倒数非线性** | 高 | F4中 `+0.2 * carbonPerCapita` 是正权重！碳排放越高幸福度越高 - 与设计意图（碳排应降低幸福度）矛盾。应为 `- 0.2 * carbonPerCapita` 或使用对数衰减 |
 | M2 | **税收计算** | 中 | contract_items 有 tax_rate 字段但公式引擎未使用；税额仅通过 SQL GENERATED 列计算 |
 | M3 | **劳动力技能等级对生产率影响** | 中 | contract_items 有 skill_level 字段，仅用于人才判断(>=0.5)，未在公式中体现 |
 | M4 | **基建h_bonus对幸福度加成** | 中 | InfrastructureType 有 h_bonus 字段但公式引擎未接收/使用 |
@@ -79,7 +79,7 @@ src/main/
 
 ## 3. 硬编码数据分析
 
-### 3.1 种子数据 — `src/main/database/seed.ts`
+### 3.1 种子数据 - `src/main/database/seed.ts`
 
 | 数据类 | 条目数 | 性质 |
 |--------|--------|------|
@@ -88,11 +88,11 @@ src/main/
 | 其中: 产业配套类 | 10种 | 分类垃圾桶/节能路灯/污水处理/碳捕集等 |
 | 就业率加成 (infra_employment_bonuses) | 32条 | 从基建类型同步，数据源相同 |
 | 合同类型 (contract_types) | 8种 | 基建/开采/采购/劳动力/投资/拨款/销售/减碳 |
-| 示例区域 (regions) | 3个 | A区(5万)/B区(3万)/C区(2万) — 固定初始值 |
+| 示例区域 (regions) | 3个 | A区(5万)/B区(3万)/C区(2万) - 固定初始值 |
 | 示例公司 (companies) | 4家 | 建设集团/市政/设计院/设备供应 |
 | 示例基建合同 | 3个×多条明细 | 每个区域一份，含固定基建项目+数量 |
 
-### 3.2 硬编码常量 — `src/shared/constants.ts`
+### 3.2 硬编码常量 - `src/shared/constants.ts`
 
 | 常量 | 值 | 位置 |
 |------|-----|------|
@@ -110,8 +110,8 @@ src/main/
 | `contract.repo.ts:241` | `infra_population_delta = land_area * quantity * 0.1` (每平米土建贡献0.1人) |
 | `auth.handler.ts:8-10` | `PBKDF2_ITERATIONS=100000, KEYLEN=64` (密码学参数) |
 | `index.ts:15` | `autoBackupInterval = 30 * 60 * 1000` (30分钟自动备份) |
-| `formula.handler.ts:41` | `Math.log10(population + 100)` — 偏移量100为经验值 |
-| `formula.handler.ts:63` | `25 * B / (B + 30)` — 就业率非线性系数25/30为经验值 |
+| `formula.handler.ts:41` | `Math.log10(population + 100)` - 偏移量100为经验值 |
+| `formula.handler.ts:63` | `25 * B / (B + 30)` - 就业率非线性系数25/30为经验值 |
 
 ### 3.4 版本号硬编码
 
@@ -122,7 +122,7 @@ src/main/
 
 ### 3.5 Dashboard bug: 引用不存在字段
 
-`DashboardPage.tsx:100` 引用 `data.total_carbon` — 但 `DashboardSummary` 类型定义(values.ts:123-130)没有此字段。这会在运行时返回 `undefined`。
+`DashboardPage.tsx:100` 引用 `data.total_carbon` - 但 `DashboardSummary` 类型定义(values.ts:123-130)没有此字段。这会在运行时返回 `undefined`。
 
 ---
 
@@ -243,9 +243,9 @@ src/main/
 
 ### 6.1 关键问题 (P0)
 
-1. **F4 碳排放权重符号错误** — `+ 0.2 * carbonPerCapita` 应改为 `- 0.2 * carbonPerCapita`（碳排越高幸福度越低才合理）
-2. **DashboardPage 引用不存在字段 `total_carbon`** — 会导致运行时显示"0"或 undefined
-3. **Contract 类型定义缺少 `contract_type_id`** — TypeScript 类型与实际查询不匹配
+1. **F4 碳排放权重符号错误** - `+ 0.2 * carbonPerCapita` 应改为 `- 0.2 * carbonPerCapita`（碳排越高幸福度越低才合理）
+2. **DashboardPage 引用不存在字段 `total_carbon`** - 会导致运行时显示"0"或 undefined
+3. **Contract 类型定义缺少 `contract_type_id`** - TypeScript 类型与实际查询不匹配
 
 ### 6.2 建议改进 (P1)
 

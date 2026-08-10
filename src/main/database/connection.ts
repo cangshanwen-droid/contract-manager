@@ -104,7 +104,7 @@ export function getDatabase(): SqlJsDatabase {
   return db
 }
 
-// Debounced save — coalesces rapid writes (兼容旧调用方)
+// Debounced save - coalesces rapid writes (兼容旧调用方)
 export function saveDatabase(immediate = false): void {
   if (!db) return
   if (saveTimer) clearTimeout(saveTimer)

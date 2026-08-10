@@ -1,5 +1,5 @@
 /**
- * credential-store.ts — 凭据安全存储（主进程专用）
+ * credential-store.ts - 凭据安全存储（主进程专用）
  *
  * 安全审计 P1-7 修复：
  *  1. 登录凭据（用户名/密码）：不再由渲染进程写入 localStorage 明文，
@@ -8,7 +8,7 @@
  *     safeStorage 不可用时（isEncryptionAvailable() === false）降级为明文文件
  *     并返回 warning，由调用方提示用户。
  *  2. 管理端密钥 adminKey：优先环境变量 GIPFEL_ADMIN_KEY，其次读取
- *     userData/admin-key.txt（若存在）。两者都无则返回 null —— 绝不硬编码，
+ *     userData/admin-key.txt（若存在）。两者都无则返回 null -- 绝不硬编码，
  *     更不进入渲染进程包。
  */
 import { app, safeStorage } from 'electron'

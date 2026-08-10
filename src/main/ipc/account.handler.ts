@@ -71,6 +71,21 @@ export function registerAccountHandlers(): void {
     }
   })
 
+  // 获取全部流水年度（年度筛选下拉动态化）
+  ipcMain.handle(IPC_CHANNELS.ACCOUNT_YEARS, () => {
+    try {
+      const perm = requirePermission(PERMISSIONS.ACCOUNT_VIEW)
+      if (!perm.ok) return perm.response
+      const rows = queryAll(
+        'SELECT DISTINCT fiscal_year FROM account_transactions WHERE fiscal_year IS NOT NULL ORDER BY fiscal_year DESC'
+      ) as { fiscal_year: number }[]
+      return rows.map(r => r.fiscal_year)
+    } catch (err: any) {
+      console.error('ACCOUNT_YEARS failed:', err)
+      return { success: false, message: `获取流水年度失败：${err.message || '未知错误'}` }
+    }
+  })
+
   // 获取交易流水
   ipcMain.handle(
     IPC_CHANNELS.ACCOUNT_TRANSACTIONS,
@@ -93,7 +108,7 @@ export function registerAccountHandlers(): void {
     }
   )
 
-  // 添加交易 — 使用事务确保 INSERT + UPDATE 原子性
+  // 添加交易 - 使用事务确保 INSERT + UPDATE 原子性
   ipcMain.handle(IPC_CHANNELS.ACCOUNT_ADD_TRANSACTION, (_e, data: {
     account_id: number
     trans_type: 'income' | 'expense'

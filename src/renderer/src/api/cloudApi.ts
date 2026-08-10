@@ -1,5 +1,5 @@
 /**
- * cloudApi.ts — 云端 API 直连模块
+ * cloudApi.ts - 云端 API 直连模块
  * 当用户开启「云端模式」后，所有数据请求直接发往 https://106.54.26.86
  * 否则走 Electron IPC（本地 SQLite）
  *
@@ -47,7 +47,7 @@ export function clearAuthToken(): void {
 
 /**
  * 调用云端 /api/auth/login 获取真正的 JWT token 并存储。
- * 不抛异常 — 网络失败时静默降级，保留本地登录态。
+ * 不抛异常 - 网络失败时静默降级，保留本地登录态。
  * 返回云端 token，失败返回空字符串。
  */
 export async function cloudLogin(username: string, password: string): Promise<string> {
@@ -63,7 +63,7 @@ export async function cloudLogin(username: string, password: string): Promise<st
     if (token) setAuthToken(token)
     return token
   } catch {
-    // 网络不通时静默降级 — 不影响本地登录
+    // 网络不通时静默降级 - 不影响本地登录
     return ''
   }
 }

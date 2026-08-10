@@ -1,7 +1,7 @@
 # Gipfel vs 成熟金融SaaS产品差距分析
 
 > 分析日期：2026-08-10
-> 项目：contract-manager (Electron 桌面应用 — 基础设施合同管理 + 区域商业模拟系统)
+> 项目：contract-manager (Electron 桌面应用 - 基础设施合同管理 + 区域商业模拟系统)
 > 对照标准：Bloomberg Terminal · Stripe Dashboard · Linear · 国内金融管理系统
 
 ---
@@ -38,7 +38,7 @@ Gipfel 是一个由小型团队开发的 Electron 桌面应用，目前处于 **
 | **设计 Token 分裂** | 3 套并行颜色体系（`design-tokens.ts` 金 accent vs `App.tsx` 蓝 accent vs 内联 T） | **一套 Design Token，全局单一事实来源**。Stripe 用 `@stripe/ui-tokens` 统一所有组件；Bloomberg 所有终端颜色索引化 | **P0** |
 | **Logo 管理脆弱** | base64 内联图片，曾多次被 agent 替换为 fake SVG | 品牌资产管理规范化：SVG/PNG 分场景，CDN 托管，CI 校验 | P1 |
 | **登录页设计规范自我违反** | `borderRadius: 12`（标准 4）、`backdropFilter: blur(24px)`（反AI规则#2）、`linear-gradient` 登录按钮（反AI规则#1） | 登录页应与系统内页面视觉统一，使用同一套 Design Token | P1 |
-| **缺少品牌应用一致性** | 登录页=金融金主题，Dashboard=蓝色主题，侧栏=金色 Active 条——三个视觉风格割裂 | 品牌色彩在所有触点上一致：Stripe 的蓝色贯穿产品页→Dashboard→文档站→API 文档 | P0 |
+| **缺少品牌应用一致性** | 登录页=金融金主题，Dashboard=蓝色主题，侧栏=金色 Active 条--三个视觉风格割裂 | 品牌色彩在所有触点上一致：Stripe 的蓝色贯穿产品页→Dashboard→文档站→API 文档 | P0 |
 | **无响应式/移动端考虑** | 固定 1280×800 桌面窗口 | 现代 SaaS 至少支持 1024-2560px 宽屏适配（Linear 在 13" 笔记本到 32" 显示器上都完美） | P2 |
 | **缺少空状态/错误/加载的品牌一致性** | 各页面空状态风格不统一（有的有引导，有的空白） | 全系统统一的 Empty/Loading/Error 三态组件，品牌色调统一 | P1 |
 
@@ -54,7 +54,7 @@ elevated: '#1A1F2E'
 
 **App.tsx ConfigProvider（蓝色主题）：**
 ```typescript
-colorPrimary: '#3B82F6'   // 品牌蓝 —— 与 tokens 冲突！
+colorPrimary: '#3B82F6'   // 品牌蓝 -- 与 tokens 冲突！
 ```
 
 **LoginPage 内联样式（金融金主题）：**
@@ -64,14 +64,14 @@ background: '#0A1C37'
 // 此外有大量与规范冲突的值：borderRadius:12, backdropFilter, linear-gradient
 ```
 
-**三个文件三个 accent 色** — 用户无法形成统一的品牌印象。金融产品品牌一致性是生命线（Bloomberg 所有终端 40 年未改设计语言）。
+**三个文件三个 accent 色** - 用户无法形成统一的品牌印象。金融产品品牌一致性是生命线（Bloomberg 所有终端 40 年未改设计语言）。
 
 ### 2.2 追赶建议
 
-1. **P0：统一 Design Token 体系** — 选定一个方向（建议：金融金 `#D4AF37` 作为唯一 accent，因为这是登录页/侧边栏/Logo 已传达的品牌色），`App.tsx` ConfigProvider、`design-tokens.ts`、所有页面内联 T 三处完全对齐
-2. **P0：登录页规范化** — `borderRadius: 12→4`、移除 `backdropFilter`、移除 `linear-gradient` 登录按钮（改用纯色按钮 + CSS shimmer）、输入框前缀图标改为标签外置（企业级模式）
-3. **P1：品牌资产保护** — 将 Logo base64 移至 `assets/` 目录，注册为受保护文件（不允许多 agent 修改），添加 CI 校验
-4. **P1：三态统一组件** — 封装 `<GipfelEmpty>` / `<GipfelSkeleton>` / `<GipfelError>` 组件，全局统一 Loading/Empty/Error 视觉语言
+1. **P0：统一 Design Token 体系** - 选定一个方向（建议：金融金 `#D4AF37` 作为唯一 accent，因为这是登录页/侧边栏/Logo 已传达的品牌色），`App.tsx` ConfigProvider、`design-tokens.ts`、所有页面内联 T 三处完全对齐
+2. **P0：登录页规范化** - `borderRadius: 12→4`、移除 `backdropFilter`、移除 `linear-gradient` 登录按钮（改用纯色按钮 + CSS shimmer）、输入框前缀图标改为标签外置（企业级模式）
+3. **P1：品牌资产保护** - 将 Logo base64 移至 `assets/` 目录，注册为受保护文件（不允许多 agent 修改），添加 CI 校验
+4. **P1：三态统一组件** - 封装 `<GipfelEmpty>` / `<GipfelSkeleton>` / `<GipfelError>` 组件，全局统一 Loading/Empty/Error 视觉语言
 
 ---
 
@@ -110,12 +110,12 @@ background: '#0A1C37'
 
 ### 3.2 追赶建议
 
-1. **P0：表格增强** — 为合同列表/区域列表/公司列表统一添加：列排序、文本筛选、日期范围筛选、列宽拖拽、固定操作列
-2. **P0：数字格式化系统** — 封装 `formatNumber()` 工具函数，统一处理：正负色、趋势箭头、百分比、货币、缩略单位、对比值
-3. **P0：提升 KPI 密度** — Dashboard 顶部从 4 列增加到 6-8 列 mini KPI（宽度减半、字号缩减），增加同比/环比对比值
-4. **P1：图表增强** — 为 recharts 图表添加 Tooltip 联动（hover 一条线时所有图表同步高亮）、数据下钻（点击区域卡片进入区域详情）、时间范围选择器
-5. **P1：增加导出功能** — 表格工具栏增加"导出 Excel"按钮，图表增加"导出 PNG"右键菜单
-6. **P1：科学色板迁移** — 将图表色板从硬编码迁移到科学色板（Nature 蓝/橙/绿），增加红绿色盲友好验证
+1. **P0：表格增强** - 为合同列表/区域列表/公司列表统一添加：列排序、文本筛选、日期范围筛选、列宽拖拽、固定操作列
+2. **P0：数字格式化系统** - 封装 `formatNumber()` 工具函数，统一处理：正负色、趋势箭头、百分比、货币、缩略单位、对比值
+3. **P0：提升 KPI 密度** - Dashboard 顶部从 4 列增加到 6-8 列 mini KPI（宽度减半、字号缩减），增加同比/环比对比值
+4. **P1：图表增强** - 为 recharts 图表添加 Tooltip 联动（hover 一条线时所有图表同步高亮）、数据下钻（点击区域卡片进入区域详情）、时间范围选择器
+5. **P1：增加导出功能** - 表格工具栏增加"导出 Excel"按钮，图表增加"导出 PNG"右键菜单
+6. **P1：科学色板迁移** - 将图表色板从硬编码迁移到科学色板（Nature 蓝/橙/绿），增加红绿色盲友好验证
 
 ---
 
@@ -156,13 +156,13 @@ background: '#0A1C37'
 
 ### 4.2 追赶建议
 
-1. **P0：合同状态机重构** — 新增审批状态（`pending_review`→`approved`→`rejected`），数据库 migration 新增 `approved_by`/`approved_at`/`revision` 字段
-2. **P0：合同版本历史** — 新增 `contract_revisions` 表，每次编辑生成快照（JSON diff），前端显示修订时间线
-3. **P0：归档功能** — Dashboard 增加"归档合同"入口，已完成/已过期合同自动归类，支持按年份检索
-4. **P1：分步创建向导** — 合同创建改为 3 步：①选择类型+基础信息 → ②填写明细项 → ③确认提交
-5. **P1：模拟计算分步向导** — 改为 4 步：①选择区域 → ②导入合同数据（展示映射）→ ③预览参数 → ④运行
-6. **P1：撤销/提示机制** — 删除操作增加 5 秒倒计时撤销 Toast；关键操作增加二次确认弹窗
-7. **P2：到期预警** — 基于 `dayjs` 计算合同到期日，Dashboard 顶部增加"即将到期合同"提醒横幅
+1. **P0：合同状态机重构** - 新增审批状态（`pending_review`→`approved`→`rejected`），数据库 migration 新增 `approved_by`/`approved_at`/`revision` 字段
+2. **P0：合同版本历史** - 新增 `contract_revisions` 表，每次编辑生成快照（JSON diff），前端显示修订时间线
+3. **P0：归档功能** - Dashboard 增加"归档合同"入口，已完成/已过期合同自动归类，支持按年份检索
+4. **P1：分步创建向导** - 合同创建改为 3 步：①选择类型+基础信息 → ②填写明细项 → ③确认提交
+5. **P1：模拟计算分步向导** - 改为 4 步：①选择区域 → ②导入合同数据（展示映射）→ ③预览参数 → ④运行
+6. **P1：撤销/提示机制** - 删除操作增加 5 秒倒计时撤销 Toast；关键操作增加二次确认弹窗
+7. **P2：到期预警** - 基于 `dayjs` 计算合同到期日，Dashboard 顶部增加"即将到期合同"提醒横幅
 
 ---
 
@@ -199,22 +199,22 @@ background: '#0A1C37'
 
 ### 5.2 追赶建议
 
-1. **P0：权限系统重构** — 从固定角色升级为 RBAC + ABAC（基于属性的访问控制），权限表设计：
+1. **P0：权限系统重构** - 从固定角色升级为 RBAC + ABAC（基于属性的访问控制），权限表设计：
    ```
    permissions: { resource, action, condition? }
    示例: { resource: "contract", action: "approve", condition: "amount <= 1000000" }
    ```
    管理后台增加角色/权限配置页面
 
-2. **P0：操作审计日志** — 新增 `audit_logs` 表（user_id, action, resource_type, resource_id, old_value, new_value, ip, timestamp），所有 IPC handler 写操作后自动记录
+2. **P0：操作审计日志** - 新增 `audit_logs` 表（user_id, action, resource_type, resource_id, old_value, new_value, ip, timestamp），所有 IPC handler 写操作后自动记录
 
-3. **P0：数据权限隔离** — 为区域/合同增加 `owner_region_id` 或 `department_id` 字段，列表查询自动过滤当前用户可访问的数据范围
+3. **P0：数据权限隔离** - 为区域/合同增加 `owner_region_id` 或 `department_id` 字段，列表查询自动过滤当前用户可访问的数据范围
 
-4. **P1：通知中心** — 新增 `notifications` 表（user_id, type, title, content, is_read, created_at），Dashboard 顶栏增加未读消息徽标，关键事件自动推送（合同被审批/公告发布/模拟完成/到期预警）
+4. **P1：通知中心** - 新增 `notifications` 表（user_id, type, title, content, is_read, created_at），Dashboard 顶栏增加未读消息徽标，关键事件自动推送（合同被审批/公告发布/模拟完成/到期预警）
 
-5. **P1：会话管理** — 增加会话超时(30分钟无操作自动登出)、登录设备记录
+5. **P1：会话管理** - 增加会话超时(30分钟无操作自动登出)、登录设备记录
 
-6. **P1：乐观锁** — 合同/区域编辑时携带 `version` 号，保存时校验版本一致性
+6. **P1：乐观锁** - 合同/区域编辑时携带 `version` 号，保存时校验版本一致性
 
 ---
 
@@ -253,13 +253,13 @@ background: '#0A1C37'
 
 ### 6.2 追赶建议
 
-1. **P0：SQL.js → SQLite 持久化** — 使用 `better-sqlite3` 替代 `sql.js`，获得真正的磁盘持久化 + WAL 模式 + 更好的性能
-2. **P0：结构化日志** — 引入 `winston` 或 `pino`，统一日志格式 JSON（timestamp/level/module/message/context），分为 DEBUG/INFO/WARN/ERROR 四级，写入 `${userData}/logs/` 按天轮转保留 30 天
-3. **P0：错误收集** — 集成 Sentry Electron SDK，自动捕获主进程+渲染进程未处理异常，附带用户环境信息
-4. **P1：备份增强** — 增加备份完整性校验(SHA256 hash)、异地备份(通过云端 API 上传)、备份恢复测试功能（设置页增加"恢复备份"按钮）
-5. **P1：应用性能仪表盘** — 在开发者工具/设置页增加性能面板，展示：DB 查询耗时分布、IPC 调用 P50/P95、内存使用、DB 文件大小
-6. **P1：健康检查面板** — 设置页增加"系统状态"卡片：数据库状态、云端 API 连通性、股票 API 连通性、最近备份时间
-7. **P2：测试体系建设** — 从公式引擎开始（纯函数，最易测试），逐步扩展到 repository 层（集成测试）、UI 层（Playwright E2E）
+1. **P0：SQL.js → SQLite 持久化** - 使用 `better-sqlite3` 替代 `sql.js`，获得真正的磁盘持久化 + WAL 模式 + 更好的性能
+2. **P0：结构化日志** - 引入 `winston` 或 `pino`，统一日志格式 JSON（timestamp/level/module/message/context），分为 DEBUG/INFO/WARN/ERROR 四级，写入 `${userData}/logs/` 按天轮转保留 30 天
+3. **P0：错误收集** - 集成 Sentry Electron SDK，自动捕获主进程+渲染进程未处理异常，附带用户环境信息
+4. **P1：备份增强** - 增加备份完整性校验(SHA256 hash)、异地备份(通过云端 API 上传)、备份恢复测试功能（设置页增加"恢复备份"按钮）
+5. **P1：应用性能仪表盘** - 在开发者工具/设置页增加性能面板，展示：DB 查询耗时分布、IPC 调用 P50/P95、内存使用、DB 文件大小
+6. **P1：健康检查面板** - 设置页增加"系统状态"卡片：数据库状态、云端 API 连通性、股票 API 连通性、最近备份时间
+7. **P2：测试体系建设** - 从公式引擎开始（纯函数，最易测试），逐步扩展到 repository 层（集成测试）、UI 层（Playwright E2E）
 
 ---
 
@@ -326,7 +326,7 @@ background: '#0A1C37'
 ### 国内金融管理系统（差距：审批流 5×，合规性 ∞）
 
 - **审批流完整度**：国内合同管理系统的审批链（部门→法务→财务→总经理）是核心功能，Gipfel 目前完全缺失
-- **合规要求**：电子签章、操作留痕、数据脱敏、等保认证 — Gipfel 目前一条未覆盖
+- **合规要求**：电子签章、操作留痕、数据脱敏、等保认证 - Gipfel 目前一条未覆盖
 - **多组织架构**：支持集团公司多级组织、部门数据隔离、矩阵权限
 - **可借鉴的点**：审批流设计、操作审计完整性、组织架构模型
 

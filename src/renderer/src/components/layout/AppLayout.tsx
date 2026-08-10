@@ -1,5 +1,5 @@
 /**
- * AppLayout — Gipfel Institutional Platform v6
+ * AppLayout - Gipfel Institutional Platform v6
  *
  * 侧边栏: 220px, #111B2D 基础暗色
  * Logo: 64px 居中，不重复品牌名
@@ -83,7 +83,7 @@ const items: (MenuProps['items'][number] & { permission?: string })[] = [
   },
 ]
 
-/** 路由层级映射 — 用于生成面包屑 */
+/** 路由层级映射 - 用于生成面包屑 */
 const ROUTE_HIERARCHY: Record<string, { label: string; parent?: string }> = {
   dashboard:     { label: '仪表盘' },
   regions:       { label: '区域管理', parent: 'dashboard' },
@@ -99,11 +99,10 @@ const ROUTE_HIERARCHY: Record<string, { label: string; parent?: string }> = {
   users:         { label: '用户管理', parent: 'dashboard' },
   announcements: { label: '公告管理', parent: 'dashboard' },
   trends:        { label: '趋势分析', parent: 'dashboard' },
-  gipfel:        { label: 'Gipfel 平台', parent: 'dashboard' },
 }
 
 /**
- * Sidebar menu overrides — Gold accent theme
+ * Sidebar menu overrides - Gold accent theme
  * Selected: #D4AF37 gold left border 3px + rgba(212,175,55,0.10) bg
  * Hover: rgba(255,255,255,0.04) subtle bg highlight
  * Default: #94A3B8 text
@@ -251,7 +250,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
   // ── 全局键盘快捷键：Escape 关闭弹窗 / Enter 提交表单 / Ctrl+Shift+N 新建区域 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Escape — 触发所有打开的 antd Modal/Drawer 关闭
+      // Escape - 触发所有打开的 antd Modal/Drawer 关闭
       // antd Modal 自带 Escape 关闭，但我们需要确保全局范围内的 Escape 也能生效
       if (e.key === 'Escape') {
         // 聚焦到 body 来触发 antd 内置的 Escape 处理
@@ -259,7 +258,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           document.activeElement.blur()
         }
       }
-      // Ctrl+Shift+N — 跳转区域管理并打开新建区域弹窗
+      // Ctrl+Shift+N - 跳转区域管理并打开新建区域弹窗
       if (e.ctrlKey && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
         e.preventDefault()
         navigate('/regions')
@@ -268,10 +267,27 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           window.dispatchEvent(new CustomEvent('gipfel:create-region'))
         }, 80)
       }
+      // Ctrl+B - 跳转公告页
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault()
+        navigate('/announcements')
+      }
+      // Ctrl+U - 跳转用户管理（仅 admin）
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && (e.key === 'u' || e.key === 'U')) {
+        if (role === 'admin') {
+          e.preventDefault()
+          navigate('/users')
+        }
+      }
+      // Ctrl+D - 跳转仪表盘
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault()
+        navigate('/dashboard')
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [navigate])
+  }, [navigate, role])
 
   // 按角色 + 权限点双重过滤菜单：
   //   第一道：角色菜单集合（ROLE_MENU_KEYS）
@@ -300,7 +316,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
     <Layout className="gipfel-layout" style={{ height: '100vh' }}>
       <style>{menuOverrideCSS}</style>
 
-      {/* Sidebar: 220px — 暗色 #111B2D */}
+      {/* Sidebar: 220px - 暗色 #111B2D */}
       <Sider
         width={220}
         collapsedWidth={64}
@@ -316,7 +332,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           flexDirection: 'column',
         }}
       >
-        {/* Logo 区域 — 64px 居中，无品牌名 */}
+        {/* Logo 区域 - 64px 居中，无品牌名 */}
         <div style={{
           height: 64,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -328,7 +344,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             style={{ height: collapsed ? 32 : 40, width: 'auto', objectFit: 'contain' }} />
         </div>
 
-        {/* Navigation — 三组 + 分割线 */}
+        {/* Navigation - 三组 + 分割线 */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           <Menu
             theme="dark"
@@ -346,7 +362,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           />
         </div>
 
-        {/* 底部用户区域 — 用户名 + 角色标签 + 点击退出 */}
+        {/* 底部用户区域 - 用户名 + 角色标签 + 点击退出 */}
         <div style={{
           borderTop: '1px solid #1E2D40',
           padding: collapsed ? '10px 8px' : '14px 16px',
@@ -410,7 +426,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
 
       {/* Main content area */}
       <Layout style={{ background: '#0B1120' }}>
-        {/* Top bar — breadcrumb + collapse trigger */}
+        {/* Top bar - breadcrumb + collapse trigger */}
         <Header className="gipfel-topbar" style={{
           background: '#111B2D',
           padding: '0 32px',
@@ -447,7 +463,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           </div>
         </Header>
 
-        {/* Content — 32px padding, responsive */}
+        {/* Content - 32px padding, responsive */}
         <Content className="gipfel-main-content" style={{
           padding: 32,
           overflow: 'auto',

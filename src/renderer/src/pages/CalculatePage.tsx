@@ -81,7 +81,7 @@ const CalculatePage: React.FC = () => {
     finally { setLoading(false) }
   }
 
-  // 面板样式 — 温暖专业派
+  // 面板样式 - 温暖专业派
   const darkPanel: React.CSSProperties = {
     background: T.panel,
     border: `1px solid ${T.border}`,

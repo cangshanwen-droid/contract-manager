@@ -112,7 +112,7 @@ describe('update() 白名单（P0-2 防伪造审批字段）', () => {
     const c = createContract()
     repo.update(c.id, {
       contract_name: '改名',
-      // 恶意/误传的审批字段——必须被白名单拦截
+      // 恶意/误传的审批字段--必须被白名单拦截
       approval_status: 'approved',
       approved_by: 'hacker'
     } as never)

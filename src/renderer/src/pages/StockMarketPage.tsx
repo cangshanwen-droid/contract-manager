@@ -1,5 +1,5 @@
 /**
- * StockMarketPage — 股票交易（三端口视图）
+ * StockMarketPage - 股票交易（三端口视图）
  *
  * 三端口对应股票系统：
  *   rep（代表端）     → 只读视图：显示本公司已上市的股票行情（不可交易）
@@ -228,7 +228,7 @@ const StockMarketPage: React.FC = () => {
           color: '#8A9BB5', fontSize: 12,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
         }}>
-          <span>代表端视图 — 查看全部股票市场行情（只读），如需买卖交易请联系操作端。</span>
+          <span>代表端视图 - 查看全部股票市场行情（只读），如需买卖交易请联系操作端。</span>
           {mySymbols.size > 0 && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <span style={{

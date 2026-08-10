@@ -64,7 +64,7 @@ const LandAreaReport: React.FC = () => {
     ? [...top8, { name: `其他 (${sortedArea.length - 8}项)`, value: Number(othersValue.toFixed(2)) }]
     : top8
 
-  // 统计卡片 — 暖金左边框
+  // 统计卡片 - 暖金左边框
   const statCard: React.CSSProperties = {
     background: T.card,
     border: `1px solid ${T.border}`,
@@ -108,7 +108,7 @@ const LandAreaReport: React.FC = () => {
         </div>
       ) : (
       <>
-        {/* 顶部统计卡片 — 暖金边框 */}
+        {/* 顶部统计卡片 - 暖金边框 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 12 }}>
           <div style={statCard}>
             <div style={{ fontSize: 11, color: T.silver3 }}>总占地面积</div>

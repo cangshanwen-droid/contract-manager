@@ -1,5 +1,5 @@
 /**
- * AccountMonitorPage — 管理端全系统账户监控
+ * AccountMonitorPage - 管理端全系统账户监控
  *
  * 仅 admin 可见：监视软件上所有账号与账户。
  *   Tab1 系统用户：本地数据库 users（角色/创建时间）
@@ -378,7 +378,7 @@ const AccountMonitorPage: React.FC = () => {
 
       {/* 股票账户详情抽屉 */}
       <Drawer
-        title={detail ? `股票账户详情 — ${detail.user.username}` : '股票账户详情'}
+        title={detail ? `股票账户详情 - ${detail.user.username}` : '股票账户详情'}
         width={560}
         open={!!detail}
         onClose={() => setDetail(null)}

@@ -9,10 +9,10 @@ import type { Region, FormulaLog } from '../../../shared/types'
 // Qualitative: 3 perceptually uniform, red-green colorblind safe colors
 // Sequential: single-hue blue gradient for quantitative data
 const C = {
-  blue:     '#5B9BD5',   // primary data series — Nature blue
-  green:    '#70AD47',   // secondary — Nature green  
-  seqBlue:  '#1565A9',   // sequential — dark blue (quantitative)
-  orange:   '#ED7D31',   // tertiary — Nature orange
+  blue:     '#5B9BD5',   // primary data series - Nature blue
+  green:    '#70AD47',   // secondary - Nature green  
+  seqBlue:  '#1565A9',   // sequential - dark blue (quantitative)
+  orange:   '#ED7D31',   // tertiary - Nature orange
 }
 
 const TrendsPage: React.FC = () => {

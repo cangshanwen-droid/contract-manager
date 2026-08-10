@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-ui.js — Gipfel 前端静态检查（无构建、纯文本扫描）
+ * verify-ui.js - Gipfel 前端静态检查（无构建、纯文本扫描）
  *
  * 检查项：
  *  1. 关键文件存在：LoginPage / StockMarketPage / AccountMonitorPage /
@@ -49,7 +49,7 @@ const pageFiles = walk(path.join(SRC, 'pages'), ['.tsx'])
 const rel = (f) => path.relative(ROOT, f).replace(/\\/g, '/')
 
 // ── 1. 关键文件存在 ────────────────────────────────────────────────
-console.log('═══ verify-ui.js — 前端静态检查 ═══')
+console.log('═══ verify-ui.js - 前端静态检查 ═══')
 console.log(`扫描目录: ${rel(SRC)}（${sourceFiles.length} 个源文件）`)
 console.log('')
 
@@ -134,7 +134,7 @@ report(
   missingImport.length ? `缺失引用: ${missingImport.join(', ')}` : ''
 )
 
-// 4c. （信息）页面内联 hex 且未引用 tokens —— 仅提示，不判失败
+// 4c. （信息）页面内联 hex 且未引用 tokens -- 仅提示，不判失败
 const hexWarn = []
 for (const f of pageFiles) {
   const content = fs.readFileSync(f, 'utf8')

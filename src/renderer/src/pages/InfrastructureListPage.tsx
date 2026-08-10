@@ -42,7 +42,7 @@ const InfrastructureListPage: React.FC = () => {
   return (
     <div>
       <Typography.Title level={4} style={{ marginBottom: 16, color: T.silver }}>基建类型字典</Typography.Title>
-      {/* 表格 — 面板包裹 + 暖色标尺 */}
+      {/* 表格 - 面板包裹 + 暖色标尺 */}
       <div style={{
         background: T.panel,
         border: `1px solid ${T.border}`,

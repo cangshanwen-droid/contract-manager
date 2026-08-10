@@ -56,6 +56,7 @@ export const IPC_CHANNELS = {
   ACCOUNT_TRANSACTIONS: 'account:transactions',
   ACCOUNT_ADD_TRANSACTION: 'account:add-transaction',
   ACCOUNT_SUMMARY: 'account:summary',
+  ACCOUNT_YEARS: 'account:years',
 
   ANNOUNCEMENT_LIST: 'announcement:list',
   ANNOUNCEMENT_ACTIVE_LIST: 'announcement:active-list',

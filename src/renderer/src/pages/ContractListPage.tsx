@@ -178,7 +178,7 @@ const ContractListPage: React.FC = () => {
     setContractTypeId(null); setItems([]); form.resetFields(); setFormOpen(true)
   }
 
-  // 新建弹窗打开后默认聚焦第一个输入框（合同名称）— 数据录入效率
+  // 新建弹窗打开后默认聚焦第一个输入框（合同名称）- 数据录入效率
   useEffect(() => {
     if (formOpen) {
       const timer = setTimeout(() => { nameInputRef.current?.focus() }, 80)
@@ -485,7 +485,7 @@ const ContractListPage: React.FC = () => {
     }
   }
 
-  // Card style for form sections — luminance stacking
+  // Card style for form sections - luminance stacking
   const itemCardStyle: React.CSSProperties = {
     background: T.bgCard,
     border: `1px solid ${T.border}`,
@@ -585,56 +585,56 @@ const ContractListPage: React.FC = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
     type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number }
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
-      1: { title: '基建项目', hint: '基础设施建设合同 — 填写项目名、数量、单价与占地面积',
+      1: { title: '基建项目', hint: '基础设施建设合同 - 填写项目名、数量、单价与占地面积',
         fields: [
           { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：道路硬化工程' },
           { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：3' },
           { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
           { label: '占地面积(㎡)', span: 5, field: 'land_area', type: 'num', placeholder: '如：1200' },
         ] },
-      2: { title: '招聘岗位', hint: '劳动力合同 — 招聘岗位、人数、月薪与技能等级',
+      2: { title: '招聘岗位', hint: '劳动力合同 - 招聘岗位、人数、月薪与技能等级',
         fields: [
           { label: '岗位名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：技术工人' },
           { label: '人数', span: 4, field: 'quantity', type: 'num', placeholder: '如：10' },
           { label: '月薪(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：8000' },
           { label: '技能等级', span: 4, field: 'skill_level', type: 'select', placeholder: '选择等级' },
         ] },
-      3: { title: '开采项', hint: '原料开采合同 — 原料名称、数量、单价与碳排放系数',
+      3: { title: '开采项', hint: '原料开采合同 - 原料名称、数量、单价与碳排放系数',
         fields: [
           { label: '原料名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：铁矿石' },
           { label: '数量(吨)', span: 4, field: 'quantity', type: 'num', placeholder: '如：100' },
           { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：500' },
           { label: '碳排放系数', span: 4, field: 'carbon_factor', type: 'num', placeholder: '如：0.8', step: 0.1 },
         ] },
-      4: { title: '销售产品', hint: '销售合同 — 产品名称、数量、单价与税率',
+      4: { title: '销售产品', hint: '销售合同 - 产品名称、数量、单价与税率',
         fields: [
           { label: '产品名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：钢材' },
           { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：50' },
           { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：3000' },
           { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
         ] },
-      5: { title: '采购物资', hint: '采购合同 — 物资名称、数量、单价与税率',
+      5: { title: '采购物资', hint: '采购合同 - 物资名称、数量、单价与税率',
         fields: [
           { label: '物资名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：水泥' },
           { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：200' },
           { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：450' },
           { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
         ] },
-      6: { title: '投资项目', hint: '投资合同 — 项目名称、投资总额、预期收益与数量',
+      6: { title: '投资项目', hint: '投资合同 - 项目名称、投资总额、预期收益与数量',
         fields: [
           { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：产业园二期' },
           { label: '投资总额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：10000000' },
           { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：15000000' },
           { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
         ] },
-      7: { title: '拨款项目', hint: '拨款合同 — 项目名称、拨款金额、数量与单价',
+      7: { title: '拨款项目', hint: '拨款合同 - 项目名称、拨款金额、数量与单价',
         fields: [
           { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：农田补贴' },
           { label: '拨款金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：500000' },
           { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
           { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
         ] },
-      8: { title: '减碳项目', hint: '减碳合同 — 项目名称、减排量、碳排系数与单价',
+      8: { title: '减碳项目', hint: '减碳合同 - 项目名称、减排量、碳排系数与单价',
         fields: [
           { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：光伏发电' },
           { label: '减排量(吨)', span: 5, field: 'quantity', type: 'num', placeholder: '如：500' },
@@ -992,7 +992,7 @@ const ContractListPage: React.FC = () => {
               <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>{approvalContract.contract_no}</div>
             </div>
             <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 16 }}>
-              审批人：{user?.username || '—'}
+              审批人：{user?.username || '-'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Popconfirm
@@ -1025,7 +1025,7 @@ const ContractListPage: React.FC = () => {
                 label: '基本信息',
                 children: (
                   <>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table className="gipfel-detail-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <tbody>
                         <tr><td style={{ padding: 6, fontWeight: 500, width: 100 }}>编号</td><td>{detail.contract_no}</td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>名称</td><td>{detail.contract_name}</td></tr>
@@ -1037,7 +1037,7 @@ const ContractListPage: React.FC = () => {
                           <Tag color={contractState(detail).color}>{contractState(detail).label}</Tag>
                           <span style={{ fontSize: 11, color: T.textMuted }}>
                             （{approvalLabels[detail.approval_status] || detail.approval_status}）
-                            {detail.approved_at ? ` · ${detail.approved_by || '—'} · ${detail.approved_at}` : ''}
+                            {detail.approved_at ? ` · ${detail.approved_by || '-'} · ${detail.approved_at}` : ''}
                           </span>
                         </td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>签约日期</td><td>{detail.sign_date || '-'}</td></tr>
@@ -1048,7 +1048,7 @@ const ContractListPage: React.FC = () => {
                       <>
                         <Divider />
                         <Typography.Text strong>明细项</Typography.Text>
-                        <Table dataSource={detail.items} rowKey="id" size="small" pagination={false}
+                        <Table className="gipfel-detail-table" dataSource={detail.items} rowKey="id" size="small" pagination={false}
                           columns={[
                             { title: '项目名称', dataIndex: 'item_name', ellipsis: true },
                             { title: '数量', dataIndex: 'quantity', width: 80, render: (v: any) => (typeof v === 'number' ? formatNumber(v) : v ?? '-') },
@@ -1069,6 +1069,7 @@ const ContractListPage: React.FC = () => {
                 label: <span><HistoryOutlined /> 版本历史（{versions.length}）</span>,
                 children: (
                   <Table
+                    className="gipfel-detail-table"
                     dataSource={versions}
                     rowKey="id"
                     size="small"
@@ -1087,7 +1088,7 @@ const ContractListPage: React.FC = () => {
                           if (r.version === 1 && (!fields || fields.length === 0)) {
                             return <Tag>创建合同</Tag>
                           }
-                          if (!fields || fields.length === 0) return <span style={{ color: T.textMuted }}>—</span>
+                          if (!fields || fields.length === 0) return <span style={{ color: T.textMuted }}>-</span>
                           return fields.map(f => <Tag key={f} style={{ marginRight: 4 }}>{FIELD_LABELS[f] || f}</Tag>)
                         }
                       },
@@ -1115,7 +1116,7 @@ const ContractListPage: React.FC = () => {
       >
         {versionDetail && (
           <>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="gipfel-detail-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr><td style={{ padding: 6, fontWeight: 500, width: 100 }}>版本</td><td><Tag color="gold">v{versionDetail.version}</Tag></td></tr>
                 <tr><td style={{ padding: 6, fontWeight: 500 }}>保存时间</td><td>{versionDetail.created_at || '-'}</td></tr>
@@ -1125,13 +1126,13 @@ const ContractListPage: React.FC = () => {
                     ? <Tag>创建合同</Tag>
                     : versionDetail.changed_fields.length > 0
                       ? versionDetail.changed_fields.map(f => <Tag key={f} style={{ marginRight: 4 }}>{FIELD_LABELS[f] || f}</Tag>)
-                      : <span style={{ color: T.textMuted }}>—</span>}
+                      : <span style={{ color: T.textMuted }}>-</span>}
                 </td></tr>
               </tbody>
             </table>
             <Divider />
             <Typography.Text strong>历史快照字段</Typography.Text>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
+            <table className="gipfel-detail-table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
               <tbody>
                 {SNAPSHOT_FIELDS.map(([key, label]) => (
                   <tr key={key}>
@@ -1145,7 +1146,7 @@ const ContractListPage: React.FC = () => {
               <>
                 <Divider />
                 <Typography.Text strong>明细项快照</Typography.Text>
-                <Table dataSource={versionDetail.snapshot.items as any[]} rowKey={(_, idx) => String(idx)} size="small" pagination={false}
+                <Table className="gipfel-detail-table" dataSource={versionDetail.snapshot.items as any[]} rowKey={(_, idx) => String(idx)} size="small" pagination={false}
                   columns={[
                     { title: '项目名称', dataIndex: 'item_name' },
                     { title: '数量', dataIndex: 'quantity', width: 80, render: (v: any) => (typeof v === 'number' ? v.toFixed(2) : v ?? '-') },
@@ -1160,6 +1161,15 @@ const ContractListPage: React.FC = () => {
           </>
         )}
       </Modal>
+
+      {/* 详情弹窗表格密度：12px 字号 + 紧凑行高 */}
+      <style>{`
+        .gipfel-detail-table td { font-size: 12px; padding: 4px 6px !important; }
+        .gipfel-detail-table th { font-size: 12px; padding: 5px 8px !important; }
+        .gipfel-detail-table .ant-table { font-size: 12px; }
+        .gipfel-detail-table .ant-table-thead > tr > th { font-size: 12px; padding: 5px 8px !important; }
+        .gipfel-detail-table .ant-table-tbody > tr > td { font-size: 12px; padding: 4px 8px !important; }
+      `}</style>
     </div>
   )
 }

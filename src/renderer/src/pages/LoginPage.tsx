@@ -1,5 +1,5 @@
 /**
- * LoginPage — Gipfel Financial Platform
+ * LoginPage - Gipfel Financial Platform
  * Bloomberg Terminal / BlackRock Aladdin / Enterprise Finance SaaS
  * 氛围增强：卡片金色环境光 + Logo呼吸 + 粒子拖尾 + 能力卡片hover + 标签闪动
  */
@@ -52,7 +52,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
     const logoBottom = () => H * 0.53
 
     const run = (t: number) => {
-      // 全清 — 不留残影
+      // 全清 - 不留残影
       ctx.clearRect(0, 0, W, H)
 
       // 1. K线柱（右侧，静态极淡，仅微弱的透明度呼吸）
@@ -65,7 +65,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         ctx.fillRect(b.x + 1, H * 0.25 + b.h - 5, 8, 1.5)
       }
 
-      // 2. 粒子 — 无 glow、无 trail，细点慢移
+      // 2. 粒子 - 无 glow、无 trail，细点慢移
       for (const p of pts) {
         p.x += p.vx; p.y += p.vy
         if (p.x < 0 || p.x > W) p.vx *= -1
@@ -75,7 +75,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         ctx.fill()
       }
 
-      // 3. Logo 金色光波 — 5s 周期横扫，克制辉光（细线 + 弱光晕）
+      // 3. Logo 金色光波 - 5s 周期横扫，克制辉光（细线 + 弱光晕）
       const lx = logoCx(), ly = logoBottom()
       const waveProgress = (t % 5000) / 5000 // 0..1 over 5s
       const waveAlpha = Math.sin(waveProgress * Math.PI) * 0.16
@@ -155,13 +155,13 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         backgroundImage: 'linear-gradient(rgba(212,175,55,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.4) 1px, transparent 1px)',
         backgroundSize: '100px 100px' }} />
 
-      {/* LEFT — Brand 45% */}
+      {/* LEFT - Brand 45% */}
       <div style={{ flex: '0 0 52%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         position: 'relative', zIndex: 2, paddingTop: 60 }}>
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
-          {/* Logo graphic only — no text — with breathe animation */}
+          {/* Logo graphic only - no text - with breathe animation */}
           <div style={{ position: 'relative', display: 'inline-block', marginBottom: 24 }}>
-            {/* Halo ring — behind logo */}
+            {/* Halo ring - behind logo */}
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
               width: 260, height: 260, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(212,175,55,0.05) 0%, transparent 65%)',
@@ -183,7 +183,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
             Financial Intelligence Platform
           </div>
 
-          {/* Capability cards — hover gold border glow */}
+          {/* Capability cards - hover gold border glow */}
           <div style={{ marginTop: 56, display: 'flex', gap: 12, justifyContent: 'center' }}>
             {caps.map((t, idx) => (
               <div key={t.zh}
@@ -212,7 +212,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
             ))}
           </div>
 
-          {/* Bottom data label — shimmer */}
+          {/* Bottom data label - shimmer */}
           <div style={{ marginTop: 40, display: 'flex', gap: 32, justifyContent: 'center' }}>
             {['MARKET DATA', 'AI ANALYTICS', 'RISK ENGINE'].map((s, idx) => (
               <span key={s} style={{
@@ -225,9 +225,9 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
         </div>
       </div>
 
-      {/* RIGHT — Login Card 48% — with golden ambient glow behind */}
+      {/* RIGHT - Login Card 48% - with golden ambient glow behind */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 2, minWidth: 370 }}>
-        {/* Golden ambient glow — 200px radial gradient behind card */}
+        {/* Golden ambient glow - 200px radial gradient behind card */}
         <div style={{
           position: 'absolute',
           width: 570, height: 570,

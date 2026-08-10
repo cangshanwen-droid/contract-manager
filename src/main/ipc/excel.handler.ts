@@ -150,7 +150,7 @@ export function registerExcelHandlers(): void {
 
         if (data.length === 0) continue
 
-        // 获取列名（排除自动计算列和ID列）— table 已通过白名单校验
+        // 获取列名（排除自动计算列和ID列）- table 已通过白名单校验
         const tableInfo = db.exec(`PRAGMA table_info(${table})`)
         if (!tableInfo.length) continue
 

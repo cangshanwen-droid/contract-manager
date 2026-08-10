@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-local.js — Gipfel 本地数据库层验证（Node + sql.js）
+ * verify-local.js - Gipfel 本地数据库层验证（Node + sql.js）
  *
  * 直接加载仓库真实的 migrations.ts / seed.ts（经 TypeScript 转译，SQL 与生产一致），
  * 在内存数据库中验证：
@@ -119,7 +119,7 @@ function runSeed(db) {
 
 // ── 主流程 ──────────────────────────────────────────────────────────
 async function main() {
-  console.log('═══ verify-local.js — 本地数据库层验证 ═══')
+  console.log('═══ verify-local.js - 本地数据库层验证 ═══')
   console.log(`迁移定义: ${path.relative(ROOT, MIGRATIONS_FILE)}`)
   console.log(`Seed 定义: ${path.relative(ROOT, SEED_FILE)}`)
   console.log('')

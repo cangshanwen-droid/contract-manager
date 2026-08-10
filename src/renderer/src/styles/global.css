@@ -1,9 +1,9 @@
 /*
  * ═══════════════════════════════════════════════════════════════
- * Gipfel 终极设计系统 — 排版精度 + 色彩微差 + 空间比例 + 精选特效
+ * Gipfel 终极设计系统 - 排版精度 + 色彩微差 + 空间比例 + 精选特效
  * ═══════════════════════════════════════════════════════════════
  *
- * 排版层级: 24/18/14/12  — 字间距 -0.02em / normal
+ * 排版层级: 24/18/14/12  - 字间距 -0.02em / normal
  * 数字字体: Inter / SF Pro Display + tabular-nums
  * 行高:     标题 1.2  /  正文 1.55
  *
@@ -30,16 +30,16 @@
  */
 
 /* ═══════════════════════════════════════════════════════════════
- * 1. 页面淡入 — 200ms
+ * 1. 页面淡入 - 200ms
  * ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════
- * 0. 字体栈 CSS 变量 — Inter / SF Pro Display
+ * 0. 字体栈 CSS 变量 - Inter / SF Pro Display
  * ═══════════════════════════════════════════════════════════════ */
 
 :root {
   /* ═══════════════════════════════════════════════════════════════
-   * Design Tokens — CSS Variables
+   * Design Tokens - CSS Variables
    * 金融金主题：深海蓝黑背景 + 暖金 accent
    * 对齐 src/renderer/src/styles/design-tokens.ts
    * ═══════════════════════════════════════════════════════════════ */
@@ -139,7 +139,7 @@
   line-height: 1.55;
 }
 
-/* 数字专用 — Inter + tabular-nums */
+/* 数字专用 - Inter + tabular-nums */
 .gipfel-num {
   font-family: var(--gipfel-font-sans);
   font-variant-numeric: tabular-nums;
@@ -151,7 +151,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 3. 卡片 — 亮度层级代替阴影 (Bloomberg 克制风格)
+ * 3. 卡片 - 亮度层级代替阴影 (Bloomberg 克制风格)
  *    不加阴影，靠 3 层背景色差创造层次
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -160,7 +160,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 4. 按钮特效 — hover 150ms 亮度提升 + active scale(0.97)
+ * 4. 按钮特效 - hover 150ms 亮度提升 + active scale(0.97)
  *    全局覆盖 Ant Design Button
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -196,7 +196,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 4.5 输入框全局金色 focus — 所有 ant-input 聚焦时金色边框+光晕
+ * 4.5 输入框全局金色 focus - 所有 ant-input 聚焦时金色边框+光晕
  * ═══════════════════════════════════════════════════════════════ */
 
 .ant-input,
@@ -218,8 +218,8 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 5. 表格 — 行高 40px + hover 微背景亮化
- *    斑马纹在前，hover 在后——避免 !important 叠加冲突
+ * 5. 表格 - 行高 40px + hover 微背景亮化
+ *    斑马纹在前，hover 在后--避免 !important 叠加冲突
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 表格行高: 40px */
@@ -239,7 +239,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 6. 表格表头 — 11px（中文表头禁 uppercase/letter-spacing）
+ * 6. 表格表头 - 11px（中文表头禁 uppercase/letter-spacing）
  * ═══════════════════════════════════════════════════════════════ */
 
 .ant-table-thead > tr > th {
@@ -248,7 +248,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 7. 斑马纹 — 极淡交替行背景（在 hover 之前）
+ * 7. 斑马纹 - 极淡交替行背景（在 hover 之前）
  * ═══════════════════════════════════════════════════════════════ */
 
 .ant-table-tbody > tr.ant-table-row:nth-child(even) > td {
@@ -259,18 +259,18 @@
   background: transparent !important;
 }
 
-/* hover 微亮 — 在斑马纹之后，优先级更高 */
+/* hover 微亮 - 在斑马纹之后，优先级更高 */
 .ant-table-tbody > tr.ant-table-row:hover > td {
   background-color: rgba(255, 255, 255, 0.025) !important;
 }
 
-/* hover 覆盖斑马纹 — 偶数行 hover 稍亮 */
+/* hover 覆盖斑马纹 - 偶数行 hover 稍亮 */
 .ant-table-tbody > tr.ant-table-row:nth-child(even):hover > td {
   background-color: rgba(255, 255, 255, 0.035) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 8. 页面根背景色 — 用于 body/html
+ * 8. 页面根背景色 - 用于 body/html
  * ═══════════════════════════════════════════════════════════════ */
 
 html, body {
@@ -280,7 +280,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 9. 温暖专业派 — Warm Professional
+ * 9. 温暖专业派 - Warm Professional
  *    卡片厚度 + 暖色hover + 私人银行质感
  * ═══════════════════════════════════════════════════════════════ */
 
@@ -334,7 +334,7 @@ html, body {
 }
 .data-row:hover::after { height: 1.5px; background: #D4AF37; }
 
-/* 5. 导航确认 — 页面标题提前淡入 */
+/* 5. 导航确认 - 页面标题提前淡入 */
 @keyframes nav-ripple {
   0%   { opacity: 0; transform: translateY(2px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -345,7 +345,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 11. 金融级登录页增强 — Gold+Glass
+ * 11. 金融级登录页增强 - Gold+Glass
  * ═══════════════════════════════════════════════════════════════ */
 
 /* Login-only financial palette overrides. */
@@ -356,7 +356,7 @@ html, body {
   color: #f5f7fa !important;
 }
 
-/* Login input placeholder — 暗灰 muted */
+/* Login input placeholder - 暗灰 muted */
 .gipfel-login__input.ant-input-affix-wrapper input::placeholder,
 .gipfel-login__input.ant-input::placeholder {
   color: rgba(138, 155, 181, 0.45) !important;
@@ -407,7 +407,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
- * 12. 响应式布局 — 全局
+ * 12. 响应式布局 - 全局
  * ═══════════════════════════════════════════════════════════════ */
 
 /* 表格容器在小屏上水平滚动 */
@@ -420,34 +420,34 @@ html, body {
     min-width: 600px;
   }
 
-  /* KPI 网格 — 4列变2列 */
+  /* KPI 网格 - 4列变2列 */
   .kpi-grid-4 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* 区域卡片 — 4列变2列 */
+  /* 区域卡片 - 4列变2列 */
   .region-grid-4 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* 图表行 — 3列变1列 */
+  /* 图表行 - 3列变1列 */
   .chart-grid-3 {
     grid-template-columns: 1fr !important;
   }
 }
 
 @media (max-width: 600px) {
-  /* KPI 网格 — 2列变1列 */
+  /* KPI 网格 - 2列变1列 */
   .kpi-grid-4 {
     grid-template-columns: 1fr !important;
   }
 
-  /* 区域卡片 — 2列变1列 */
+  /* 区域卡片 - 2列变1列 */
   .region-grid-4 {
     grid-template-columns: 1fr !important;
   }
 
-  /* 表单行 — 并排变堆叠 */
+  /* 表单行 - 并排变堆叠 */
   .form-row-responsive {
     flex-direction: column !important;
   }

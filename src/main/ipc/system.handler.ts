@@ -1,5 +1,5 @@
 /**
- * system.handler.ts — 系统健康检查
+ * system.handler.ts - 系统健康检查
  *
  * 服务器状态（系统设置页"服务器状态"卡片 + 管理端概览）：
  *  - 云端 API 健康：GET https://106.54.26.86/api/regions（云端模式数据源）

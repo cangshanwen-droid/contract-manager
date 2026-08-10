@@ -1,10 +1,10 @@
 /**
- * DashboardPage — 合同管理 + 区域模拟驾驶舱
+ * DashboardPage - 合同管理 + 区域模拟驾驶舱
  * ─────────────────────────────────────────────
  * Layout (3 sections, top→bottom):
- *   1. 核心 KPI 行 — 区域数/合同数/公司数/碳排放
- *   2. 区域网格 — 4 张区域卡片（人口/幸福度/就业率/碳排）
- *   3. 图表行 — 人口趋势折线 | 合同状态分布柱状 | 最近活动列表
+ *   1. 核心 KPI 行 - 区域数/合同数/公司数/碳排放
+ *   2. 区域网格 - 4 张区域卡片（人口/幸福度/就业率/碳排）
+ *   3. 图表行 - 人口趋势折线 | 合同状态分布柱状 | 最近活动列表
  *
  * Tokens: 基础暗色色板
  *   品牌蓝 #1677FF 用于核心 KPI 数字和图表
@@ -231,7 +231,7 @@ const DashboardPage: React.FC = () => {
   // Section 3: Chart data
   // ════════════════════════════════════════
 
-  // Population trend — sorted regions
+  // Population trend - sorted regions
   const popChartData = [...regions]
     .sort((a, b) => (b.population || 0) - (a.population || 0))
     .map((r) => ({
@@ -251,7 +251,7 @@ const DashboardPage: React.FC = () => {
     count,
   }))
 
-  // Recent activity — latest 6 contracts
+  // Recent activity - latest 6 contracts
   const recentContracts = [...contracts]
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
     .slice(0, 6)
@@ -279,7 +279,7 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <RepMiniStat label="本公司" value={repListedCompanies.length > 0 ? repListedCompanies[0].name : '—'} />
+            <RepMiniStat label="本公司" value={repListedCompanies.length > 0 ? repListedCompanies[0].name : '-'} />
             <RepMiniStat label="已上市股票数" value={repListedCompanies.filter((c: any) => c.stock_symbol).length} />
             <RepMiniStat label="公司总数" value={companyCount} />
           </div>
@@ -370,7 +370,7 @@ const DashboardPage: React.FC = () => {
                       marginLeft: 'auto', fontSize: 11, color: T.silverMut, flexShrink: 0,
                       fontVariantNumeric: 'tabular-nums',
                     }}>
-                      {u.created_at?.slice(0, 16) || '—'}
+                      {u.created_at?.slice(0, 16) || '-'}
                     </span>
                   </div>
                 ))
@@ -610,7 +610,7 @@ const DashboardPage: React.FC = () => {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
 
-/** KPI card — left 3px accent border + large number + small label */
+/** KPI card - left 3px accent border + large number + small label */
 const KPICard: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
   <div className="gipfel-card" style={{
     background: T.bgCard,
@@ -636,7 +636,7 @@ const KPICard: React.FC<{ label: string; value: number | string }> = ({ label, v
   </div>
 )
 
-/** 代表端迷你统计 — 欢迎语右侧紧凑指标 */
+/** 代表端迷你统计 - 欢迎语右侧紧凑指标 */
 const RepMiniStat: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
   <div style={{
     background: T.bgPanel,
@@ -664,7 +664,7 @@ const RepMiniStat: React.FC<{ label: string; value: number | string }> = ({ labe
   </div>
 )
 
-/** 待办工作台卡片 — 可点击跳转到合同列表对应筛选 */
+/** 待办工作台卡片 - 可点击跳转到合同列表对应筛选 */
 const TodoCard: React.FC<{ label: string; count: number; color: string; onClick: () => void }> = ({ label, count, color, onClick }) => (
   <div
     onClick={onClick}
@@ -755,7 +755,7 @@ const RegionInfoCard: React.FC<{
               </span>
             ) : (
               <span style={{ fontSize: 11, color: T.silverMut }}>
-                {quoteFailed ? '行情暂不可用' : '—'}
+                {quoteFailed ? '行情暂不可用' : '-'}
               </span>
             )}
           </div>

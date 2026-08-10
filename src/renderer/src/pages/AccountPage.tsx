@@ -31,6 +31,7 @@ const AccountPage: React.FC = () => {
   const [transactions, setTransactions] = useState<any[]>([])
   const [txLoading, setTxLoading] = useState(false)
   const [filterYear, setFilterYear] = useState<number | undefined>()
+  const [yearOptions, setYearOptions] = useState<number[]>([])
   const [txForm] = Form.useForm()
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm] = Form.useForm()
@@ -49,6 +50,16 @@ const AccountPage: React.FC = () => {
   }
 
   useEffect(() => { load() }, [])
+
+  // 年度筛选动态化：从 account_transactions 表读取全部年度，无数据时回退当前年份
+  useEffect(() => {
+    invoke(IPC_CHANNELS.ACCOUNT_YEARS)
+      .then((ys: any) => {
+        const years = Array.isArray(ys) ? ys.filter((y: any) => typeof y === 'number') : []
+        setYearOptions(years.length > 0 ? years : [new Date().getFullYear()])
+      })
+      .catch(() => setYearOptions([new Date().getFullYear()]))
+  }, [])
 
   // ── 快捷键：Escape 关闭弹窗 ──
   useEffect(() => {
@@ -294,7 +305,7 @@ const AccountPage: React.FC = () => {
         <div style={{ marginBottom: 12, display:'flex', gap:8 }}>
           <Select placeholder="筛选年度" size="small" style={{ width:100 }} allowClear
             value={filterYear} onChange={handleFilterYear}
-            options={[2024,2025,2026,2027,2028].map(y=>({value:y,label:`${y}年`}))} />
+            options={yearOptions.map(y => ({ value: y, label: `${y}年` }))} />
         </div>
         <Spin spinning={txLoading}>
           <Table

@@ -94,7 +94,7 @@ const RegionListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI 卡片 — 暖金点缀 */}
+      {/* KPI 卡片 - 暖金点缀 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 12 }}>
         {[
         { l: '区域数量', v: regions.length },
@@ -120,7 +120,7 @@ const RegionListPage: React.FC = () => {
         ))}
       </div>
 
-      {/* 表格 — 面板包裹 + 暖色行悬停 */}
+      {/* 表格 - 面板包裹 + 暖色行悬停 */}
       <div style={{
         background: T.bgPanel,
         border: `1px solid ${T.border}`,
@@ -148,7 +148,7 @@ const RegionListPage: React.FC = () => {
                 </span>
               )},
             { title: '幸福', dataIndex: 'current_happiness', width: 65, align: 'right' as const, sorter: (a: Region, b: Region) => (a.current_happiness || 0) - (b.current_happiness || 0),
-              render: (v: any) => v != null ? <span style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", color: v > 60 ? POSITIVE_COLOR : T.silverSec }}>{v.toFixed(1)}</span> : <span style={{ color: T.silverMut }}>—</span> },
+              render: (v: any) => v != null ? <span style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace", color: v > 60 ? POSITIVE_COLOR : T.silverSec }}>{v.toFixed(1)}</span> : <span style={{ color: T.silverMut }}>-</span> },
             { title: '操作', width: 120, render: (_: any, r: Region) => (
               <Space size={4}>
                 <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} style={{ padding: '0 4px', color: T.silverSec }} />
