@@ -348,6 +348,17 @@ export function registerContractHandlers(): void {
 
       return result
     } catch (err: any) {
+      // P1-1 修复：状态变更 + 资金入账原子性——入账失败（如余额竞态不足）时回滚已写入的 status，
+      // 避免出现「状态已改为 active 但无支出流水」的财务缺口
+      if (oldContract && data?.status !== undefined && String(data.status) !== String(oldContract.status)) {
+        try {
+          const db = getDatabase()
+          db.run('UPDATE contracts SET status = ? WHERE id = ?', [oldContract.status, id])
+          console.warn(`[CONTRACT_UPDATE] 入账失败，已回滚合同 ${id} 状态 → ${oldContract.status}`)
+        } catch (rollbackErr) {
+          console.error('状态回滚失败:', rollbackErr)
+        }
+      }
       console.error('CONTRACT_UPDATE failed:', err)
       return { success: false, message: `更新合同失败：${err.message || '未知错误'}` }
     }

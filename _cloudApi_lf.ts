@@ -219,12 +219,12 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   // P1-1 补全：审批写操作映射云端（不再静默降级本地 SQLite，避免与云端数据分叉）
   'contract:approve':     { method: 'POST',   path: (id: unknown) => `/api/contracts/${id}/approve`, body: (args) => ({ action: args[1], operator: args[2] }) },
   'contract:batch-approve': { method: 'POST', path: '/api/contracts/batch-approve', body: (args) => ({ ids: args[0], action: args[1], operator: args[2] }) },
-  'contract:summarize':   { method: 'GET',    path: (regionId: unknown) => `/api/contracts/summarize/${regionId}` },
+  'contract:summarize':   { method: 'GET',    path: (id: unknown) => `/api/contracts/${id}/summarize` },
   'contract:list-versions': { method: 'GET', path: (id: unknown) => `/api/contracts/${id}/versions` },
 
-  'contract-type:list':   { method: 'GET',    path: '/api/contracts/types/all' },
+  'contract-type:list':   { method: 'GET',    path: '/api/contract-types' },
 
-  'infra-type:list':      { method: 'GET',    path: '/api/infra/types' },
+  'infra-type:list':      { method: 'GET',    path: '/api/infra-types' },
 
   'dashboard:summary':    { method: 'GET',    path: '/api/dashboard/summary' },
   'dashboard:system-stats': { method: 'GET',  path: '/api/dashboard/system-stats' },
@@ -232,9 +232,9 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'system:health':        { method: 'GET',    path: '/api/health' },
 
   'formula:calculate':    { method: 'POST',   path: '/api/formula/calculate' },
-  'formula:log-list':     { method: 'GET',    path: (regionId: unknown) => `/api/formula/logs/${regionId}` },
+  'formula:log-list':     { method: 'GET',    path: (regionId: unknown) => `/api/formula/logs?region_id=${regionId}` },
 
-  'infra-calc:load':      { method: 'GET',    path: (regionId: unknown) => `/api/infra/calculate?region_id=${regionId}` },
+  'infra-calc:load':      { method: 'GET',    path: (regionId: unknown) => `/api/infra-calc?region_id=${regionId}` },
 
   'auth:login':            { method: 'POST',   path: '/api/auth/login' },
   'auth:logout':           { method: 'POST',   path: '/api/auth/logout' },
@@ -242,12 +242,12 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'auth:change-password':  { method: 'POST',   path: '/api/auth/change-password' },
   'auth:reset-password':   { method: 'POST',   path: (id: unknown) => `/api/auth/users/${id}/reset-password` },
 
-  'account:summary':      { method: 'GET',    path: '/api/accounts/summary/all' },
+  'account:summary':      { method: 'GET',    path: '/api/accounts/summary' },
   'account:list':         { method: 'GET',    path: '/api/accounts' },
   'account:get':          { method: 'GET',    path: (id: unknown) => `/api/accounts/${id}` },
   'account:create':       { method: 'POST',   path: '/api/accounts' },
   'account:transactions': { method: 'GET',    path: (id: unknown) => `/api/accounts/${id}/transactions` },
-  'account:add-transaction': { method: 'POST', path: '/api/accounts/transactions' },
+  'account:add-transaction': { method: 'POST', path: (id: unknown) => `/api/accounts/${id}/transactions` },
   'account:years':        { method: 'GET',    path: '/api/accounts/years' },
 
   'announcement:active-list': { method: 'GET', path: '/api/announcements/active' },

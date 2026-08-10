@@ -33,8 +33,14 @@ export function computeContractAmounts(
     const price = item.unit_price ?? 0
     const tax = item.tax_rate ?? 0
     // P1-1 税率口径：tax_rate 为百分比（13=13%），含税成本 = 不含税 ×(1+tax/100)
-    const itemCost = item.total_cost ?? qty * price * (1 + tax / 100)
-    const itemIncome = item.expected_income ?? (contractTypeId === 7 ? qty * price : 0)
+    // P1-2 修复：DB 行中未显式录入的 total_cost/expected_income 存 0（非 NULL），
+    // 0 ?? fallback = 0 会绕过推算（余额预检被击穿）。显式判断：>0 才用显式值，否则推算。
+    const itemCost = item.total_cost != null && item.total_cost > 0
+      ? item.total_cost
+      : qty * price * (1 + tax / 100)
+    const itemIncome = item.expected_income != null && item.expected_income > 0
+      ? item.expected_income
+      : (contractTypeId === 7 ? qty * price : 0)
     totalCost += itemCost
     expectedIncome += itemIncome
   }
