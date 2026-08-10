@@ -259,14 +259,8 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'report:land-area':              { method: 'GET', path: '/api/reports/land-area' },
   'report:land-area-by-region':    { method: 'GET', path: '/api/reports/land-area-by-region' },
 
+  // 股票通道：仅保留渲染端实际调用的 get-market（行情），其余交易在 iframe 内完成
   'stock:get-market':             { method: 'GET', path: '/market' },
-  'stock:get-quote':              { method: 'GET', path: (symbol: unknown) => `/market/quotes/${symbol}` },
-  'stock:get-orders':             { method: 'GET', path: '/market/orders' },
-  'stock:place-order':            { method: 'POST', path: '/market/orders' },
-  'stock:cancel-order':           { method: 'DELETE', path: (id: unknown) => `/market/orders/${id}` },
-  'stock:get-positions':          { method: 'GET', path: '/market/positions' },
-  'stock:get-accounts':           { method: 'GET', path: '/market/accounts' },
-  'stock:account-summary':        { method: 'GET', path: '/market/account/summary' },
 
   'announcement:create':          { method: 'POST', path: '/api/announcements' },
   'announcement:list':            { method: 'GET', path: '/api/announcements' },
