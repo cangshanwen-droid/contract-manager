@@ -156,6 +156,23 @@ export function registerAuthHandlers(): void {
         [username]
       )
       if (!user) {
+        // ── v1.3.0 云端统一账号兜底：本地无此用户时，尝试云端验证。
+        // 多人多机场景：新电脑首次登录用云端账号自动建本地用户。──
+        const cloudUser = await verifyAgainstCloud(username, password)
+        if (cloudUser) {
+          const localHash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
+          const res = getDatabase().run(
+            'INSERT INTO users(username, password, role, company_id) VALUES (?, ?, ?, ?)',
+            [username, localHash, cloudUser.role ?? 'user', cloudUser.company_id ?? null]
+          )
+          const newUser = queryOne(
+            `SELECT u.id, u.username, u.role, u.password, u.company_id, c.name AS company_name
+             FROM users u LEFT JOIN companies c ON c.id = u.company_id
+             WHERE u.username = ?`, [username]
+          )
+          loginAttempts.delete(username)
+          return finishLogin(newUser as any)
+        }
         loginAttempts.get(username)!.count++
         return { success: false, message: '用户名或密码错误' }
       }
