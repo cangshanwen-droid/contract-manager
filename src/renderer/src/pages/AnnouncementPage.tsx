@@ -59,8 +59,9 @@ const AnnouncementPage: React.FC = () => {
   const handleCreate = async () => {
     try {
       const vals = await form.validateFields()
-      // 发布者强制取当前登录用户，防止前端伪造
-      await invoke(IPC_CHANNELS.ANNOUNCEMENT_CREATE, { ...vals, created_by: user?.username || 'admin' })
+      // 发布者：默认当前登录人，允许手动修改为实际发布人（admin/operator 操作）
+      const publisher = (vals.created_by || '').trim() || user?.username || 'admin'
+      await invoke(IPC_CHANNELS.ANNOUNCEMENT_CREATE, { ...vals, created_by: publisher })
       message.success('公告发布成功')
       form.resetFields(); setCreateOpen(false); load()
     } catch (err: any) { if (err?.errorFields) return; message.error(err?.message || '发布失败') }
@@ -172,8 +173,9 @@ const AnnouncementPage: React.FC = () => {
               options={regions.map(r => ({ value: r.id, label: r.name }))}
             />
           </Form.Item>
-          <Form.Item name="created_by" label="发布者" initialValue={user?.username || 'admin'}>
-            <Input value={user?.username || 'admin'} disabled style={{ color: T.textSecondary }} />
+          <Form.Item name="created_by" label="发布者" initialValue={user?.username || 'admin'}
+            tooltip="默认当前登录人，可手动修改为实际发布人">
+            <Input placeholder={user?.username || 'admin'} maxLength={30} />
           </Form.Item>
         </Form>
       </Modal>
