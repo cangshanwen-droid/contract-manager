@@ -33,8 +33,12 @@ export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS)
 
 /** 角色 → 权限点（保守方案：保持 3 个固定角色，用权限点细化控制） */
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
-  // 代表端：只读
-  rep: [PERMISSIONS.CONTRACT_VIEW, PERMISSIONS.ACCOUNT_VIEW],
+  // 代表端：只读（含股票面板只读视图——rep 需看到本公司上市股票行情）
+  rep: [
+    PERMISSIONS.CONTRACT_VIEW,
+    PERMISSIONS.ACCOUNT_VIEW,
+    PERMISSIONS.STOCK_TRADE
+  ],
 
   // 操作端：合同全流程（创建/审批/编辑）+ 资金操作 + 股票 + 公告
   operator: [

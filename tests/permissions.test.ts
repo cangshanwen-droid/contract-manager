@@ -37,16 +37,18 @@ beforeEach(async () => {
 })
 
 describe('ROLE_PERMISSIONS 静态映射', () => {
-  it('rep：只读--有 contract.view/account.view，无任何写权限', () => {
+  it('rep：只读--有 contract.view/account.view/stock.trade（股票面板只读视图），无任何写权限', () => {
     const perms = ROLE_PERMISSIONS.rep
     expect(perms).toContain(PERMISSIONS.CONTRACT_VIEW)
     expect(perms).toContain(PERMISSIONS.ACCOUNT_VIEW)
+    // v1.3.0 修复：用户端需看到股票面板（只读行情视图，UI 层禁交易按钮）
+    expect(perms).toContain(PERMISSIONS.STOCK_TRADE)
     expect(perms).not.toContain(PERMISSIONS.CONTRACT_CREATE)
     expect(perms).not.toContain(PERMISSIONS.CONTRACT_APPROVE)
     expect(perms).not.toContain(PERMISSIONS.CONTRACT_EDIT)
     expect(perms).not.toContain(PERMISSIONS.USER_MANAGE)
     expect(perms).not.toContain(PERMISSIONS.SYSTEM_CONFIG)
-    expect(perms).toHaveLength(2)
+    expect(perms).toHaveLength(3)
   })
 
   it('operator：合同全流程（create/approve/edit）+ 资金 + 股票 + 公告', () => {

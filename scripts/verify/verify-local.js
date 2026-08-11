@@ -4,7 +4,7 @@
  *
  * 直接加载仓库真实的 migrations.ts / seed.ts（经 TypeScript 转译，SQL 与生产一致），
  * 在内存数据库中验证：
- *   1. 迁移 v1–v22 全部可执行（全新库）
+ *   1. 迁移 v1–v23 全部可执行（全新库）
  *   2. 迁移幂等（同库重跑 / 已有 DB 文件重开，均不重复应用）
  *   3. seed 数据正确（admin 用户存在、区域/合同类型/基建类型齐全）
  *   4. bcrypt 密码验证（admin/admin123 可通过，错误密码拒绝）
@@ -128,29 +128,29 @@ async function main() {
   const db = new SQL.Database()
 
   // 1. 迁移可执行（全新库）
-  test('迁移 v1–v22 全部可执行（全新库）', () => {
+  test('迁移 v1–v23 全部可执行（全新库）', () => {
     runMigrations(db)
     const versions = schemaVersions(db)
-    assertEq(versions.length, 22, 'schema_migrations 应恰好 22 条')
-    const expected = Array.from({ length: 22 }, (_, i) => i + 1)
-    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..22')
+    assertEq(versions.length, 23, 'schema_migrations 应恰好 23 条')
+    const expected = Array.from({ length: 23 }, (_, i) => i + 1)
+    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..23')
   })
 
   // 2. 迁移幂等（同库重跑）
   test('迁移幂等（同库重跑不重复应用）', () => {
     runMigrations(db)
-    assertEq(schemaVersions(db).length, 22, '重跑后仍应为 22 条')
+    assertEq(schemaVersions(db).length, 23, '重跑后仍应为 23 条')
   })
 
   // 3. 迁移幂等（已有 DB 文件重开）
-  test('迁移幂等（已有 DB 文件重开仍为 22 条）', () => {
+  test('迁移幂等（已有 DB 文件重开仍为 23 条）', () => {
     const buf = db.export()
     const tmp = path.join(os.tmpdir(), `gipfel-verify-${Date.now()}-${Math.random().toString(36).slice(2)}.db`)
     fs.writeFileSync(tmp, Buffer.from(buf))
     try {
       const db2 = new SQL.Database(fs.readFileSync(tmp))
       runMigrations(db2)
-      assertEq(schemaVersions(db2).length, 22, '重开已有库后仍应为 22 条')
+      assertEq(schemaVersions(db2).length, 23, '重开已有库后仍应为 23 条')
       db2.close()
     } finally {
       try { fs.unlinkSync(tmp) } catch { /* ignore */ }

@@ -345,9 +345,10 @@ CREATE TABLE IF NOT EXISTS user_roles (
 );
 
 -- 种子：3 个固定角色及其权限点（与 src/shared/permissions.ts 保持一致）
+-- v1.3.0 修复：rep 增加 stock.trade（用户端需看到股票面板只读视图）
 INSERT OR IGNORE INTO roles (name, label, permissions) VALUES
  ('rep', '代表端',
-  '["contract.view","account.view"]'),
+  '["contract.view","account.view","stock.trade"]'),
  ('operator', '操作端',
   '["contract.view","contract.create","contract.approve","contract.edit","account.view","account.create","account.transact","stock.trade","announce.manage"]'),
  ('admin', '管理端',
@@ -448,6 +449,19 @@ CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON contracts(created_at);
 -- ═══════════════════════════════════════════════════════════════
 ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id);
 CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id);
+    `
+  },
+  {
+    version: 23,
+    name: 'rep_add_stock_trade_permission',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v23 用户端股票面板：rep 增加 stock.trade 权限（只读行情视图）。
+-- 与 src/shared/permissions.ts ROLE_PERMISSIONS.rep 保持一致。
+-- ═══════════════════════════════════════════════════════════════
+UPDATE roles SET permissions = '["contract.view","account.view","stock.trade"]',
+  updated_at = datetime('now','localtime')
+WHERE name = 'rep';
     `
   },
 ]
