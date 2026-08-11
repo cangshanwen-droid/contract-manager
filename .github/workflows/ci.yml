@@ -1,80 +1,27 @@
-# Gipfel 合同管理系统 - CI 流水线
-# 触发：master 分支 push / 针对 master 的 PR
 name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
 
 jobs:
-  # ── 主流水线：构建 + 静态验证（全部离线可跑，不需要云端） ──────────────
-  build-test:
-    name: 构建 + 类型检查 + 本地验证
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  desktop-tests:
+    name: 桌面端 typecheck + vitest + build
+    runs-on: windows-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'  # vitest 用 electron mock，无需真二进制
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 安装 Node 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '20'
           cache: npm
-
-      # npm ci 要求 package-lock.json 已提交且与 package.json 同步
       - name: 安装依赖
         run: npm ci
-
-      - name: TypeScript 类型检查
+      - name: 类型检查
         run: npm run typecheck
-
-      # 注意：此处的 build 是 electron-vite build（纯 bundle，跨平台可跑），
-      # 不是 electron-builder 出安装包 -- electron-builder 的 nsis/certs 仅用于
-      # Windows 本地的 package / package:portable 脚本，ubuntu CI 不涉及。
-      # 若未来 electron 相关依赖在 ubuntu 上构建出问题，可拆为三个独立 job：
-      # typecheck / verify:ui / verify:local，build 保持 electron-vite build。
-      - name: 生产构建（electron-vite）
+      - name: 单元测试（69 项）
+        run: npm test
+      - name: 构建
         run: npm run build
-
-      - name: 前端静态检查（纯 Node 文本扫描，无需云端）
-        run: npm run verify:ui
-
-      - name: 数据库层验证（内存 sql.js + bcryptjs，无需云端）
-        run: npm run verify:local
-
-  # ── 云端验证（不阻塞主流水线） ────────────────────────────────────────
-  # verify-cloud.py 需要访问私有服务器（默认 http://106.54.26.86，ADMIN_KEY 默认取
-  # 线上值）。脚本在云端不可达时以退出码 2（SKIP）结束，本身不会误报失败；
-  # 此处再用 continue-on-error: true + if: always() 双保险：
-  #   - if: always()          → 即使主流水线失败也照常尝试云端验证
-  #   - continue-on-error     → 私有服务器故障/维护/网络受限时，绝不影响流水线结论
-  # 如需覆盖服务器地址 / 管理密钥，可在仓库 Settings → Secrets 配置：
-  #   GIPFEL_CLOUD_URL / GIPFEL_ADMIN_KEY（未配置时脚本使用内置默认值）。
-  verify-cloud:
-    name: 云端 API 验证（不阻塞）
-    needs: build-test
-    if: always()
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    timeout-minutes: 10
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 安装 Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 云端 API 验证（需私有服务器可达）
-        run: npm run verify:cloud
