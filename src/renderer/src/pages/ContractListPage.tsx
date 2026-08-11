@@ -140,11 +140,11 @@ const ContractListPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handler)
   }, [canCreate])
 
-  // 快捷筛选映射：'todo' = 我的待办（草稿 + 待审批 + 已驳回待重提）
+  // 快捷筛选映射：'todo' = 我的待办（草稿）
   const quickFilterMatch = (c: Contract): boolean => {
     const key = contractState(c).key
     if (quickFilter === 'all') return true
-    if (quickFilter === 'todo') return key === 'draft' || key === 'pending' || key === 'rejected'
+    if (quickFilter === 'todo') return key === 'draft'
     return key === quickFilter
   }
 
@@ -292,12 +292,9 @@ const ContractListPage: React.FC = () => {
     }
   }
 
-  // ── 批量操作：批量提交审批 / 批量批准 / 批量删除 ──
+  // ── 批量操作：批量删除（v1.3.1 金融化：批量审批已废弃）──
   const selectedContracts = contracts.filter(c => selectedRowKeys.includes(c.id))
-  // 各操作的可选条件：submit 仅草稿/已驳回；approve 仅待审批；delete 任意
-  const canBatchSubmit = selectedContracts.length > 0 && selectedContracts.every(c => c.approval_status === 'none' || c.approval_status === 'rejected')
-  const canBatchApprove = selectedContracts.length > 0 && selectedContracts.every(c => c.approval_status === 'pending')
-  const batchBarVisible = (canApprove || canEdit) && selectedRowKeys.length > 0
+  const batchBarVisible = canEdit && selectedRowKeys.length > 0
 
   const handleBatch = async (action: 'submit' | 'approve' | 'delete') => {
     if (selectedRowKeys.length === 0) return
@@ -314,7 +311,7 @@ const ContractListPage: React.FC = () => {
       const results = Array.isArray(res?.results) ? res.results : []
       const okCount = results.filter((r: any) => r.success).length
       const failCount = results.length - okCount
-      // 刷新列表：删除的移除，审批的更新状态
+      // 刷新列表：删除的移除
       if (action === 'delete') {
         const deletedIds = new Set(results.filter((r: any) => r.success).map((r: any) => r.id))
         setContracts(prev => prev.filter(c => !deletedIds.has(c.id)))
@@ -323,7 +320,7 @@ const ContractListPage: React.FC = () => {
       }
       setSelectedRowKeys([])
       if (failCount === 0) {
-        message.success(`批量${action === 'submit' ? '提交审批' : action === 'approve' ? '批准' : '删除'}成功：${okCount} 条`)
+        message.success(`批量${action === 'delete' ? '删除' : '操作'}成功：${okCount} 条`)
       } else {
         message.warning(`批量操作完成：成功 ${okCount} 条，失败 ${failCount} 条` +
           (results.filter((r: any) => !r.success).map((r: any) => `#${r.id} ${r.message || ''}`).join('；')))
@@ -613,10 +610,11 @@ const ContractListPage: React.FC = () => {
             options={[
               { value: 'all', label: '全部' },
               { value: 'todo', label: '我的待办' },
-              { value: 'pending', label: '待审批' },
-              { value: 'active', label: '执行中' },
-              { value: 'expired', label: '已过期' },
-              { value: 'rejected', label: '已驳回' },
+              { value: 'draft', label: '草稿' },
+              { value: 'active', label: '有效' },
+              { value: 'executing', label: '执行中' },
+              { value: 'completed', label: '完成' },
+              { value: 'terminated', label: '终止' },
             ]}
           />
           <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 'auto', lineHeight: '24px' }}>
@@ -633,30 +631,6 @@ const ContractListPage: React.FC = () => {
               已选 <span style={{ color: T.primary, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>{selectedRowKeys.length}</span> 项
             </span>
             <Divider type="vertical" />
-            {canApprove && (
-              <>
-                <Button
-                  size="small"
-                  icon={<SendOutlined />}
-                  disabled={!canBatchSubmit || batchBusy}
-                  loading={batchAction === 'submit'}
-                  onClick={() => handleBatch('submit')}
-                >
-                  批量提交审批
-                </Button>
-                <Button
-                  size="small"
-                  type="primary"
-                  ghost
-                  icon={<CheckCircleOutlined />}
-                  disabled={!canBatchApprove || batchBusy}
-                  loading={batchAction === 'approve'}
-                  onClick={() => handleBatch('approve')}
-                >
-                  批量批准
-                </Button>
-              </>
-            )}
             {canEdit && (
               <Popconfirm
                 title={`确认删除选中的 ${selectedRowKeys.length} 个合同？`}
