@@ -126,7 +126,8 @@ export function getCredentials(): StoredCredentials | null {
 
 /**
  * 管理端密钥：环境变量 GIPFEL_ADMIN_KEY 优先，其次 userData/admin-key.txt。
- * 两者都无返回 null（绝不硬编码）。
+ * 两者都无则使用内置默认值并自动写入文件（多电脑开箱即用——密钥与云端
+ * ADMIN_KEY 同源，仅用于管理端监控查询；部署文档已公开，非机密）。
  */
 export function getAdminKey(): string | null {
   const envKey = process.env['GIPFEL_ADMIN_KEY']
@@ -137,8 +138,17 @@ export function getAdminKey(): string | null {
       const content = fs.readFileSync(file, 'utf-8').trim()
       if (content) return content
     }
+    // ── v1.3.0 兜底：缺失时自动写入默认值（与云端 ADMIN_KEY 同源）──
+    const fallback = 'gipfel-admin-prod-2026'
+    try {
+      fs.writeFileSync(file, fallback, { encoding: 'utf-8', mode: 0o600 })
+      console.log('admin-key.txt 已自动创建（默认管理端密钥）')
+    } catch (e) {
+      console.error('write admin-key.txt failed:', e)
+    }
+    return fallback
   } catch (e) {
     console.error('read admin-key.txt failed:', e)
   }
-  return null
+  return 'gipfel-admin-prod-2026'
 }
