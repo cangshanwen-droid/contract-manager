@@ -17,33 +17,17 @@ import { useAuth } from '../context/AuthContext'
 import dayjs from 'dayjs'
 
 const statusColors: Record<string, string> = {
-  draft: 'default', active: 'processing', completed: 'success',
-  terminated: 'error', expired: 'warning'
+  draft: 'default', active: 'success', executing: 'processing',
+  completed: 'blue', terminated: 'error'
 }
 const statusLabels: Record<string, string> = {
-  draft: '草稿', active: '执行中', completed: '已完成',
-  terminated: '已终止', expired: '已过期'
-}
-// 审批状态：none=未提交 pending=待审批 approved=已审批 rejected=已驳回
-const approvalLabels: Record<string, string> = {
-  none: '未提交', pending: '待审批', approved: '已审批', rejected: '已驳回'
+  draft: '草稿', active: '有效', executing: '执行中',
+  completed: '完成', terminated: '终止'
 }
 
-// 完整状态机视图：审批状态 + 执行状态组合成展示态
-// 草稿 → 待审批 → 已审批 → 执行中 → 已完成/已终止
+// v1.3.1 金融化：审批流已废弃（approval 状态保留兼容历史数据，不再展示）
+// 状态机：草稿 → 有效 → 执行中 → 完成/终止
 function contractState(c: Contract): { key: string; label: string; color: string } {
-  if (c.approval_status === 'pending') return { key: 'pending', label: '待审批', color: 'processing' }
-  if (c.approval_status === 'rejected') return { key: 'rejected', label: '已驳回', color: 'error' }
-  if (c.approval_status === 'approved') {
-    switch (c.status) {
-      case 'active': return { key: 'active', label: '执行中', color: 'processing' }
-      case 'completed': return { key: 'completed', label: '已完成', color: 'success' }
-      case 'terminated': return { key: 'terminated', label: '已终止', color: 'error' }
-      case 'expired': return { key: 'expired', label: '已过期', color: 'warning' }
-      default: return { key: 'approved', label: '已审批', color: 'success' }
-    }
-  }
-  // 未提交审批（草稿）或历史数据（无审批列，默认视为已审批）
   const s = c.status || 'draft'
   return { key: s, label: statusLabels[s] || s, color: statusColors[s] || 'default' }
 }
@@ -106,9 +90,6 @@ const ContractListPage: React.FC = () => {
   const [detail, setDetail] = useState<ContractWithItems | null>(null)
   const [versions, setVersions] = useState<ContractVersion[]>([])
   const [versionDetail, setVersionDetail] = useState<ContractVersion | null>(null)
-  const [approvalOpen, setApprovalOpen] = useState(false)
-  const [approvalContract, setApprovalContract] = useState<Contract | null>(null)
-  const [approvalSubmitting, setApprovalSubmitting] = useState(false)
   const [companies, setCompanies] = useState<Company[]>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [contractTypeId, setContractTypeId] = useState<number | null>(null)
@@ -119,7 +100,7 @@ const ContractListPage: React.FC = () => {
   // 支持 URL 参数：?q=搜索词 &status=快捷筛选（Dashboard 待办工作台跳转）
   const [searchText, setSearchText] = useState(searchParams.get('q') || '')
   const [quickFilter, setQuickFilter] = useState<string>(
-    ['pending', 'active', 'expired', 'todo', 'draft'].includes(searchParams.get('status') || '')
+    ['active', 'executing', 'completed', 'terminated', 'todo', 'draft'].includes(searchParams.get('status') || '')
       ? (searchParams.get('status') as string)
       : 'all'
   )
@@ -234,44 +215,7 @@ const ContractListPage: React.FC = () => {
     }
   }
 
-  // 审批操作：submit(提交审批) / approve(批准) / reject(驳回)
-  const handleApproval = async (id: number, action: 'submit' | 'approve' | 'reject') => {
-    try {
-      const res = await invoke(IPC_CHANNELS.CONTRACT_APPROVE, id, action, user?.username || '', user?.role || '')
-      if (res && res.success === false) { message.error(res.message || '操作失败'); return }
-      const updated = res as Contract
-      setContracts(prev => prev.map(c => c.id === id ? updated : c))
-      message.success(action === 'submit' ? '已提交审批' : action === 'approve' ? '审批通过' : '已驳回')
-    } catch (err: any) {
-      message.error(err?.message || '操作失败')
-    }
-  }
-
-  // 打开审批确认弹窗
-  const openApprovalModal = (c: Contract) => {
-    setApprovalContract(c)
-    setApprovalOpen(true)
-  }
-
-  // 弹窗内批准/驳回（单级审批）
-  const doApprove = async (action: 'approve' | 'reject') => {
-    if (!approvalContract) return
-    setApprovalSubmitting(true)
-    try {
-      const res = await invoke(IPC_CHANNELS.CONTRACT_APPROVE, approvalContract.id, action, user?.username || '', user?.role || '')
-      if (res && res.success === false) { message.error(res.message || '操作失败'); return }
-      const updated = res as Contract
-      setContracts(prev => prev.map(c => c.id === approvalContract.id ? updated : c))
-      setApprovalOpen(false)
-      message.success(action === 'approve' ? '审批通过' : '已驳回')
-    } catch (err: any) {
-      message.error(err?.message || '操作失败')
-    } finally {
-      setApprovalSubmitting(false)
-    }
-  }
-
-  // 执行状态流转：开始执行 / 完成 / 终止（仅已审批合同可操作）
+  // 执行状态流转：开始执行 / 完成 / 终止（v1.3.1 金融化状态机）
   const handleLifecycle = async (id: number, status: string) => {
     try {
       const res = await invoke(IPC_CHANNELS.CONTRACT_UPDATE, id, { status, updated_by: user?.username || '' })
@@ -286,16 +230,14 @@ const ContractListPage: React.FC = () => {
   // ── P1-4：状态流动作（操作列下拉菜单，按状态显示可用动作，避免 5 按钮并排）──
   const statusMenuItems = (r: Contract): NonNullable<MenuProps['items']> => {
     const actions: { key: string; label: string; icon?: React.ReactNode; danger?: boolean }[] = []
-    if (!canApprove) return actions
-    if (r.approval_status === 'none' && r.status === 'draft') {
-      actions.push({ key: 'submit', label: '提交审批', icon: <SendOutlined /> })
-    } else if (r.approval_status === 'rejected') {
-      actions.push({ key: 'submit', label: '重新提交审批', icon: <SendOutlined /> })
-    } else if (r.approval_status === 'pending') {
-      actions.push({ key: 'approval', label: '审批进度', icon: <HistoryOutlined /> })
-    } else if (r.approval_status === 'approved' && r.status === 'draft') {
-      actions.push({ key: 'start', label: '开始执行', icon: <PlayCircleOutlined /> })
-    } else if (r.approval_status === 'approved' && r.status === 'active') {
+    if (!canEdit) return actions
+    // v1.3.1 金融化状态机：草稿→有效→执行中→完成/终止
+    if (r.status === 'draft') {
+      actions.push({ key: 'start', label: '生效', icon: <PlayCircleOutlined /> })
+    } else if (r.status === 'active') {
+      actions.push({ key: 'execute', label: '开始执行', icon: <PlayCircleOutlined /> })
+      actions.push({ key: 'terminate', label: '终止合同', icon: <StopOutlined />, danger: true })
+    } else if (r.status === 'executing') {
       actions.push({ key: 'complete', label: '完成合同', icon: <CheckCircleOutlined /> })
       actions.push({ key: 'terminate', label: '终止合同', icon: <StopOutlined />, danger: true })
     }
@@ -304,19 +246,16 @@ const ContractListPage: React.FC = () => {
 
   const onStatusAction = (r: Contract, key: string) => {
     switch (key) {
-      case 'submit':
-        handleApproval(r.id, 'submit')
-        break
-      case 'approval':
-        openApprovalModal(r)
-        break
       case 'start':
         handleLifecycle(r.id, 'active')
+        break
+      case 'execute':
+        handleLifecycle(r.id, 'executing')
         break
       case 'complete':
         Modal.confirm({
           title: '确认完成该合同？',
-          content: '完成后结算收入流水',
+          content: '完成合同，进入完成状态',
           okText: '完成',
           onOk: () => handleLifecycle(r.id, 'completed')
         })
@@ -415,7 +354,7 @@ const ContractListPage: React.FC = () => {
         items,
         created_by: user?.username || ''
       }) as Contract
-      message.success('合同创建成功（草稿，请提交审批）')
+      message.success('合同创建成功（已生效）')
       setContracts(prev => [saved, ...prev])
       // Reset for continuous entry
       setItems([])
@@ -430,37 +369,12 @@ const ContractListPage: React.FC = () => {
   }
 
   const addItem = () => {
-    const base = { item_name: '', quantity: 1, unit_price: 0 }
-    // ⚠️ type_id 映射与 FIELD_SETS / seed.ts 一致（P0-A 修复）：
-    //   1=基建 2=开采 3=采购 4=劳动力 5=投资 6=拨款 7=销售 8=减碳
-    switch (contractTypeId) {
-      case 1: // 基建
-        setItems([...items, { ...base, land_area: 0 }])
-        break
-      case 2: // 开采
-        setItems([...items, { ...base, carbon_factor: 0 }])
-        break
-      case 3: // 采购
-        setItems([...items, { ...base, tax_rate: 0 }])
-        break
-      case 4: // 劳动力
-        setItems([...items, { ...base, skill_level: 0 }])
-        break
-      case 5: // 投资
-        setItems([...items, { ...base, expected_income: 0, total_cost: 0 }])
-        break
-      case 6: // 拨款
-        setItems([...items, { ...base, total_cost: 0 }])
-        break
-      case 7: // 销售
-        setItems([...items, { ...base, tax_rate: 0 }])
-        break
-      case 8: // 减碳
-        setItems([...items, { ...base, carbon_factor: 0 }])
-        break
-      default:
-        setItems([...items, { ...base, land_area: 0 }])
-    }
+    // v1.3.1 金融化：所有合同类型统一投资项目模板（投资金额/类型/占股/收益率/期限）
+    setItems([...items, {
+      item_name: '', investment_type: '项目投资',
+      equity_ratio: 0, expected_return_rate: 0, investment_period: '',
+      total_cost: 0, expected_income: 0
+    }])
   }
   const updateItem = (idx: number, field: string, value: unknown) => {
     const newItems = [...items]
@@ -508,28 +422,39 @@ const ContractListPage: React.FC = () => {
   const itemCardBodyStyle = { padding: '10px 12px' }
 
   const columns = [
-    { title: '合同编号', dataIndex: 'contract_no', width: 150 },
+    { title: '合同编号', dataIndex: 'contract_no', width: 140 },
     { title: '名称', dataIndex: 'contract_name', ellipsis: true },
-    { title: '类型', dataIndex: 'contract_type_name', width: 100,
+    { title: '类型', dataIndex: 'contract_type_name', width: 90,
       render: (v: string) => <Tag>{v}</Tag>
     },
-    { title: '区域', dataIndex: 'region_name', width: 80 },
-    { title: '签约公司', dataIndex: 'company_name', width: 120,
+    // v1.3.1 金融化：投资金额列
+    { title: '投资金额', dataIndex: 'contract_amount', width: 110, align: 'right' as const,
+      render: (v: number | undefined) => v ? (
+        <span style={{ fontSize: 12 }}>¥{Number(v).toLocaleString()}</span>
+      ) : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
+    },
+    // v1.3.1 金融化：收益率列（取首条投资明细）
+    { title: '收益率', width: 80, align: 'right' as const,
+      render: (_: unknown, r: any) => {
+        const rate = (r.items && r.items[0]?.expected_return_rate) || 0
+        return rate ? <span style={{ fontSize: 12, color: T.gold }}>{Number(rate)}%</span>
+          : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
+      }
+    },
+    { title: '签约公司', dataIndex: 'company_name', width: 110,
       render: (v: string) => v ? <span style={{ fontSize: 12 }}>{v}</span> : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
     },
     {
-      title: '状态', dataIndex: 'status', width: 190,
+      title: '状态', dataIndex: 'status', width: 110,
       filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
         <div style={{ padding: 8, background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 4 }}>
           <Checkbox.Group
             options={[
               { label: '草稿', value: 'draft' },
-              { label: '待审批', value: 'pending' },
-              { label: '已审批', value: 'approved' },
-              { label: '执行中', value: 'active' },
-              { label: '已完成', value: 'completed' },
-              { label: '已终止', value: 'terminated' },
-              { label: '已驳回', value: 'rejected' },
+              { label: '有效', value: 'active' },
+              { label: '执行中', value: 'executing' },
+              { label: '完成', value: 'completed' },
+              { label: '终止', value: 'terminated' },
             ]}
             value={selectedKeys as string[]}
             onChange={(checkedValues) => setSelectedKeys(checkedValues)}
@@ -550,25 +475,17 @@ const ContractListPage: React.FC = () => {
         )
       }
     },
-    { title: '签约日期', dataIndex: 'sign_date', width: 100, sorter: (a: Contract, b: Contract) => (a.sign_date || '').localeCompare(b.sign_date || '') },
+    { title: '创建时间', dataIndex: 'created_at', width: 105,
+      render: (v: string) => v ? <span style={{ fontSize: 11, color: T.textMuted }}>{String(v).slice(0, 10)}</span> : '-'
+    },
     {
-      title: '操作', width: 190,
+      title: '操作', width: 120,
       render: (_: unknown, r: Contract) => {
         const menuItems = statusMenuItems(r)
         return (
           <Space size={2}>
             {canEdit ? <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} /> : null}
             <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(r.id)} />
-            {canApprove && r.approval_status === 'pending' && (
-              <>
-                <Tooltip title="批准">
-                  <Button size="small" type="link" icon={<CheckCircleOutlined style={{ color: T.green }} />} onClick={() => handleApproval(r.id, 'approve')} />
-                </Tooltip>
-                <Tooltip title="驳回">
-                  <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => handleApproval(r.id, 'reject')} />
-                </Tooltip>
-              </>
-            )}
             {menuItems && menuItems.length > 0 && (
               <Dropdown
                 menu={{ items: menuItems, onClick: ({ key }) => onStatusAction(r, key as string) }}
@@ -591,67 +508,33 @@ const ContractListPage: React.FC = () => {
 
   const renderItemFields = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
-    type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number }
-    // ⚠️ 类型 ID 必须与 seed.ts 的 contract_types 插入顺序一致（P0-A 修复）：
-    //   1=基建 2=开采 3=采购 4=劳动力 5=投资 6=拨款 7=销售 8=减碳
-    //   后端 summarizeByRegion() 同样按此 ID 分支出，改动前必须同步核对。
+    type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number; options?: { value: string; label: string }[] }
+    // v1.3.1 金融化：所有合同类型统一投资项目字段（全面替代工程类数量/单价明细）
+    const INVESTMENT_FIELDS: FieldDef[] = [
+      { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：产业园一期' },
+      { label: '投资金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：5000000' },
+      { label: '投资类型', span: 5, field: 'investment_type', type: 'select', placeholder: '选择投资类型',
+        options: [
+          { value: '股权投资', label: '股权投资' },
+          { value: '债权投资', label: '债权投资' },
+          { value: '基金投资', label: '基金投资' },
+          { value: '项目投资', label: '项目投资' },
+          { value: '其他', label: '其他' },
+        ] },
+      { label: '占股比例(%)', span: 5, field: 'equity_ratio', type: 'num', placeholder: '如：20' },
+      { label: '预期收益率(%)', span: 5, field: 'expected_return_rate', type: 'num', placeholder: '如：8' },
+      { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：400000' },
+      { label: '投资期限', span: 5, field: 'investment_period', type: 'text', placeholder: '如：3年' },
+    ]
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
-      1: { title: '基建项目', hint: '基础设施建设合同 - 填写项目名、数量、单价与占地面积',
-        fields: [
-          { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：道路硬化工程' },
-          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：3' },
-          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
-          { label: '占地面积(㎡)', span: 5, field: 'land_area', type: 'num', placeholder: '如：1200' },
-        ] },
-      2: { title: '开采项', hint: '原料开采合同 - 原料名称、数量、单价与碳排放系数',
-        fields: [
-          { label: '原料名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：铁矿石' },
-          { label: '数量(吨)', span: 4, field: 'quantity', type: 'num', placeholder: '如：100' },
-          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：500' },
-          { label: '碳排放系数', span: 4, field: 'carbon_factor', type: 'num', placeholder: '如：0.8', step: 0.1 },
-        ] },
-      3: { title: '采购物资', hint: '采购合同 - 物资名称、数量、单价与税率',
-        fields: [
-          { label: '物资名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：水泥' },
-          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：200' },
-          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：450' },
-          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
-        ] },
-      4: { title: '招聘岗位', hint: '劳动力合同 - 招聘岗位、人数、月薪与技能等级',
-        fields: [
-          { label: '岗位名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：技术工人' },
-          { label: '人数', span: 4, field: 'quantity', type: 'num', placeholder: '如：10' },
-          { label: '月薪(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：8000' },
-          { label: '技能等级', span: 4, field: 'skill_level', type: 'select', placeholder: '选择等级' },
-        ] },
-      5: { title: '投资项目', hint: '投资合同 - 项目名称、投资总额、预期收益与数量',
-        fields: [
-          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：产业园二期' },
-          { label: '投资总额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：10000000' },
-          { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：15000000' },
-          { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
-        ] },
-      6: { title: '拨款项目', hint: '拨款合同 - 项目名称、拨款金额、数量与单价',
-        fields: [
-          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：农田补贴' },
-          { label: '拨款金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：500000' },
-          { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1' },
-          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：500000' },
-        ] },
-      7: { title: '销售产品', hint: '销售合同 - 产品名称、数量、单价与税率',
-        fields: [
-          { label: '产品名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：钢材' },
-          { label: '数量', span: 4, field: 'quantity', type: 'num', placeholder: '如：50' },
-          { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：3000' },
-          { label: '税率(%)', span: 4, field: 'tax_rate', type: 'num', placeholder: '如：13' },
-        ] },
-      8: { title: '减碳项目', hint: '减碳合同 - 项目名称、减排量、碳排系数与单价',
-        fields: [
-          { label: '项目名称', span: 6, field: 'item_name', type: 'text', placeholder: '如：光伏发电' },
-          { label: '减排量(吨)', span: 5, field: 'quantity', type: 'num', placeholder: '如：500' },
-          { label: '碳排系数', span: 5, field: 'carbon_factor', type: 'num', placeholder: '如：0.5', step: 0.1 },
-          { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：100' },
-        ] },
+      1: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      2: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      3: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      4: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      5: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      6: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      7: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      8: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
     }
     const config = FIELD_SETS[contractTypeId || 1]
     const addLabel = config.title.replace('项', '').replace('岗位', '')
@@ -678,10 +561,7 @@ const ContractListPage: React.FC = () => {
                     <Select placeholder={f.placeholder} style={{ width: '100%' }}
                       value={(item as any)[f.field]}
                       onChange={v => updateItem(idx, f.field, v)}
-                      options={[
-                        { value: 0, label: '普通工人' },
-                        { value: 1, label: '高素质人才' }
-                      ]} />
+                      options={f.options || []} />
                   ) : f.type === 'text' ? (
                     <Input placeholder={f.placeholder} value={(item as any)[f.field] || ''}
                       onChange={e => updateItem(idx, f.field, e.target.value)} />
@@ -920,6 +800,29 @@ const ContractListPage: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
+          {/* v1.3.1 金融化：合同金额/期限/负责人/附件 */}
+          <Row gutter={12}>
+            <Col span={6}>
+              <Form.Item name="contract_amount" label="合同金额(元)" tooltip="总投资额，自动带入投资金额列">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="如：5000000" />
+              </Form.Item>
+            </Col>
+            <Col span={5}>
+              <Form.Item name="contract_period" label="合同期限">
+                <Input placeholder="如：3年" />
+              </Form.Item>
+            </Col>
+            <Col span={5}>
+              <Form.Item name="owner" label="负责人">
+                <Input placeholder="如：张三" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="attachment" label="附件">
+                <Input placeholder="如：投资协议.pdf" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
 
         {contractTypeId && (
@@ -935,7 +838,7 @@ const ContractListPage: React.FC = () => {
         )}
         <Divider style={{ margin: '8px 0' }} />
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          新建合同默认为「草稿」，需提交审批通过后方可执行并计入资金流水。
+          v1.3.1 金融化：新建合同即生效（有效状态），资金入账请在资金模块手动操作。
         </Typography.Text>
       </Modal>
 
@@ -946,16 +849,35 @@ const ContractListPage: React.FC = () => {
               <Input value={editingContract.contract_name}
                 onChange={(e) => setEditingContract({ ...editingContract, contract_name: e.target.value })} />
             </Form.Item>
-            <Form.Item label="审批状态">
+            <Form.Item label="当前状态">
               <Tag color={contractState(editingContract).color}>{contractState(editingContract).label}</Tag>
               <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 8 }}>
-                状态由审批流程控制，请在列表中操作
+                状态流转请在列表中操作
               </span>
             </Form.Item>
             <Form.Item label="备注">
               <Input.TextArea rows={2} value={editingContract.notes || ''}
                 onChange={(e) => setEditingContract({ ...editingContract, notes: e.target.value })} />
             </Form.Item>
+            {/* v1.3.1 金融化：编辑弹窗支持合同金额/期限/负责人 */}
+            <Form.Item label="合同金额(元)">
+              <InputNumber style={{ width: '100%' }} min={0} value={editingContract.contract_amount ?? undefined}
+                onChange={(v) => setEditingContract({ ...editingContract, contract_amount: v ?? 0 })} />
+            </Form.Item>
+            <Row gutter={8}>
+              <Col span={12}>
+                <Form.Item label="合同期限">
+                  <Input value={editingContract.contract_period || ''}
+                    onChange={(e) => setEditingContract({ ...editingContract, contract_period: e.target.value })} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="负责人">
+                  <Input value={editingContract.owner || ''}
+                    onChange={(e) => setEditingContract({ ...editingContract, owner: e.target.value })} />
+                </Form.Item>
+              </Col>
+            </Row>
             <Form.Item label="明细项">
               {editItems.length === 0 ? (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>该合同暂无明细项</Typography.Text>
@@ -986,46 +908,6 @@ const ContractListPage: React.FC = () => {
         )}
       </Modal>
 
-      <Modal
-        title="审批合同"
-        open={approvalOpen}
-        onCancel={() => setApprovalOpen(false)}
-        width={460}
-        footer={null}
-        destroyOnClose
-      >
-        {approvalContract && (
-          <>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: T.textPrimary }}>
-                {approvalContract.contract_name}
-              </div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>{approvalContract.contract_no}</div>
-            </div>
-            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 16 }}>
-              审批人：{user?.username || '-'}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <Popconfirm
-                title="确认驳回该合同？驳回后需重新提交审批"
-                onConfirm={() => doApprove('reject')}
-              >
-                <Button danger icon={<StopOutlined />} loading={approvalSubmitting}>驳回</Button>
-              </Popconfirm>
-              <Button
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                loading={approvalSubmitting}
-                style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                onClick={() => doApprove('approve')}
-              >
-                批准
-              </Button>
-            </div>
-          </>
-        )}
-      </Modal>
-
       <Modal title="合同详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={760} destroyOnClose>
         {detail && (
           <Tabs
@@ -1044,13 +926,10 @@ const ContractListPage: React.FC = () => {
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>区域</td><td>{detail.region_name || '-'}</td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>对方公司</td><td>{detail.company_name || detail.party_b_name || '-'}</td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>状态</td><td><Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag></td></tr>
-                        <tr><td style={{ padding: 6, fontWeight: 500 }}>审批状态</td><td>
-                          <Tag color={contractState(detail).color}>{contractState(detail).label}</Tag>
-                          <span style={{ fontSize: 11, color: T.textMuted }}>
-                            （{approvalLabels[detail.approval_status] || detail.approval_status}）
-                            {detail.approved_at ? ` · ${detail.approved_by || '-'} · ${detail.approved_at}` : ''}
-                          </span>
-                        </td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>合同金额</td><td>{detail.contract_amount ? formatMoneyCNY(detail.contract_amount) : '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>合同期限</td><td>{detail.contract_period || '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>负责人</td><td>{detail.owner || '-'}</td></tr>
+                        <tr><td style={{ padding: 6, fontWeight: 500 }}>附件</td><td>{detail.attachment || '-'}</td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>签约日期</td><td>{detail.sign_date || '-'}</td></tr>
                         <tr><td style={{ padding: 6, fontWeight: 500 }}>操作人</td><td>创建：{detail.created_by || '-'}　更新：{detail.updated_by || '-'}</td></tr>
                       </tbody>
@@ -1058,16 +937,16 @@ const ContractListPage: React.FC = () => {
                     {detail.items && detail.items.length > 0 && (
                       <>
                         <Divider />
-                        <Typography.Text strong>明细项</Typography.Text>
+                        <Typography.Text strong>投资项目</Typography.Text>
                         <Table className="gipfel-detail-table" dataSource={detail.items} rowKey="id" size="small" pagination={false}
                           columns={[
                             { title: '项目名称', dataIndex: 'item_name', ellipsis: true },
-                            { title: '数量', dataIndex: 'quantity', width: 80, render: (v: any) => (typeof v === 'number' ? formatNumber(v) : v ?? '-') },
-                            { title: '单价', dataIndex: 'unit_price', width: 110, render: (v: any) => (typeof v === 'number' ? formatMoneyCNY(v) : v ?? '-') },
-                            { title: '小计', dataIndex: 'amount', width: 120, render: (v: any, r: any) => formatMoneyCNY(v ?? (r.quantity ?? 0) * (r.unit_price ?? 0)) },
-                            { title: '占地面积', dataIndex: 'land_area', width: 90, render: (v: any) => (v ? formatNumber(v) : '-') },
-                            { title: '技能等级', dataIndex: 'skill_level', width: 90, render: (v: any) => (v ? formatNumber(v) : '-') },
-                            { title: '碳排系数', dataIndex: 'carbon_factor', width: 90, render: (v: any) => (v ? formatNumber(v) : '-') }
+                            { title: '投资金额', dataIndex: 'total_cost', width: 110, render: (v: any) => (v ? formatMoneyCNY(v) : '-') },
+                            { title: '投资类型', dataIndex: 'investment_type', width: 90, render: (v: any) => (v ? <Tag>{v}</Tag> : '-') },
+                            { title: '占股比例', dataIndex: 'equity_ratio', width: 80, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') },
+                            { title: '预期收益率', dataIndex: 'expected_return_rate', width: 90, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') },
+                            { title: '预期收益', dataIndex: 'expected_income', width: 110, render: (v: any) => (v ? formatMoneyCNY(v) : '-') },
+                            { title: '投资期限', dataIndex: 'investment_period', width: 90, render: (v: any) => v || '-' }
                           ]}
                         />
                       </>

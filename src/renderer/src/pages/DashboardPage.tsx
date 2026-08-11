@@ -402,22 +402,28 @@ const DashboardPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <TodoCard
-              label="待审批合同"
-              count={data?.contract_approval_pending ?? 0}
-              color={T.warning}
-              onClick={() => navigate('/contracts?status=pending')}
-            />
-            <TodoCard
-              label="执行中合同"
+              label="有效合同"
               count={statusCounts['active'] || 0}
-              color={T.blue}
+              color={T.green}
               onClick={() => navigate('/contracts?status=active')}
             />
             <TodoCard
-              label="已过期合同"
-              count={statusCounts['expired'] || 0}
+              label="执行中合同"
+              count={statusCounts['executing'] || 0}
+              color={T.blue}
+              onClick={() => navigate('/contracts?status=executing')}
+            />
+            <TodoCard
+              label="已完成合同"
+              count={statusCounts['completed'] || 0}
+              color={T.success}
+              onClick={() => navigate('/contracts?status=completed')}
+            />
+            <TodoCard
+              label="已终止合同"
+              count={statusCounts['terminated'] || 0}
               color={T.red}
-              onClick={() => navigate('/contracts?status=expired')}
+              onClick={() => navigate('/contracts?status=terminated')}
             />
           </div>
         </div>

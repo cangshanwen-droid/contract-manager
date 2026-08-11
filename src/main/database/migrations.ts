@@ -476,6 +476,27 @@ WHERE name = 'rep';
 ALTER TABLE users ADD COLUMN company_ids TEXT DEFAULT NULL;
     `
   },
+  {
+    version: 25,
+    name: 'contract_financialization',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v25 合同金融化：去审批流（创建即 active）+ 投资字段。
+-- contracts 加：contract_amount(合同金额) / contract_period(期限) /
+--             owner(负责人) / attachment(附件名)
+-- contract_items 加：investment_type(投资类型) / equity_ratio(占股%) /
+--                   expected_return_rate(预期收益率%) / investment_period(投资期限)
+-- ═══════════════════════════════════════════════════════════════
+ALTER TABLE contracts ADD COLUMN contract_amount REAL DEFAULT 0;
+ALTER TABLE contracts ADD COLUMN contract_period TEXT DEFAULT '';
+ALTER TABLE contracts ADD COLUMN owner TEXT DEFAULT '';
+ALTER TABLE contracts ADD COLUMN attachment TEXT DEFAULT '';
+ALTER TABLE contract_items ADD COLUMN investment_type TEXT DEFAULT '';
+ALTER TABLE contract_items ADD COLUMN equity_ratio REAL DEFAULT 0;
+ALTER TABLE contract_items ADD COLUMN expected_return_rate REAL DEFAULT 0;
+ALTER TABLE contract_items ADD COLUMN investment_period TEXT DEFAULT '';
+    `
+  },
 ]
 
 export function runMigrations(): void {

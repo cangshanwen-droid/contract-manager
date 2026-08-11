@@ -1,6 +1,6 @@
 // ---- 数据库实体接口 ----
 
-export type ContractStatus = 'draft' | 'active' | 'completed' | 'terminated' | 'expired'
+export type ContractStatus = 'draft' | 'active' | 'executing' | 'completed' | 'terminated'
 // 审批状态：none=未提交审批(草稿) pending=待审批 approved=已审批 rejected=已驳回
 export type ApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected'
 export type ContractApprovalAction = 'submit' | 'approve' | 'reject'
@@ -44,6 +44,11 @@ export interface Contract {
   updated_by: string
   created_at: string
   updated_at: string
+  // ── v1.3.1 金融化新字段 ──
+  contract_amount?: number        // 合同金额（总投资额）
+  contract_period?: string        // 合同期限
+  owner?: string                  // 负责人
+  attachment?: string             // 附件名/路径
 }
 
 export interface ContractType {
@@ -72,6 +77,11 @@ export interface ContractItem {
   // v8 迁移新增：明细级金额（投资合同=投资总额/预期收益、拨款合同=拨款金额），创建时可透传
   total_cost?: number
   expected_income?: number
+  // ── v1.3.1 金融化投资项目字段 ──
+  investment_type?: string        // 股权投资/债权投资/基金投资/项目投资/其他
+  equity_ratio?: number           // 占股比例（%）
+  expected_return_rate?: number   // 预期收益率（%）
+  investment_period?: string      // 投资期限
 }
 
 export interface ContractWithItems extends Contract {
