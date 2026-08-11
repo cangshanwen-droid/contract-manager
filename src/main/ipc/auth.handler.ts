@@ -31,8 +31,116 @@ function checkLoginLimit(username: string): { allowed: boolean; remaining: numbe
   return { allowed: true, remaining: -1 }
 }
 
+/**
+ * 登录成功收尾：记录审计 + 建立主进程会话 + 返回用户对象
+ */
+function finishLogin(user: {
+  id: number | bigint; username: string; role?: string; password?: string;
+  company_id?: number | null; company_name?: string | null
+}) {
+  const uid = Number(user.id)
+  // 记录最后登录时间（系统概览活跃用户统计）
+  try {
+    getDatabase().run(
+      "UPDATE users SET last_login = datetime('now','localtime') WHERE id = ?",
+      [uid]
+    )
+  } catch (e) {
+    console.error('update last_login failed:', e)
+  }
+  insertAuditLog({
+    username: user.username,
+    role: (user.role as string) || 'user',
+    action: 'login',
+    target: 'user',
+    target_id: uid,
+    result: 'success'
+  })
+
+  // 建立主进程会话：计算该用户的权限点列表（roles 表 + user_roles 关联）
+  const permissions = resolveUserPermissions(uid)
+  setSessionUser({
+    id: uid,
+    username: user.username,
+    role: (user.role as string) || 'user',
+    permissions,
+    // v22 公司绑定：登录响应携带 company_id + company_name（数据隔离依据）
+    company_id: (user.company_id as number | null) ?? null,
+    company_name: (user.company_name as string | undefined) || undefined
+  })
+
+  return {
+    success: true,
+    user: {
+      id: uid,
+      username: user.username,
+      role: user.role,
+      permissions,
+      company_id: (user.company_id as number | null) ?? null,
+      company_name: (user.company_name as string | undefined) || undefined
+    }
+  }
+}
+
+/**
+ * v1.3.0 云端统一账号兜底：调 gipfel-api /api/auth/login 验证。
+ * 多人多机场景：本地密码不一致时用云端账号（单一账号源）兜底登录。
+ * 返回云端用户信息（role/company_id）或 null（验证失败/云端不可达）。
+ */
+function verifyAgainstCloud(username: string, password: string): Promise<{
+  role?: string; company_id?: number | null
+} | null> {
+  return new Promise((resolve) => {
+    const https = require('https')
+    const cloudBase = (() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { CLOUD_API_BASE } = require('../../shared/cloud-config')
+        return CLOUD_API_BASE as string
+      } catch {
+        return 'https://106.54.26.86'
+      }
+    })()
+    const url = new URL(`${cloudBase}/api/auth/login`)
+    const body = JSON.stringify({ username, password })
+    const req = https.request({
+      hostname: url.hostname,
+      port: 443,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      },
+      rejectUnauthorized: false // 自签名证书：信任白名单主机（will-navigate 已精确匹配）
+    }, (res: any) => {
+      let data = ''
+      res.on('data', (c: Buffer) => { data += c.toString() })
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data)
+          if (res.statusCode === 200 && parsed?.user) {
+            resolve({
+              role: parsed.user.role ?? 'user',
+              company_id: parsed.user.company_id ?? null
+            })
+          } else {
+            resolve(null)
+          }
+        } catch {
+          resolve(null)
+        }
+      })
+    })
+    req.on('error', () => resolve(null))
+    req.setTimeout(8000, () => { req.destroy(); resolve(null) })
+    req.write(body)
+    req.end()
+  })
+}
+
 export function registerAuthHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN, (_e, username: string, password: string) => {
+  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN, async (_e, username: string, password: string) => {
     try {
       // 登录限流检查
       const limit = checkLoginLimit(username)
@@ -56,53 +164,51 @@ export function registerAuthHandlers(): void {
       const valid = bcrypt.compareSync(password, user.password as string)
 
       if (!valid) {
+        // ── v1.3.0 云端统一账号兜底：本地密码不匹配时，尝试云端验证。
+        // 多人多机场景：任何电脑用云端账号（如 admin/admin123）即可登录；
+        // 云端验证通过 → 同步本地用户密码 hash，下次本地直通。──
+        const cloudUser = await verifyAgainstCloud(username, password)
+        if (cloudUser) {
+          // 同步本地：更新或创建该用户（密码 hash 同步为本地 bcrypt）
+          const localHash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
+          const existing = queryOne('SELECT id FROM users WHERE username = ?', [username])
+          if (existing) {
+            getDatabase().run(
+              'UPDATE users SET password = ?, role = ?, company_id = ? WHERE id = ?',
+              [localHash, cloudUser.role ?? (user.role as string) ?? 'user',
+               cloudUser.company_id ?? user.company_id ?? null, existing.id]
+            )
+          } else {
+            const res = getDatabase().run(
+              'INSERT INTO users(username, password, role, company_id) VALUES (?, ?, ?, ?)',
+              [username, localHash, cloudUser.role ?? 'user', cloudUser.company_id ?? null]
+            )
+            user = {
+              id: res.lastInsertRowid,
+              username,
+              role: cloudUser.role ?? 'user',
+              password: localHash,
+              company_id: cloudUser.company_id ?? null,
+              company_name: null
+            } as any
+          }
+          if (existing) {
+            user = queryOne(
+              `SELECT u.id, u.username, u.role, u.password, u.company_id, c.name AS company_name
+               FROM users u LEFT JOIN companies c ON c.id = u.company_id
+               WHERE u.username = ?`, [username]
+            )
+          }
+          loginAttempts.delete(username)
+          return finishLogin(user as any)
+        }
         loginAttempts.get(username)!.count++
         return { success: false, message: '用户名或密码错误' }
       }
 
       // 登录成功，清除限流
       loginAttempts.delete(username)
-      // 记录最后登录时间（系统概览活跃用户统计）
-      try {
-        getDatabase().run(
-          "UPDATE users SET last_login = datetime('now','localtime') WHERE id = ?",
-          [user.id]
-        )
-      } catch (e) {
-        console.error('update last_login failed:', e)
-      }
-      insertAuditLog({
-        username,
-        role: (user.role as string) || 'user',
-        action: 'login',
-        target: 'user',
-        target_id: user.id as number,
-        result: 'success'
-      })
-
-      // 建立主进程会话：计算该用户的权限点列表（roles 表 + user_roles 关联）
-      const permissions = resolveUserPermissions(user.id as number)
-      setSessionUser({
-        id: user.id as number,
-        username: user.username as string,
-        role: (user.role as string) || 'user',
-        permissions,
-        // v22 公司绑定：登录响应携带 company_id + company_name（数据隔离依据）
-        company_id: (user.company_id as number | null) ?? null,
-        company_name: (user.company_name as string | undefined) || undefined
-      })
-
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          permissions,
-          company_id: (user.company_id as number | null) ?? null,
-          company_name: (user.company_name as string | undefined) || undefined
-        }
-      }
+      return finishLogin(user as any)
     } catch (err: any) {
       console.error('AUTH_LOGIN failed:', err)
       return { success: false, message: `登录失败：${err.message || '未知错误'}` }
