@@ -267,7 +267,15 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'announcement:delete':          { method: 'DELETE', path: (id: unknown) => `/api/announcements/${id}` },
   'auth:list-users':              { method: 'GET', path: '/api/auth/users' },
   'auth:create-user':             { method: 'POST', path: '/api/auth/users',
-                                    body: (args: unknown[]) => ({ username: args[0], password: args[1], role: args[2], org_id: args[3] ?? null }) },
+                                    body: (args: unknown[]) => {
+                                      // args: [username, password, role, companyId, operator, operatorRole, companyIds]
+                                      const companyIds = Array.isArray(args[6]) ? (args[6] as number[]) : null
+                                      return {
+                                        username: args[0], password: args[1], role: args[2],
+                                        org_id: (args[3] as number | null | undefined) ?? null,
+                                        company_ids: companyIds
+                                      }
+                                    } },
   'auth:delete-user':             { method: 'DELETE', path: (id: unknown) => `/api/auth/users/${id}` },
   'audit:list':                   { method: 'GET', path: '/api/audit' },
   'audit:log':                    { method: 'POST', path: '/api/audit/log' },

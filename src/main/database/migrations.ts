@@ -464,6 +464,18 @@ UPDATE roles SET permissions = '["contract.view","account.view","stock.trade"]',
 WHERE name = 'rep';
     `
   },
+  {
+    version: 24,
+    name: 'user_multicompany_binding',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v24 多公司绑定：users 加 company_ids JSON 列（主席/操作端可管多家公司）。
+-- 与云端 user_companies 关联表对应；本地 company_ids 为 JSON 数组
+-- （[companyId,...]），旧 company_id 单值保留作为默认绑定。
+-- ═══════════════════════════════════════════════════════════════
+ALTER TABLE users ADD COLUMN company_ids TEXT DEFAULT NULL;
+    `
+  },
 ]
 
 export function runMigrations(): void {

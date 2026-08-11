@@ -107,7 +107,16 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
     try {
       const vals = await createForm.validateFields()
       // v22 公司绑定：第 4 参 companyId（null = 未绑定）
-      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, vals.role, vals.company_id ?? null) as any
+      // v24 多公司绑定：operator 传 company_ids 数组（第 7 参）；rep/admin 单值 company_id
+      const role = vals.role || 'rep'
+      const companyIds = (role === 'operator' && Array.isArray(vals.company_ids) && vals.company_ids.length > 0)
+        ? vals.company_ids.map(Number)
+        : null
+      // company_id 兼容字段：operator 多选取第一个；rep/admin 用单选值
+      const companyId = companyIds && companyIds.length > 0
+        ? companyIds[0]
+        : (vals.company_id ?? null)
+      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, role, companyId, undefined, undefined, companyIds) as any
       if (!r.success) {
         message.error(r.message || '创建失败')
         return
@@ -395,24 +404,53 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
               ]}
             />
           </Form.Item>
-          {/* v22 公司绑定：可选所属公司（allowClear = 可留空不绑定） */}
+          {/* v24 多公司绑定：operator（操作端/主席）可多选公司；rep/admin 单选 */}
           <Form.Item
-            name="company_id"
-            label="所属公司"
-            extra="可选。绑定后该用户登录仅可见本公司的合同数据（代表端强制隔离）"
+            noStyle
+            shouldUpdate={(prev, cur) => prev.role !== cur.role}
           >
-            <Select
-              placeholder="未绑定公司"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={companies.map(c => ({ value: c.id, label: c.name }))}
-              notFoundContent={
-                companies.length === 0 ? (
-                  <span style={{ fontSize: 12, color: T.textMuted }}>暂无公司，请先在「公司管理」中创建</span>
-                ) : undefined
-              }
-            />
+            {({ getFieldValue }) => {
+              const role = getFieldValue('role')
+              const isOperator = role === 'operator'
+              return (
+                <Form.Item
+                  name={isOperator ? 'company_ids' : 'company_id'}
+                  label="所属公司"
+                  extra={isOperator
+                    ? '操作端可管多家公司（多选）：绑定后仅可见/操作这些公司的数据'
+                    : '可选。绑定后该用户登录仅可见本公司的合同数据（代表端强制隔离）'}
+                >
+                  {isOperator ? (
+                    <Select
+                      mode="multiple"
+                      placeholder="选择多家公司（可多选）"
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      options={companies.map(c => ({ value: c.id, label: c.name }))}
+                      notFoundContent={
+                        companies.length === 0 ? (
+                          <span style={{ fontSize: 12, color: T.textMuted }}>暂无公司，请先在「公司管理」中创建</span>
+                        ) : undefined
+                      }
+                    />
+                  ) : (
+                    <Select
+                      placeholder="未绑定公司"
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      options={companies.map(c => ({ value: c.id, label: c.name }))}
+                      notFoundContent={
+                        companies.length === 0 ? (
+                          <span style={{ fontSize: 12, color: T.textMuted }}>暂无公司，请先在「公司管理」中创建</span>
+                        ) : undefined
+                      }
+                    />
+                  )}
+                </Form.Item>
+              )
+            }}
           </Form.Item>
         </Form>
       </Modal>

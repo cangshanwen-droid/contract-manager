@@ -324,7 +324,7 @@ export function registerAuthHandlers(): void {
   // admin 创建用户（指定角色 + 可选绑定公司 v22）
   ipcMain.handle(
     IPC_CHANNELS.AUTH_CREATE_USER,
-    (_e, username: string, password: string, role: string, companyId?: number | null, _operator?: string, _operatorRole?: string) => {
+    (_e, username: string, password: string, role: string, companyId?: number | null, _operator?: string, _operatorRole?: string, companyIds?: number[] | null) => {
       try {
         // user.manage 校验；首次使用引导（无会话且用户表为空）时放行，用于创建首个 admin
         if (getSessionUser()) {
@@ -352,9 +352,13 @@ export function registerAuthHandlers(): void {
           bindCompanyId = Number(companyId)
         }
         const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS)
+        // v24 多公司绑定：companyIds（数组）优先，否则退回单值 companyId
+        const bindCompanyIds: number[] = (Array.isArray(companyIds) && companyIds.length > 0)
+          ? companyIds.map(Number)
+          : (bindCompanyId != null ? [bindCompanyId] : [])
         getDatabase().run(
-          'INSERT INTO users (username, password, role, company_id) VALUES (?, ?, ?, ?)',
-          [username, hash, role, bindCompanyId]
+          'INSERT INTO users (username, password, role, company_id, company_ids) VALUES (?, ?, ?, ?, ?)',
+          [username, hash, role, bindCompanyId, bindCompanyIds.length ? JSON.stringify(bindCompanyIds) : null]
         )
         const newUserId = (getDatabase().exec('SELECT last_insert_rowid() as id')[0].values[0][0]) as number
         insertAuditLog({
@@ -363,7 +367,7 @@ export function registerAuthHandlers(): void {
           action: 'create_user',
           target: 'user',
           target_id: newUserId,
-          new_value: JSON.stringify({ username, role, company_id: bindCompanyId }),
+          new_value: JSON.stringify({ username, role, company_id: bindCompanyId, company_ids: bindCompanyIds }),
           result: 'success'
         })
         return { success: true }
