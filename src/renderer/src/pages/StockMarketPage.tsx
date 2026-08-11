@@ -15,10 +15,11 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
-import { Button, Spin, Result, Card, Tag, Empty, message } from 'antd'
+import { Button, Spin, Result, Card, Tag, Empty, message, Table } from 'antd'
 import {
   ArrowLeftOutlined, StockOutlined, ReloadOutlined,
   GlobalOutlined, LoadingOutlined, RiseOutlined, FallOutlined,
+  WalletOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -105,6 +106,47 @@ async function fetchMarket(): Promise<CloudStock[]> {
   }
 }
 
+// ── v1.3.1 rep 资产总览：本公司股票账户余额 + 持仓 + 总资产（整理需求 7/8）──
+export interface PortfolioData {
+  user?: { username?: string; role?: string; balance?: number }
+  summary?: { marketValue?: number; totalAssets?: number; totalPnl?: number; pnlRatio?: number }
+  positions?: { symbol: string; name: string; shares: number; avgCost: number; currentPrice: number; marketValue: number; pnl: number; pnlRatio: number }[]
+}
+
+async function fetchPortfolio(): Promise<PortfolioData | null> {
+  try {
+    // 凭据由主进程 safeStorage 加密存储（credential:get）
+    let username = 'admin'
+    let password = 'admin123'
+    const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+    const saved = r?.success ? r.credentials : null
+    if (saved?.username && saved?.password) {
+      username = saved.username
+      password = saved.password
+    }
+    // 登录 stock-api 拿 token（统一账号）
+    const loginRes = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!loginRes.ok) return null
+    const data = await loginRes.json()
+    const token = data?.token || ''
+    if (!token) return null
+    // 查本公司股票账户/持仓（rep 只读：username 与 JWT 身份一致才可查）
+    const qs = new URLSearchParams({ username })
+    const res = await fetch(`${CLOUD_ARENA_URL}portfolio?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 const StockMarketPage: React.FC = () => {
   const navigate = useNavigate()
   const auth = useAuth()
@@ -118,6 +160,9 @@ const StockMarketPage: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   // 本公司已上市股票代码集合（companies.is_listed=1 且有 stock_symbol）
   const [mySymbols, setMySymbols] = useState<Set<string>>(new Set())
+  // v1.3.1 rep 资产总览：本公司股票账户/持仓/总资产
+  const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
+  const [portfolioLoading, setPortfolioLoading] = useState(true)
 
   // operator/admin 视图状态
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -166,6 +211,18 @@ const StockMarketPage: React.FC = () => {
     loadMySymbols()
     return () => { alive = false }
   }, [role, auth?.company_id])
+
+  // ── v1.3.1 rep 资产总览：加载本公司股票账户/持仓（整理需求 7/8）──
+  useEffect(() => {
+    if (role !== 'rep') return
+    let alive = true
+    fetchPortfolio().then((p) => {
+      if (!alive) return
+      setPortfolio(p)
+      setPortfolioLoading(false)
+    })
+    return () => { alive = false }
+  }, [role])
 
   // ── operator/admin 视图：统一登录 URL ──
   useEffect(() => {
@@ -260,6 +317,75 @@ const StockMarketPage: React.FC = () => {
             </span>
           )}
         </div>
+
+        {/* v1.3.1 资产总览：本公司股票账户余额 + 持仓（整理需求 7/8） */}
+        {portfolio && (
+          <Card
+            style={{ background: T.panel, borderColor: 'rgba(212,175,55,0.18)', borderRadius: 4, marginBottom: 16, flexShrink: 0 }}
+            styles={{ body: { padding: '14px 18px' } }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <WalletOutlined style={{ color: '#D4AF37', fontSize: 16 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>我的股票账户</span>
+              <span style={{ fontSize: 11, color: T.textMuted }}>（本公司 · 只读）</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>账户余额</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#F5F7FA', fontVariantNumeric: 'tabular-nums' }}>
+                    ¥{Number(portfolio.user?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>持仓市值</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#F5F7FA', fontVariantNumeric: 'tabular-nums' }}>
+                    ¥{Number(portfolio.summary?.marketValue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>总资产</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#D4AF37', fontVariantNumeric: 'tabular-nums' }}>
+                    ¥{Number(portfolio.summary?.totalAssets ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>总盈亏</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: (portfolio.summary?.totalPnl ?? 0) >= 0 ? '#22C55E' : '#EF4444', fontVariantNumeric: 'tabular-nums' }}>
+                    {Number(portfolio.summary?.totalPnl ?? 0) >= 0 ? '+' : ''}
+                    ¥{Number(portfolio.summary?.totalPnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    <span style={{ fontSize: 11, marginLeft: 4 }}>
+                      ({Number(portfolio.summary?.pnlRatio ?? 0) >= 0 ? '+' : ''}{Number(portfolio.summary?.pnlRatio ?? 0).toFixed(2)}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {portfolio.positions && portfolio.positions.length > 0 ? (
+              <Table
+                className="gipfel-detail-table"
+                dataSource={portfolio.positions}
+                rowKey="symbol"
+                size="small"
+                pagination={false}
+                columns={[
+                  { title: '股票', dataIndex: 'name', render: (_: unknown, r: any) => (<span>{r.name} <span style={{ color: T.textMuted, fontSize: 11 }}>{r.symbol}</span></span>) },
+                  { title: '持仓数量', dataIndex: 'shares', width: 90, align: 'right' as const, render: (v: number) => v.toLocaleString() },
+                  { title: '成本价', dataIndex: 'avgCost', width: 90, align: 'right' as const, render: (v: number) => v.toFixed(2) },
+                  { title: '现价', dataIndex: 'currentPrice', width: 90, align: 'right' as const, render: (v: number) => v.toFixed(2) },
+                  { title: '市值', dataIndex: 'marketValue', width: 110, align: 'right' as const, render: (v: number) => `¥${v.toLocaleString()}` },
+                  { title: '盈亏', dataIndex: 'pnl', width: 110, align: 'right' as const, render: (v: number, r: any) => (
+                    <span style={{ color: v >= 0 ? '#22C55E' : '#EF4444' }}>
+                      {v >= 0 ? '+' : ''}¥{v.toLocaleString()} ({r.pnlRatio >= 0 ? '+' : ''}{r.pnlRatio.toFixed(2)}%)
+                    </span>
+                  ) },
+                ]}
+              />
+            ) : (
+              <div style={{ fontSize: 12, color: T.textMuted, padding: '8px 0' }}>
+                {portfolioLoading ? '加载中…' : '当前无持仓'}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* 股票卡片 */}
         <div style={{ flex: 1, overflow: 'auto' }}>
