@@ -129,7 +129,13 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
       load()
     } catch (err: any) {
       if (err?.errorFields) return
-      message.error(err?.message || '创建失败')
+      const msg = err?.message || '创建失败'
+      // v1.3.1-4 云端建号失败明确指引：本地账号无云端权限时提示改用云端账号
+      if (/401|403|权限|云端 API/.test(msg)) {
+        message.error('云端建号失败：请使用管理端云端账号（admin/admin123）登录后再创建用户')
+      } else {
+        message.error(msg)
+      }
     }
   }
 

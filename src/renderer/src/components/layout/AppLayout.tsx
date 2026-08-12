@@ -193,8 +193,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 /** 各角色可访问的菜单 key 集合（无权限点映射的菜单项兜底） */
 const ROLE_MENU_KEYS: Record<string, Set<string>> = {
-  // rep: 仪表盘 + 合同总览(只读) + 资金总览(只读) + 本公司股票(只读)
-  rep: new Set(['/dashboard', '/contracts', '/accounts', '/stocks']),
+  // rep: 仪表盘 + 合同总览(只读) + 资金总览(只读) + 公告 + 本公司股票
+  rep: new Set(['/dashboard', '/contracts', '/accounts', '/announcements', '/stocks']),
   operator: new Set([
     '/dashboard',
     '/regions', '/contracts', '/companies',
