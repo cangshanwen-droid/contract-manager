@@ -32,6 +32,24 @@ function checkLoginLimit(username: string): { allowed: boolean; remaining: numbe
 }
 
 /**
+ * 确保 users → roles 关联存在（按 users.role 匹配 roles 表 name）。
+ * 修复：云端建号/同步的用户未建 user_roles → 主路径权限查询为空 → rep 看不到股票等菜单。
+ */
+function ensureUserRoleLink(userId: number, role: string): void {
+  try {
+    const roleRow = queryOne('SELECT id FROM roles WHERE name = ?', [role])
+    if (roleRow) {
+      getDatabase().run(
+        'INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)',
+        [userId, roleRow.id]
+      )
+    }
+  } catch (err) {
+    console.error('ensureUserRoleLink failed:', err)
+  }
+}
+
+/**
  * 登录成功收尾：记录审计 + 建立主进程会话 + 返回用户对象
  */
 function finishLogin(user: {
@@ -39,6 +57,12 @@ function finishLogin(user: {
   company_id?: number | null; company_name?: string | null
 }) {
   const uid = Number(user.id)
+  // 修复：确保 user_roles 关联存在（云端同步/本地新建用户主路径权限查询依赖它）
+  try {
+    ensureUserRoleLink(uid, (user.role as string) || 'rep')
+  } catch (e) {
+    console.error('ensureUserRoleLink in finishLogin failed:', e)
+  }
   // 记录最后登录时间（系统概览活跃用户统计）
   try {
     getDatabase().run(

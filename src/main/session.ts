@@ -82,7 +82,7 @@ export function resolveUserPermissions(userId: number): string[] {
     const user = queryOne('SELECT role FROM users WHERE id = ?', [userId])
     const role = user?.role as string | undefined
     const fallback: Record<string, string[]> = {
-      rep: ['contract.view', 'account.view'],
+      rep: ['contract.view', 'account.view', 'stock.trade'],
       operator: [
         'contract.view', 'contract.create', 'contract.approve', 'contract.edit',
         'account.view', 'account.create', 'account.transact',
