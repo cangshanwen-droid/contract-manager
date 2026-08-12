@@ -195,7 +195,6 @@ const StockMarketPage: React.FC = () => {
   }, [clearTimer])
 
   useEffect(() => {
-    if (role === 'rep') return
     startTimer()
     return clearTimer
   }, [attempt, startTimer, clearTimer, role])
