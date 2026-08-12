@@ -273,7 +273,8 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
                                       return {
                                         username: args[0], password: args[1], role: args[2],
                                         org_id: (args[3] as number | null | undefined) ?? null,
-                                        company_ids: companyIds
+                                        company_ids: companyIds,
+                                        stock_adjustable: args[7] != null ? (args[7] ? 1 : 0) : 1
                                       }
                                     } },
   'auth:delete-user':             { method: 'DELETE', path: (id: unknown) => `/api/auth/users/${id}` },

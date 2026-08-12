@@ -348,7 +348,7 @@ export function registerAuthHandlers(): void {
   // admin 创建用户（指定角色 + 可选绑定公司 v22）
   ipcMain.handle(
     IPC_CHANNELS.AUTH_CREATE_USER,
-    (_e, username: string, password: string, role: string, companyId?: number | null, _operator?: string, _operatorRole?: string, companyIds?: number[] | null) => {
+    (_e, username: string, password: string, role: string, companyId?: number | null, _operator?: string, _operatorRole?: string, companyIds?: number[] | null, stockAdjustable?: number | null) => {
       try {
         // user.manage 校验；首次使用引导（无会话且用户表为空）时放行，用于创建首个 admin
         if (getSessionUser()) {

@@ -116,7 +116,9 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
       const companyId = companyIds && companyIds.length > 0
         ? companyIds[0]
         : (vals.company_id ?? null)
-      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, role, companyId, undefined, undefined, companyIds) as any
+      // v1.3.1-3 股票账户类型：1=可修改（代表）/ 0=不可修改（主席审计100万锁定）
+      const stockAdjustable = vals.stock_adjustable != null ? (vals.stock_adjustable ? 1 : 0) : 1
+      const r = await invoke(IPC_CHANNELS.AUTH_CREATE_USER, vals.username, vals.password, role, companyId, undefined, undefined, companyIds, stockAdjustable) as any
       if (!r.success) {
         message.error(r.message || '创建失败')
         return
@@ -451,6 +453,21 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
                 </Form.Item>
               )
             }}
+          </Form.Item>
+          {/* v1.3.1-3 股票账户类型：可修改=代表账户（管理端/操作端可调可用资金）/ 不可修改=主席审计账户（初始100万锁定） */}
+          <Form.Item
+            name="stock_adjustable"
+            label="股票账户类型"
+            initialValue={1}
+            extra="不可修改=主席审计账户（初始100万锁定，仅用于股票交易）；可修改=代表账户（可用资金由管理端/操作端调整）"
+          >
+            <Select
+              placeholder="选择股票账户类型"
+              options={[
+                { value: 1, label: '可修改（代表股票账户）' },
+                { value: 0, label: '不可修改（主席审计账户，初始100万）' },
+              ]}
+            />
           </Form.Item>
         </Form>
       </Modal>
