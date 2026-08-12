@@ -2,13 +2,13 @@
  * StockMarketPage - 股票交易（三端口视图）
  *
  * 三端口对应股票系统：
- *   rep（代表端）     → 只读视图：显示本公司已上市的股票行情（不可交易）
+ *   rep（代表端）     → iframe 内嵌云端完整交易工作台（与操作端一致，可买卖）
  *   operator（操作端） → iframe 内嵌云端完整交易工作台（可买卖）
  *   admin（管理端）   → iframe 内嵌云端完整版（含管理面板）
  *
  * 特性：
  *   - 顶部标题栏：返回导航 + 页面标题 + 角色标签
- *   - rep 视图：本公司上市股票卡片（代码/名称/价格/涨跌幅），实时刷新
+ *   - 全部角色统一 iframe 完整版（rep 与操作端看到完全一致的交易工作台）
  *   - operator/admin 视图：iframe 全屏内嵌，加载检测 + 失败重试
  *   - 统一登录：桌面端登录后自动获取云端 token，iframe 免登录
  */
@@ -24,7 +24,6 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { invoke } from '../api/cloudApi'
-import { usePolling } from '../hooks/usePolling'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { tokens as T } from '../styles/design-tokens'
 
@@ -38,7 +37,6 @@ const LOAD_TIMEOUT_MS = 20000
 const PAGE_HEIGHT = 'calc(100vh - 52px - 64px)'
 
 /** 行情刷新间隔（rep 只读视图，秒） */
-const QUOTE_REFRESH_MS = 30000
 
 /** 格式化为 HH:MM:SS */
 const fmtHHMMSS = (d: Date): string => {
@@ -87,132 +85,13 @@ interface CloudStock {
   sector: string
 }
 
-/** 行情请求超时（P0-2 修复）：断网时 10s 内中止，避免轮询悬挂 */
-const MARKET_TIMEOUT_MS = 10000
-
-/** 获取云端全部股票行情 */
-async function fetchMarket(): Promise<CloudStock[]> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), MARKET_TIMEOUT_MS)
-  try {
-    const res = await fetch(`${CLOUD_ARENA_URL}market`, { cache: 'no-store', signal: controller.signal })
-    if (!res.ok) throw new Error('行情获取失败')
-    return res.json()
-  } catch (err: any) {
-    if (err?.name === 'AbortError') throw new Error('行情请求超时，请检查网络连接')
-    throw err
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-// ── v1.3.1 rep 资产总览：本公司股票账户余额 + 持仓 + 总资产（整理需求 7/8）──
-export interface PortfolioData {
-  user?: { username?: string; role?: string; balance?: number }
-  summary?: { marketValue?: number; totalAssets?: number; totalPnl?: number; pnlRatio?: number }
-  positions?: { symbol: string; name: string; shares: number; avgCost: number; currentPrice: number; marketValue: number; pnl: number; pnlRatio: number }[]
-}
-
-async function fetchPortfolio(): Promise<PortfolioData | null> {
-  try {
-    // 凭据由主进程 safeStorage 加密存储（credential:get）
-    let username = 'admin'
-    let password = 'admin123'
-    const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
-    const saved = r?.success ? r.credentials : null
-    if (saved?.username && saved?.password) {
-      username = saved.username
-      password = saved.password
-    }
-    // 登录 stock-api 拿 token（统一账号）
-    const loginRes = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-    if (!loginRes.ok) return null
-    const data = await loginRes.json()
-    const token = data?.token || ''
-    if (!token) return null
-    // 查本公司股票账户/持仓（rep 只读：username 与 JWT 身份一致才可查）
-    const qs = new URLSearchParams({ username })
-    const res = await fetch(`${CLOUD_ARENA_URL}portfolio?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
-  }
-}
 
 const StockMarketPage: React.FC = () => {
   const navigate = useNavigate()
   const auth = useAuth()
   const role = auth?.role || 'rep'
 
-  // rep 视图状态
-  const [myStocks, setMyStocks] = useState<CloudStock[]>([])
-  const [repLoading, setRepLoading] = useState(true)
-  const [repError, setRepError] = useState('')
-  // 最近一次行情刷新成功的时间（30s 轮询时更新）
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  // 本公司已上市股票代码集合（companies.is_listed=1 且有 stock_symbol）
-  const [mySymbols, setMySymbols] = useState<Set<string>>(new Set())
-  // v1.3.1 rep 资产总览：本公司股票账户/持仓/总资产
-  const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
-  const [portfolioLoading, setPortfolioLoading] = useState(true)
-  // v1.3.1-2 rep 交易：数量 + 进行中状态
-  const [tradeQty, setTradeQty] = useState<Record<string, number>>({})
-  const [trading, setTrading] = useState<Record<string, 'buy' | 'sell'>>({})
 
-  // v1.3.1-2 rep 自行买卖（调云端 /orders，JWT 身份与 username 一致）
-  const doRepTrade = useCallback(async (s: CloudStock, side: 'buy' | 'sell') => {
-    const qty = tradeQty[s.symbol] || 1
-    setTrading(t => ({ ...t, [s.symbol]: side }))
-    try {
-      let username = 'admin'
-      let password = 'admin123'
-      const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
-      const saved = r?.success ? r.credentials : null
-      if (saved?.username && saved?.password) {
-        username = saved.username
-        password = saved.password
-      }
-      const loginRes = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
-      if (!loginRes.ok) throw new Error('登录失败，请重新登录')
-      const data = await loginRes.json()
-      const token = data?.token || ''
-      if (!token) throw new Error('登录失败，请重新登录')
-      const idem = `rep-${side}-${s.symbol}-${Date.now()}`
-      const res = await fetch(`${CLOUD_ARENA_URL}orders`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: s.symbol, side, quantity: qty, price: s.current_price,
-          username, idempotency_key: idem,
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(body?.detail || (side === 'buy' ? '买入失败' : '卖出失败'))
-      }
-      message.success(`${side === 'buy' ? '买入' : '卖出'}成功：${s.name} ${qty} 股`)
-      setTradeQty(q => ({ ...q, [s.symbol]: 1 }))
-      // 刷新资产卡
-      const pf = await fetchPortfolio()
-      if (pf) setPortfolio(pf)
-    } catch (e: any) {
-      message.error(e?.message || '交易失败')
-    } finally {
-      setTrading(t => ({ ...t, [s.symbol]: undefined }))
-    }
-  }, [tradeQty])
 
   // operator/admin 视图状态
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -287,63 +166,11 @@ const StockMarketPage: React.FC = () => {
     }
   }, [adjustUser, adjustAmount, adjustReason])
 
-  // ── rep 视图：市场行情（v1.3.1-2 可自行买卖）──
-  const loadRepStocks = useCallback(async (): Promise<boolean> => {
-    setRepLoading(true)
-    setRepError('')
-    try {
-      // 云端全部行情
-      const market = await fetchMarket()
-      setMyStocks(market)
-      setLastUpdated(new Date())
-      return true
-    } catch (e: any) {
-      setRepError(e?.message || '加载失败')
-      return false
-    } finally {
-      setRepLoading(false)
-    }
-  }, [])
 
-  // P0-2 修复：30s 轮询行情 — in-flight 守卫 + 失败指数退避（30s→60s→5m，恢复后重置）
-  usePolling(loadRepStocks, QUOTE_REFRESH_MS, { enabled: role === 'rep' })
 
-  // 本公司已上市股票：本地 companies 表按登录用户所属公司过滤（is_listed=1 且有 stock_symbol）
-  useEffect(() => {
-    if (role !== 'rep') return
-    let alive = true
-    const loadMySymbols = async () => {
-      try {
-        const res = await invoke(IPC_CHANNELS.COMPANY_LIST) as any
-        const list = Array.isArray(res) ? res : (res?.data || [])
-        const syms = new Set<string>()
-        for (const c of list) {
-          // 用户绑定公司后仅高亮本公司股票；未绑定（如历史账号）退化为全部已上市
-          const isMyCompany = auth?.company_id == null || Number(c.id) === Number(auth.company_id)
-          if (isMyCompany && c.is_listed && c.stock_symbol) syms.add(String(c.stock_symbol).toUpperCase())
-        }
-        if (alive) setMySymbols(syms)
-      } catch { /* 本地公司数据不可用时不高亮 */ }
-    }
-    loadMySymbols()
-    return () => { alive = false }
-  }, [role, auth?.company_id])
-
-  // ── v1.3.1 rep 资产总览：加载本公司股票账户/持仓（整理需求 7/8）──
-  useEffect(() => {
-    if (role !== 'rep') return
-    let alive = true
-    fetchPortfolio().then((p) => {
-      if (!alive) return
-      setPortfolio(p)
-      setPortfolioLoading(false)
-    })
-    return () => { alive = false }
-  }, [role])
 
   // ── operator/admin 视图：统一登录 URL ──
   useEffect(() => {
-    if (role === 'rep') return
     let alive = true
     fetchArenaUrl().then(({ url, usingDefault }) => {
       if (!alive) return
@@ -386,237 +213,6 @@ const StockMarketPage: React.FC = () => {
   const roleLabel = role === 'admin' ? '管理端' : role === 'operator' ? '操作端' : '代表端'
   const roleColor = role === 'admin' ? 'gold' : role === 'operator' ? 'blue' : 'green'
 
-  // ── rep 只读视图渲染 ──
-  if (role === 'rep') {
-    return (
-      <div className="page-fade-in" style={{ display: 'flex', flexDirection: 'column', height: PAGE_HEIGHT }}>
-        {/* 顶部标题栏 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexShrink: 0 }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/dashboard')}
-            style={{ background: T.panel, borderColor: T.border, color: T.textPrimary }}
-          >返回</Button>
-          <StockOutlined style={{ color: '#D4AF37', fontSize: 18 }} />
-          <span style={{ fontSize: 18, fontWeight: 600, color: T.textPrimary, letterSpacing: '-0.01em' }}>
-            股票市场
-          </span>
-          <Tag color={roleColor} style={{ marginLeft: 4 }}>{roleLabel} · 只读行情</Tag>
-          <div style={{ marginLeft: 'auto' }}>
-            <Button
-              icon={<GlobalOutlined />}
-              onClick={() => window.open(`${CLOUD_ARENA_URL}market`, '_blank')}
-              style={{ background: T.panel, borderColor: T.border, color: T.textSecondary }}
-            >查看行情</Button>
-          </div>
-        </div>
-
-        {/* 说明条 */}
-        <div style={{
-          padding: '8px 14px', borderRadius: 4, marginBottom: 16,
-          background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.12)',
-          color: T.textSecondary, fontSize: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-        }}>
-          <span>代表端视图 - 查看全部股票市场行情（只读），如需买卖交易请联系操作端。</span>
-          {mySymbols.size > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: 2, display: 'inline-block',
-                background: 'rgba(212,175,55,0.25)', border: '1px solid #D4AF37',
-              }} />
-              <span style={{ color: '#D4AF37' }}>金色边框为本公司股票（{mySymbols.size} 只）</span>
-            </span>
-          )}
-          {lastUpdated && (
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: T.textMuted, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-              更新于 {fmtHHMMSS(lastUpdated)} · 每 30 秒自动刷新
-            </span>
-          )}
-        </div>
-
-        {/* v1.3.1 资产总览：本公司股票账户余额 + 持仓（整理需求 7/8） */}
-        {portfolio && (
-          <Card
-            style={{ background: T.panel, borderColor: 'rgba(212,175,55,0.18)', borderRadius: 4, marginBottom: 16, flexShrink: 0 }}
-            styles={{ body: { padding: '14px 18px' } }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <WalletOutlined style={{ color: '#D4AF37', fontSize: 16 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>我的股票账户</span>
-              <span style={{ fontSize: 11, color: T.textMuted }}>（本公司 · 只读）</span>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 24 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: T.textMuted }}>账户余额</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#F5F7FA', fontVariantNumeric: 'tabular-nums' }}>
-                    ¥{Number(portfolio.user?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: T.textMuted }}>持仓市值</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#F5F7FA', fontVariantNumeric: 'tabular-nums' }}>
-                    ¥{Number(portfolio.summary?.marketValue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: T.textMuted }}>总资产</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#D4AF37', fontVariantNumeric: 'tabular-nums' }}>
-                    ¥{Number(portfolio.summary?.totalAssets ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: T.textMuted }}>总盈亏</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: (portfolio.summary?.totalPnl ?? 0) >= 0 ? '#22C55E' : '#EF4444', fontVariantNumeric: 'tabular-nums' }}>
-                    {Number(portfolio.summary?.totalPnl ?? 0) >= 0 ? '+' : ''}
-                    ¥{Number(portfolio.summary?.totalPnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    <span style={{ fontSize: 11, marginLeft: 4 }}>
-                      ({Number(portfolio.summary?.pnlRatio ?? 0) >= 0 ? '+' : ''}{Number(portfolio.summary?.pnlRatio ?? 0).toFixed(2)}%)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {portfolio.positions && portfolio.positions.length > 0 ? (
-              <Table
-                className="gipfel-detail-table"
-                dataSource={portfolio.positions}
-                rowKey="symbol"
-                size="small"
-                pagination={false}
-                columns={[
-                  { title: '股票', dataIndex: 'name', render: (_: unknown, r: any) => (<span>{r.name} <span style={{ color: T.textMuted, fontSize: 11 }}>{r.symbol}</span></span>) },
-                  { title: '持仓数量', dataIndex: 'shares', width: 90, align: 'right' as const, render: (v: number) => v.toLocaleString() },
-                  { title: '成本价', dataIndex: 'avgCost', width: 90, align: 'right' as const, render: (v: number) => v.toFixed(2) },
-                  { title: '现价', dataIndex: 'currentPrice', width: 90, align: 'right' as const, render: (v: number) => v.toFixed(2) },
-                  { title: '市值', dataIndex: 'marketValue', width: 110, align: 'right' as const, render: (v: number) => `¥${v.toLocaleString()}` },
-                  { title: '盈亏', dataIndex: 'pnl', width: 110, align: 'right' as const, render: (v: number, r: any) => (
-                    <span style={{ color: v >= 0 ? '#22C55E' : '#EF4444' }}>
-                      {v >= 0 ? '+' : ''}¥{v.toLocaleString()} ({r.pnlRatio >= 0 ? '+' : ''}{r.pnlRatio.toFixed(2)}%)
-                    </span>
-                  ) },
-                ]}
-              />
-            ) : (
-              <div style={{ fontSize: 12, color: T.textMuted, padding: '8px 0' }}>
-                {portfolioLoading ? '加载中…' : '当前无持仓'}
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* 股票卡片 */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          {repLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-              <Spin indicator={<LoadingOutlined spin style={{ fontSize: 28, color: '#D4AF37' }} />} />
-            </div>
-          ) : repError ? (
-            <Result
-              status="warning"
-              title={<span style={{ color: T.textPrimary }}>行情加载失败</span>}
-              subTitle={<span style={{ color: T.textMuted, fontSize: 12 }}>{repError}</span>}
-              extra={<Button type="primary" icon={<ReloadOutlined />} onClick={() => setAttempt(n => n + 1)}>重试</Button>}
-            />
-          ) : myStocks.length === 0 ? (
-            <Card style={{ background: T.panel, borderColor: T.border, borderRadius: 4 }}>
-              <Empty
-                description={
-                  <div>
-                    <div style={{ color: T.textPrimary, fontSize: 14, fontWeight: 500 }}>暂无市场行情</div>
-                    <div style={{ color: T.textMuted, fontSize: 12, marginTop: 4 }}>
-                      云端股票市场暂无可展示的股票
-                    </div>
-                  </div>
-                }
-              />
-            </Card>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {myStocks.map(s => {
-                const up = s.change_pct >= 0
-                const isMine = mySymbols.has(s.symbol.toUpperCase())
-                return (
-                  <Card
-                    key={s.symbol}
-                    style={{
-                      background: T.panel,
-                      borderColor: isMine ? 'rgba(212,175,55,0.55)' : T.border,
-                      border: isMine ? '1px solid rgba(212,175,55,0.55)' : undefined,
-                      borderRadius: 4,
-                      boxShadow: isMine ? '0 0 0 1px rgba(212,175,55,0.18), 0 2px 10px rgba(212,175,55,0.06)' : undefined,
-                    }}
-                    styles={{ body: { padding: '16px 18px' } }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: T.textPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {s.name}
-                          {isMine && (
-                            <Tag color="gold" style={{ margin: 0, fontSize: 11, lineHeight: '16px', flexShrink: 0 }}>
-                              本公司
-                            </Tag>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2, letterSpacing: '0.04em' }}>{s.symbol}</div>
-                      </div>
-                      <Tag color="gold" style={{ fontSize: 11 }}>{s.sector}</Tag>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 14 }}>
-                      <span style={{ fontSize: 24, fontWeight: 700, color: '#F5F7FA', fontVariantNumeric: 'tabular-nums' }}>
-                        {s.current_price.toFixed(2)}
-                      </span>
-                      <span style={{ fontSize: 11, color: T.textMuted }}>元</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                      {up
-                        ? <RiseOutlined style={{ color: '#22C55E', fontSize: 13 }} />
-                        : <FallOutlined style={{ color: '#EF4444', fontSize: 13 }} />}
-                      <span style={{
-                        fontSize: 13, fontWeight: 600,
-                        color: up ? '#22C55E' : '#EF4444',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}>
-                        {up ? '+' : ''}{s.change_pct.toFixed(2)}%
-                      </span>
-                      <span style={{ fontSize: 11, color: T.textMuted }}>
-                        昨收 {s.prev_price.toFixed(2)}
-                      </span>
-                    </div>
-                    {/* v1.3.1-2：rep 可自行买卖（代表端交易区） */}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                      <InputNumber
-                        size="small"
-                        min={1}
-                        max={100000}
-                        value={tradeQty[s.symbol] || 1}
-                        onChange={(v) => setTradeQty(q => ({ ...q, [s.symbol]: v || 1 }))}
-                        style={{ width: 90, background: T.bgCard, borderColor: T.border, color: T.textPrimary }}
-                        addonAfter={<span style={{ fontSize: 10, color: T.textMuted }}>股</span>}
-                      />
-                      <Button
-                        size="small"
-                        type="primary"
-                        loading={trading[s.symbol] === 'buy'}
-                        onClick={() => doRepTrade(s, 'buy')}
-                        style={{ background: '#22C55E', borderColor: '#22C55E', fontSize: 12 }}
-                      >买入</Button>
-                      <Button
-                        size="small"
-                        loading={trading[s.symbol] === 'sell'}
-                        onClick={() => doRepTrade(s, 'sell')}
-                        style={{ background: T.panel, borderColor: '#EF4444', color: '#EF4444', fontSize: 12 }}
-                      >卖出</Button>
-                    </div>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // ── operator / admin 视图：iframe 完整版 ──
   return (
     <div className="page-fade-in" style={{ display: 'flex', flexDirection: 'column', height: PAGE_HEIGHT }}>
@@ -635,13 +231,14 @@ const StockMarketPage: React.FC = () => {
         <span style={{ fontSize: 12, color: T.textMuted }}>
           {role === 'admin' ? '完整版 · 含管理面板' : '完整交易工作台 · Gipfel Trading Arena'}
         </span>
-
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <Button
-            icon={<WalletOutlined />}
-            onClick={() => openAdjust()}
-            style={{ background: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.5)', color: '#D4AF37' }}
-          >调整可用资金</Button>
+          {role !== 'rep' && (
+            <Button
+              icon={<WalletOutlined />}
+              onClick={() => openAdjust()}
+              style={{ background: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.5)', color: '#D4AF37' }}
+            >调整可用资金</Button>
+          )}
           <Button
             icon={<GlobalOutlined />}
             onClick={() => window.open(CLOUD_ARENA_URL, '_blank')}
