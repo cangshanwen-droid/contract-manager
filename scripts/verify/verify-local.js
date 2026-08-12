@@ -4,7 +4,7 @@
  *
  * 直接加载仓库真实的 migrations.ts / seed.ts（经 TypeScript 转译，SQL 与生产一致），
  * 在内存数据库中验证：
- *   1. 迁移 v1–v25 全部可执行（全新库）
+ *   1. 迁移 v1–v26 全部可执行（全新库）
  *   2. 迁移幂等（同库重跑 / 已有 DB 文件重开，均不重复应用）
  *   3. seed 数据正确（admin 用户存在、区域/合同类型/基建类型齐全）
  *   4. bcrypt 密码验证（admin/admin123 可通过，错误密码拒绝）
@@ -128,11 +128,11 @@ async function main() {
   const db = new SQL.Database()
 
   // 1. 迁移可执行（全新库）
-  test('迁移 v1–v25 全部可执行（全新库）', () => {
+  test('迁移 v1–v26 全部可执行（全新库）', () => {
     runMigrations(db)
     const versions = schemaVersions(db)
-    assertEq(versions.length, 25, 'schema_migrations 应恰好 25 条')
-    const expected = Array.from({ length: 25 }, (_, i) => i + 1)
+    assertEq(versions.length, 26, 'schema_migrations 应恰好 26 条')
+    const expected = Array.from({ length: 26 }, (_, i) => i + 1)
     assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..25')
   })
 

@@ -305,7 +305,7 @@ export class ContractRepository {
         db.run('DELETE FROM contract_items WHERE contract_id = ?', [id])
         if (mergedItems.length > 0) {
           const stmt = db.prepare(
-            `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, total_cost, expected_income, investment_type, equity_ratio, expected_return_rate, investment_period, sort_order)
+            `INSERT INTO contract_items (contract_id, item_name, quantity, unit_price, land_area, tax_rate, skill_level, carbon_factor, total_cost, expected_income, investment_type, equity_ratio, shares, price, sort_order)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
           for (const [idx, item] of mergedItems.entries()) {
@@ -322,8 +322,8 @@ export class ContractRepository {
               item.expected_income ?? 0,
               item.investment_type ?? null,
               item.equity_ratio ?? null,
-              item.expected_return_rate ?? null,
-              item.investment_period ?? null,
+              item.shares ?? null,
+              item.price ?? null,
               idx
             ])
             stmt.step()

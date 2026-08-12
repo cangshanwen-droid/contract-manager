@@ -204,8 +204,8 @@ const ContractListPage: React.FC = () => {
           // v1.3.1 金融化投资字段（审核 P0：缺传会被云端重建清空）
           investment_type: it.investment_type,
           equity_ratio: it.equity_ratio,
-          expected_return_rate: it.expected_return_rate,
-          investment_period: it.investment_period,
+          shares: it.shares,
+          price: it.price,
           total_cost: it.total_cost,
           expected_income: it.expected_income
         })),
@@ -373,10 +373,10 @@ const ContractListPage: React.FC = () => {
   }
 
   const addItem = () => {
-    // v1.3.1 金融化：所有合同类型统一投资项目模板（投资金额/类型/占股/收益率/期限）
+    // v1.3.1 金融化：所有合同类型统一投资项目模板（投资金额/类型/占股/股数/股价）
     setItems([...items, {
       item_name: '', investment_type: '项目投资',
-      equity_ratio: 0, expected_return_rate: 0, investment_period: '',
+      equity_ratio: 0, shares: 0, price: 0,
       total_cost: 0, expected_income: 0
     }])
   }
@@ -437,11 +437,18 @@ const ContractListPage: React.FC = () => {
         <span style={{ fontSize: 12 }}>¥{Number(v).toLocaleString()}</span>
       ) : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
     },
-    // v1.3.1 金融化：收益率列（取首条投资明细）
-    { title: '收益率', width: 80, align: 'right' as const,
+    // v1.3.1-2 金融化：股数/股价列（取首条投资明细）
+    { title: '股数', width: 70, align: 'right' as const,
       render: (_: unknown, r: any) => {
-        const rate = (r.items && r.items[0]?.expected_return_rate) || 0
-        return rate ? <span style={{ fontSize: 12, color: T.gold }}>{Number(rate)}%</span>
+        const s = (r.items && r.items[0]?.shares) || 0
+        return s ? <span style={{ fontSize: 12, color: T.gold, fontFamily: 'JetBrains Mono, monospace' }}>{Number(s)}</span>
+          : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
+      }
+    },
+    { title: '股价', width: 80, align: 'right' as const,
+      render: (_: unknown, r: any) => {
+        const p2 = (r.items && r.items[0]?.price) || 0
+        return p2 ? <span style={{ fontSize: 12, color: T.gold, fontFamily: 'JetBrains Mono, monospace' }}>¥{Number(p2)}</span>
           : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
       }
     },
@@ -526,19 +533,18 @@ const ContractListPage: React.FC = () => {
           { value: '其他', label: '其他' },
         ] },
       { label: '占股比例(%)', span: 5, field: 'equity_ratio', type: 'num', placeholder: '如：20' },
-      { label: '预期收益率(%)', span: 5, field: 'expected_return_rate', type: 'num', placeholder: '如：8' },
-      { label: '预期收益(元)', span: 5, field: 'expected_income', type: 'num', placeholder: '如：400000' },
-      { label: '投资期限', span: 5, field: 'investment_period', type: 'text', placeholder: '如：3年' },
+      { label: '股数', span: 5, field: 'shares', type: 'num', placeholder: '如：10000' },
+      { label: '股价(元/股)', span: 5, field: 'price', type: 'num', placeholder: '如：50' },
     ]
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
-      1: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      2: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      3: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      4: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      5: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      6: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      7: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
-      8: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例与预期收益率', fields: INVESTMENT_FIELDS },
+      1: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      2: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      3: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      4: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      5: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      6: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      7: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      8: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
     }
     const config = FIELD_SETS[contractTypeId || 1]
     const addLabel = config.title.replace('项', '').replace('岗位', '')
@@ -925,9 +931,10 @@ const ContractListPage: React.FC = () => {
                             { title: '投资金额', dataIndex: 'total_cost', width: 110, render: (v: any) => (v ? formatMoneyCNY(v) : '-') },
                             { title: '投资类型', dataIndex: 'investment_type', width: 90, render: (v: any) => (v ? <Tag>{v}</Tag> : '-') },
                             { title: '占股比例', dataIndex: 'equity_ratio', width: 80, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') },
-                            { title: '预期收益率', dataIndex: 'expected_return_rate', width: 90, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') },
+                            { title: '股数', dataIndex: 'shares', width: 70, render: (v: any) => (v ? formatNumber(v) : '-') },
+                            { title: '股价(元/股)', dataIndex: 'price', width: 90, render: (v: any) => (v ? `¥${formatNumber(v)}` : '-') },
                             { title: '预期收益', dataIndex: 'expected_income', width: 110, render: (v: any) => (v ? formatMoneyCNY(v) : '-') },
-                            { title: '投资期限', dataIndex: 'investment_period', width: 90, render: (v: any) => v || '-' }
+                            { title: '占股比例', dataIndex: 'equity_ratio', width: 80, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') }
                           ]}
                         />
                       </>

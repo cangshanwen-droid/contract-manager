@@ -497,6 +497,18 @@ ALTER TABLE contract_items ADD COLUMN expected_return_rate REAL DEFAULT 0;
 ALTER TABLE contract_items ADD COLUMN investment_period TEXT DEFAULT '';
     `
   },
+  {
+    version: 26,
+    name: 'investment_shares_price',
+    sql: `
+-- ═══════════════════════════════════════════════════════════════
+-- v26 用户拍板：投资项目字段 股数/股价 替换 预期收益率/预期收益/投资期限。
+-- contract_items 加：shares(股数) / price(股价)（旧列保留但弃用）
+-- ═══════════════════════════════════════════════════════════════
+ALTER TABLE contract_items ADD COLUMN shares INTEGER DEFAULT 0;
+ALTER TABLE contract_items ADD COLUMN price REAL DEFAULT 0;
+    `
+  },
 ]
 
 export function runMigrations(): void {

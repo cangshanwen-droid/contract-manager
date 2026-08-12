@@ -80,8 +80,9 @@ export interface ContractItem {
   // ── v1.3.1 金融化投资项目字段 ──
   investment_type?: string        // 股权投资/债权投资/基金投资/项目投资/其他
   equity_ratio?: number           // 占股比例（%）
-  expected_return_rate?: number   // 预期收益率（%）
-  investment_period?: string      // 投资期限
+  // v1.3.1-2 用户拍板：股数/股价 替换 预期收益率/预期收益/投资期限
+  shares?: number                 // 股数
+  price?: number                  // 股价（每股）
 }
 
 export interface ContractWithItems extends Contract {

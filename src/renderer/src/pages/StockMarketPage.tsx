@@ -15,7 +15,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
-import { Button, Spin, Result, Card, Tag, Empty, message, Table } from 'antd'
+import { Button, Spin, Result, Card, Tag, Empty, message, Table, InputNumber, Modal, Select, Input } from 'antd'
 import {
   ArrowLeftOutlined, StockOutlined, ReloadOutlined,
   GlobalOutlined, LoadingOutlined, RiseOutlined, FallOutlined,
@@ -163,6 +163,56 @@ const StockMarketPage: React.FC = () => {
   // v1.3.1 rep 资产总览：本公司股票账户/持仓/总资产
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
   const [portfolioLoading, setPortfolioLoading] = useState(true)
+  // v1.3.1-2 rep 交易：数量 + 进行中状态
+  const [tradeQty, setTradeQty] = useState<Record<string, number>>({})
+  const [trading, setTrading] = useState<Record<string, 'buy' | 'sell'>>({})
+
+  // v1.3.1-2 rep 自行买卖（调云端 /orders，JWT 身份与 username 一致）
+  const doRepTrade = useCallback(async (s: CloudStock, side: 'buy' | 'sell') => {
+    const qty = tradeQty[s.symbol] || 1
+    setTrading(t => ({ ...t, [s.symbol]: side }))
+    try {
+      let username = 'admin'
+      let password = 'admin123'
+      const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+      const saved = r?.success ? r.credentials : null
+      if (saved?.username && saved?.password) {
+        username = saved.username
+        password = saved.password
+      }
+      const loginRes = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      if (!loginRes.ok) throw new Error('登录失败，请重新登录')
+      const data = await loginRes.json()
+      const token = data?.token || ''
+      if (!token) throw new Error('登录失败，请重新登录')
+      const idem = `rep-${side}-${s.symbol}-${Date.now()}`
+      const res = await fetch(`${CLOUD_ARENA_URL}orders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: s.symbol, side, quantity: qty, price: s.current_price,
+          username, idempotency_key: idem,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body?.detail || (side === 'buy' ? '买入失败' : '卖出失败'))
+      }
+      message.success(`${side === 'buy' ? '买入' : '卖出'}成功：${s.name} ${qty} 股`)
+      setTradeQty(q => ({ ...q, [s.symbol]: 1 }))
+      // 刷新资产卡
+      const pf = await fetchPortfolio()
+      if (pf) setPortfolio(pf)
+    } catch (e: any) {
+      message.error(e?.message || '交易失败')
+    } finally {
+      setTrading(t => ({ ...t, [s.symbol]: undefined }))
+    }
+  }, [tradeQty])
 
   // operator/admin 视图状态
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -170,7 +220,74 @@ const StockMarketPage: React.FC = () => {
   const [arenaSrc, setArenaSrc] = useState<string>(CLOUD_ARENA_URL)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ── rep 只读视图：整个市场行情（只读，不可交易）──
+  // v1.3.1-2 调整可用资金（仅 operator/admin 可见入口）
+  const [adjustOpen, setAdjustOpen] = useState(false)
+  const [adjustUsers, setAdjustUsers] = useState<{ id: number; username: string; role: string }[]>([])
+  const [adjustUser, setAdjustUser] = useState('')
+  const [adjustAmount, setAdjustAmount] = useState(0)
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false)
+  const [adjustReason, setAdjustReason] = useState('')
+
+  const openAdjust = useCallback(async () => {
+    setAdjustOpen(true)
+    try {
+      const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
+      const list = (r?.users || r || []) as { id: number; username: string; role: string }[]
+      setAdjustUsers(list)
+      if (list.length > 0 && !list.find(u => u.username === adjustUser)) {
+        setAdjustUser(list[0].username)
+      }
+    } catch {
+      setAdjustUsers([])
+    }
+  }, [adjustUser])
+
+  // v1.3.1-2 主席/管理员调整可用资金（云端 /adjust-balance，rep 403）
+  const submitAdjust = useCallback(async () => {
+    if (!adjustUser) { message.warning('请选择用户'); return }
+    if (!adjustAmount || adjustAmount === 0) { message.warning('请输入调整金额（正数=注入，负数=扣减）'); return }
+    setAdjustSubmitting(true)
+    try {
+      let username = 'admin'
+      let password = 'admin123'
+      const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+      const saved = r?.success ? r.credentials : null
+      if (saved?.username && saved?.password) {
+        username = saved.username
+        password = saved.password
+      }
+      const loginRes = await fetch(`${CLOUD_ARENA_URL}auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      if (!loginRes.ok) throw new Error('登录失败，请重新登录')
+      const data = await loginRes.json()
+      const token = data?.token || ''
+      if (!token) throw new Error('登录失败，请重新登录')
+      const idem = `adj-${adjustUser}-${Date.now()}`
+      const res = await fetch(`${CLOUD_ARENA_URL}adjust-balance`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: adjustUser, amount: adjustAmount,
+          reason: adjustReason || '主席调整', idempotency_key: idem,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.detail || '调整失败')
+      message.success(`已调整 ${adjustUser} 可用资金 ${adjustAmount > 0 ? '+' : ''}¥${adjustAmount}，当前余额 ¥${body?.balance ?? '-'}`)
+      setAdjustOpen(false)
+      setAdjustAmount(0)
+      setAdjustReason('')
+    } catch (e: any) {
+      message.error(e?.message || '调整失败')
+    } finally {
+      setAdjustSubmitting(false)
+    }
+  }, [adjustUser, adjustAmount, adjustReason])
+
+  // ── rep 视图：市场行情（v1.3.1-2 可自行买卖）──
   const loadRepStocks = useCallback(async (): Promise<boolean> => {
     setRepLoading(true)
     setRepError('')
@@ -465,6 +582,31 @@ const StockMarketPage: React.FC = () => {
                         昨收 {s.prev_price.toFixed(2)}
                       </span>
                     </div>
+                    {/* v1.3.1-2：rep 可自行买卖（代表端交易区） */}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                      <InputNumber
+                        size="small"
+                        min={1}
+                        max={100000}
+                        value={tradeQty[s.symbol] || 1}
+                        onChange={(v) => setTradeQty(q => ({ ...q, [s.symbol]: v || 1 }))}
+                        style={{ width: 90, background: T.bgCard, borderColor: T.border, color: T.textPrimary }}
+                        addonAfter={<span style={{ fontSize: 10, color: T.textMuted }}>股</span>}
+                      />
+                      <Button
+                        size="small"
+                        type="primary"
+                        loading={trading[s.symbol] === 'buy'}
+                        onClick={() => doRepTrade(s, 'buy')}
+                        style={{ background: '#22C55E', borderColor: '#22C55E', fontSize: 12 }}
+                      >买入</Button>
+                      <Button
+                        size="small"
+                        loading={trading[s.symbol] === 'sell'}
+                        onClick={() => doRepTrade(s, 'sell')}
+                        style={{ background: T.panel, borderColor: '#EF4444', color: '#EF4444', fontSize: 12 }}
+                      >卖出</Button>
+                    </div>
                   </Card>
                 )
               })}
@@ -494,7 +636,12 @@ const StockMarketPage: React.FC = () => {
           {role === 'admin' ? '完整版 · 含管理面板' : '完整交易工作台 · Gipfel Trading Arena'}
         </span>
 
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <Button
+            icon={<WalletOutlined />}
+            onClick={() => openAdjust()}
+            style={{ background: 'rgba(212,175,55,0.12)', borderColor: 'rgba(212,175,55,0.5)', color: '#D4AF37' }}
+          >调整可用资金</Button>
           <Button
             icon={<GlobalOutlined />}
             onClick={() => window.open(CLOUD_ARENA_URL, '_blank')}
@@ -539,6 +686,51 @@ const StockMarketPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* v1.3.1-2 调整可用资金弹窗（主席/管理员） */}
+      <Modal
+        title="调整可用资金"
+        open={adjustOpen}
+        onCancel={() => setAdjustOpen(false)}
+        onOk={submitAdjust}
+        okText="确认调整"
+        confirmLoading={adjustSubmitting}
+        destroyOnClose
+      >
+        <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 12 }}>
+          调整用户（代表/主席）的股票可用资金：正数=注入，负数=扣减（扣减后余额不能为负）。代表不可自行调整。
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 4 }}>选择用户</div>
+            <Select
+              style={{ width: '100%' }}
+              value={adjustUser || undefined}
+              placeholder="选择要调整的用户"
+              onChange={(v) => setAdjustUser(v)}
+              options={adjustUsers.map(u => ({ value: u.username, label: `${u.username}（${u.role === 'admin' ? '管理端' : u.role === 'operator' ? '操作端' : '代表端'}）` }))}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 4 }}>调整金额（元）</div>
+            <InputNumber
+              style={{ width: '100%' }}
+              value={adjustAmount}
+              onChange={(v) => setAdjustAmount(Number(v) || 0)}
+              placeholder="正数注入 / 负数扣减"
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 4 }}>调整原因（可选）</div>
+            <Input
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              placeholder="如：追加投资资金"
+              maxLength={100}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

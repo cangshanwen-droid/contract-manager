@@ -103,14 +103,14 @@ describe('B. validateContractStatusTransition', () => {
   })
 })
 
-describe('C. 迁移 v20~v25', () => {
+describe('C. 迁移 v20~v26', () => {
   beforeEach(async () => { await setupBase() })
 
   it('C1 全新库：全部 25 个迁移执行成功，生成列口径正确', async () => {
     const db = getDatabase()
     const rows = db.exec('SELECT version FROM schema_migrations ORDER BY version')[0].values
-    expect(rows.length).toBe(25)
-    expect(rows[24][0]).toBe(25)
+    expect(rows.length).toBe(26)
+    expect(rows[25][0]).toBe(26)
     // 新口径：tax_rate=13 → tax_amount=26, total=226
     const c = repo.create({
       contract_name: '税率合同', contract_type_id: 7, region_id: 1, created_by: 'op',
@@ -126,7 +126,7 @@ describe('C. 迁移 v20~v25', () => {
     const db = getDatabase()
     expect(() => runMigrations()).not.toThrow()
     const rows = db.exec('SELECT count(*) FROM schema_migrations')[0].values[0][0]
-    expect(rows).toBe(25)
+    expect(rows).toBe(26)
   })
 
   it('C3 模拟用户升级：v19 旧表（税率当小数用）→ 重跑迁移 → v20 重建、数据保留、口径修正', () => {
