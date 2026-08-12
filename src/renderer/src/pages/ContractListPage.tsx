@@ -378,7 +378,7 @@ const ContractListPage: React.FC = () => {
     // v1.3.1-3 类型化：默认投资类型按合同类型区分（投资=项目投资 / 拨款=项目拨款）
     const defaultType = (contractTypeId === 6) ? '项目拨款' : '项目投资'
     setItems([...items, {
-      item_name: '', quantity: 0, unit_price: 0, tax_rate: 0,
+      item_name: '', quantity: 0, unit_price: 0,
       investment_type: defaultType,
       equity_ratio: 0, shares: 0, price: 0,
       total_cost: 0, expected_income: 0
@@ -526,7 +526,7 @@ const ContractListPage: React.FC = () => {
   const renderItemFields = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
     type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number; options?: { value: string; label: string }[] }
-    // v1.3.1-3 类型化明细模板：各合同类型字段与类型严格对应（用户拍板：投资类=投资项目，销售/采购含税率）
+    // v1.3.1-3 类型化明细模板：各合同类型字段与类型严格对应（用户拍板：投资类=投资项目，交易类不要税率）
     const INVESTMENT_FIELDS: FieldDef[] = [
       { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：产业园一期' },
       { label: '投资金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：5000000' },
@@ -549,12 +549,11 @@ const ContractListPage: React.FC = () => {
       { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：350' },
       { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：350000' },
     ]
-    // 交易类（采购/销售）：数量×单价+税率
+    // 交易类（采购/销售）：数量×单价（用户拍板：不要税率）
     const TRADE_FIELDS: FieldDef[] = [
       { label: '品名', span: 7, field: 'item_name', type: 'text', placeholder: '如：钢材' },
       { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：100' },
       { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：1200' },
-      { label: '税率(%)', span: 5, field: 'tax_rate', type: 'num', placeholder: '如：13' },
       { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：120000' },
     ]
     // 劳动力：岗位×人数×月薪
@@ -586,11 +585,11 @@ const ContractListPage: React.FC = () => {
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
       1: { title: '工程明细', hint: '基建合同 - 项目名称、工程量、单价与金额', fields: ENGINEERING_FIELDS },
       2: { title: '开采明细', hint: '开采合同 - 矿种、开采量、单价与金额', fields: ENGINEERING_FIELDS },
-      3: { title: '采购明细', hint: '采购合同 - 品名、数量、单价、税率与金额', fields: TRADE_FIELDS },
+      3: { title: '采购明细', hint: '采购合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
       4: { title: '岗位明细', hint: '劳动力雇佣合同 - 岗位、人数、月薪与金额', fields: LABOR_FIELDS },
       5: { title: '投资项目', hint: '投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
       6: { title: '拨款明细', hint: '拨款合同 - 项目名称、拨款金额与拨款类型', fields: ALLOCATION_FIELDS },
-      7: { title: '销售明细', hint: '销售合同 - 品名、数量、单价、税率与金额', fields: TRADE_FIELDS },
+      7: { title: '销售明细', hint: '销售合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
       8: { title: '减碳明细', hint: '减碳合同 - 项目名称、减碳量、碳单价与金额', fields: CARBON_FIELDS },
     }
     const config = FIELD_SETS[contractTypeId || 1]
@@ -943,7 +942,7 @@ const ContractListPage: React.FC = () => {
                               onChange={(v) => updateEditItem(idx, 'price', v)} />
                           </>
                         ) : (
-                          // 其他类型：数量×单价（含税率）
+                          // 其他类型：数量×单价
                           <>
                             <span style={{ fontSize: 11, color: T.textMuted }}>数量</span>
                             <InputNumber size="small" min={0} style={{ width: 84 }} value={it.quantity}
@@ -951,13 +950,6 @@ const ContractListPage: React.FC = () => {
                             <span style={{ fontSize: 11, color: T.textMuted }}>单价</span>
                             <InputNumber size="small" min={0} style={{ width: 110 }} value={it.unit_price}
                               onChange={(v) => updateEditItem(idx, 'unit_price', v)} />
-                            {(editTypeId === 3 || editTypeId === 7) && (
-                              <>
-                                <span style={{ fontSize: 11, color: T.textMuted }}>税率%</span>
-                                <InputNumber size="small" min={0} style={{ width: 70 }} value={it.tax_rate}
-                                  onChange={(v) => updateEditItem(idx, 'tax_rate', v)} />
-                              </>
-                            )}
                           </>
                         )}
                         <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 'auto' }}>
