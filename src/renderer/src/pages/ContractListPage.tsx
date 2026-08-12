@@ -95,6 +95,7 @@ const ContractListPage: React.FC = () => {
   const [contractTypeId, setContractTypeId] = useState<number | null>(null)
   const [items, setItems] = useState<Partial<any>[]>([])
   const [editItems, setEditItems] = useState<Partial<ContractItem>[]>([])
+  const [editTypeId, setEditTypeId] = useState<number>(0)
   const [form] = Form.useForm()
   const nameInputRef = useRef<any>(null)
   // 支持 URL 参数：?q=搜索词 &status=快捷筛选（Dashboard 待办工作台跳转）
@@ -175,6 +176,7 @@ const ContractListPage: React.FC = () => {
       const full = await invoke(IPC_CHANNELS.CONTRACT_GET, c.id) as ContractWithItems
       setEditingContract({ ...c, ...full })
       setEditItems((full.items || []).map(i => ({ ...i })))
+      setEditTypeId(full.contract_type_id || c.contract_type_id || 0)
     } catch {
       setEditingContract(c)
       setEditItems([])
@@ -373,9 +375,11 @@ const ContractListPage: React.FC = () => {
   }
 
   const addItem = () => {
-    // v1.3.1 金融化：所有合同类型统一投资项目模板（投资金额/类型/占股/股数/股价）
+    // v1.3.1-3 类型化：默认投资类型按合同类型区分（投资=项目投资 / 拨款=项目拨款）
+    const defaultType = (contractTypeId === 6) ? '项目拨款' : '项目投资'
     setItems([...items, {
-      item_name: '', investment_type: '项目投资',
+      item_name: '', quantity: 0, unit_price: 0, tax_rate: 0,
+      investment_type: defaultType,
       equity_ratio: 0, shares: 0, price: 0,
       total_cost: 0, expected_income: 0
     }])
@@ -437,17 +441,19 @@ const ContractListPage: React.FC = () => {
         <span style={{ fontSize: 12 }}>¥{Number(v).toLocaleString()}</span>
       ) : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
     },
-    // v1.3.1-2 金融化：股数/股价列（取首条投资明细）
-    { title: '股数', width: 70, align: 'right' as const,
+    // v1.3.1-3 类型化：数量列（投资=股数 / 其他=数量）取首条明细
+    { title: '数量', width: 70, align: 'right' as const,
       render: (_: unknown, r: any) => {
-        const s = (r.items && r.items[0]?.shares) || 0
+        const it = r.items && r.items[0]
+        const s = (it?.shares) || (it?.quantity) || 0
         return s ? <span style={{ fontSize: 12, color: T.gold, fontFamily: 'JetBrains Mono, monospace' }}>{Number(s)}</span>
           : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
       }
     },
-    { title: '股价', width: 80, align: 'right' as const,
+    { title: '单价', width: 80, align: 'right' as const,
       render: (_: unknown, r: any) => {
-        const p2 = (r.items && r.items[0]?.price) || 0
+        const it = r.items && r.items[0]
+        const p2 = (it?.price) || (it?.unit_price) || 0
         return p2 ? <span style={{ fontSize: 12, color: T.gold, fontFamily: 'JetBrains Mono, monospace' }}>¥{Number(p2)}</span>
           : <span style={{ color: T.textMuted, fontSize: 11 }}>-</span>
       }
@@ -520,7 +526,7 @@ const ContractListPage: React.FC = () => {
   const renderItemFields = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
     type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number; options?: { value: string; label: string }[] }
-    // v1.3.1 金融化：所有合同类型统一投资项目字段（全面替代工程类数量/单价明细）
+    // v1.3.1-3 类型化明细模板：各合同类型字段与类型严格对应（用户拍板：投资类=投资项目，销售/采购含税率）
     const INVESTMENT_FIELDS: FieldDef[] = [
       { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：产业园一期' },
       { label: '投资金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：5000000' },
@@ -536,15 +542,56 @@ const ContractListPage: React.FC = () => {
       { label: '股数', span: 5, field: 'shares', type: 'num', placeholder: '如：10000' },
       { label: '股价(元/股)', span: 5, field: 'price', type: 'num', placeholder: '如：50' },
     ]
+    // 工程类（基建/开采）：工程量×单价
+    const ENGINEERING_FIELDS: FieldDef[] = [
+      { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：道路硬化工程' },
+      { label: '工程量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1000' },
+      { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：350' },
+      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：350000' },
+    ]
+    // 交易类（采购/销售）：数量×单价+税率
+    const TRADE_FIELDS: FieldDef[] = [
+      { label: '品名', span: 7, field: 'item_name', type: 'text', placeholder: '如：钢材' },
+      { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：100' },
+      { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：1200' },
+      { label: '税率(%)', span: 5, field: 'tax_rate', type: 'num', placeholder: '如：13' },
+      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：120000' },
+    ]
+    // 劳动力：岗位×人数×月薪
+    const LABOR_FIELDS: FieldDef[] = [
+      { label: '岗位名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：土建工程师' },
+      { label: '人数', span: 5, field: 'quantity', type: 'num', placeholder: '如：10' },
+      { label: '月薪(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：8000' },
+      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：80000' },
+    ]
+    // 拨款：项目+金额+用途
+    const ALLOCATION_FIELDS: FieldDef[] = [
+      { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：区域基建专项' },
+      { label: '拨款金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：2000000' },
+      { label: '拨款类型', span: 5, field: 'investment_type', type: 'select', placeholder: '选择拨款类型',
+        options: [
+          { value: '专项资金', label: '专项资金' },
+          { value: '项目拨款', label: '项目拨款' },
+          { value: '运营拨款', label: '运营拨款' },
+          { value: '其他', label: '其他' },
+        ] },
+    ]
+    // 减碳：项目+减碳量×碳单价
+    const CARBON_FIELDS: FieldDef[] = [
+      { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：光伏发电项目' },
+      { label: '减碳量(吨CO₂)', span: 5, field: 'quantity', type: 'num', placeholder: '如：5000' },
+      { label: '碳单价(元/吨)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：60' },
+      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：300000' },
+    ]
     const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
-      1: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      2: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      3: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      4: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      5: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      6: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      7: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      8: { title: '投资项目', hint: '金融化投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      1: { title: '工程明细', hint: '基建合同 - 项目名称、工程量、单价与金额', fields: ENGINEERING_FIELDS },
+      2: { title: '开采明细', hint: '开采合同 - 矿种、开采量、单价与金额', fields: ENGINEERING_FIELDS },
+      3: { title: '采购明细', hint: '采购合同 - 品名、数量、单价、税率与金额', fields: TRADE_FIELDS },
+      4: { title: '岗位明细', hint: '劳动力雇佣合同 - 岗位、人数、月薪与金额', fields: LABOR_FIELDS },
+      5: { title: '投资项目', hint: '投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      6: { title: '拨款明细', hint: '拨款合同 - 项目名称、拨款金额与拨款类型', fields: ALLOCATION_FIELDS },
+      7: { title: '销售明细', hint: '销售合同 - 品名、数量、单价、税率与金额', fields: TRADE_FIELDS },
+      8: { title: '减碳明细', hint: '减碳合同 - 项目名称、减碳量、碳单价与金额', fields: CARBON_FIELDS },
     }
     const config = FIELD_SETS[contractTypeId || 1]
     const addLabel = config.title.replace('项', '').replace('岗位', '')
@@ -876,14 +923,45 @@ const ContractListPage: React.FC = () => {
                         {it.item_name || '未命名明细'}
                       </div>
                       <Space size={8} wrap>
-                        <span style={{ fontSize: 11, color: T.textMuted }}>数量</span>
-                        <InputNumber size="small" min={0} style={{ width: 84 }} value={it.quantity}
-                          onChange={(v) => updateEditItem(idx, 'quantity', v)} />
-                        <span style={{ fontSize: 11, color: T.textMuted }}>单价</span>
-                        <InputNumber size="small" min={0} style={{ width: 110 }} value={it.unit_price}
-                          onChange={(v) => updateEditItem(idx, 'unit_price', v)} />
+                        {editTypeId === 5 ? (
+                          // 投资合同：股数/股价/占股/投资类型
+                          <>
+                            <span style={{ fontSize: 11, color: T.textMuted }}>投资类型</span>
+                            <Select size="small" style={{ width: 110 }} value={it.investment_type || '项目投资'}
+                              onChange={(v) => updateEditItem(idx, 'investment_type', v)}
+                              options={[{ value: '股权投资', label: '股权投资' }, { value: '债权投资', label: '债权投资' },
+                                { value: '基金投资', label: '基金投资' }, { value: '项目投资', label: '项目投资' },
+                                { value: '其他', label: '其他' }]} />
+                            <span style={{ fontSize: 11, color: T.textMuted }}>占股%</span>
+                            <InputNumber size="small" min={0} style={{ width: 76 }} value={it.equity_ratio}
+                              onChange={(v) => updateEditItem(idx, 'equity_ratio', v)} />
+                            <span style={{ fontSize: 11, color: T.textMuted }}>股数</span>
+                            <InputNumber size="small" min={0} style={{ width: 84 }} value={it.shares}
+                              onChange={(v) => updateEditItem(idx, 'shares', v)} />
+                            <span style={{ fontSize: 11, color: T.textMuted }}>股价</span>
+                            <InputNumber size="small" min={0} style={{ width: 90 }} value={it.price}
+                              onChange={(v) => updateEditItem(idx, 'price', v)} />
+                          </>
+                        ) : (
+                          // 其他类型：数量×单价（含税率）
+                          <>
+                            <span style={{ fontSize: 11, color: T.textMuted }}>数量</span>
+                            <InputNumber size="small" min={0} style={{ width: 84 }} value={it.quantity}
+                              onChange={(v) => updateEditItem(idx, 'quantity', v)} />
+                            <span style={{ fontSize: 11, color: T.textMuted }}>单价</span>
+                            <InputNumber size="small" min={0} style={{ width: 110 }} value={it.unit_price}
+                              onChange={(v) => updateEditItem(idx, 'unit_price', v)} />
+                            {(editTypeId === 3 || editTypeId === 7) && (
+                              <>
+                                <span style={{ fontSize: 11, color: T.textMuted }}>税率%</span>
+                                <InputNumber size="small" min={0} style={{ width: 70 }} value={it.tax_rate}
+                                  onChange={(v) => updateEditItem(idx, 'tax_rate', v)} />
+                              </>
+                            )}
+                          </>
+                        )}
                         <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 'auto' }}>
-                          小计 {formatMoneyCNY((it.quantity ?? 0) * (it.unit_price ?? 0))}
+                          小计 {formatMoneyCNY((it.total_cost ?? ((it.quantity ?? 0) * (it.unit_price ?? 0))))}
                         </span>
                       </Space>
                     </div>
