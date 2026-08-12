@@ -221,6 +221,7 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'contract:delete':      { method: 'DELETE', path: (id: unknown) => `/api/contracts/${id}` },
   // P1-1 补全：审批写操作映射云端（不再静默降级本地 SQLite，避免与云端数据分叉）
   'contract:approve':     { method: 'POST',   path: (id: unknown) => `/api/contracts/${id}/approve`, body: (args) => ({ action: args[1], operator: args[2] }) },
+  'contract:reject':      { method: 'POST',   path: (id: unknown) => `/api/contracts/${id}/reject` },
   'contract:batch-approve': { method: 'POST', path: '/api/contracts/batch-approve', body: (args) => ({ ids: args[0], action: args[1], operator: args[2] }) },
   'contract:summarize':   { method: 'GET',    path: (regionId: unknown) => `/api/contracts/summarize/${regionId}` },
   'contract:list-versions': { method: 'GET', path: (id: unknown) => `/api/contracts/${id}/versions` },

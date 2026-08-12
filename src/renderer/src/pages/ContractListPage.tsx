@@ -4,7 +4,7 @@ import {
   Typography, message, Skeleton, Empty, Tag, InputNumber, Card, Row, Col, Divider, Checkbox, Tabs, Segmented
 } from 'antd'
 import type { MenuProps } from 'antd'
-import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined, SearchOutlined, FilterOutlined, HistoryOutlined, SendOutlined, CheckCircleOutlined, StopOutlined, PlayCircleOutlined, MoreOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined, SearchOutlined, FilterOutlined, HistoryOutlined, SendOutlined, CheckCircleOutlined, StopOutlined, PlayCircleOutlined, MoreOutlined , CloseCircleOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { PERMISSIONS, hasPermission } from '../../../shared/permissions'
@@ -246,9 +246,12 @@ const ContractListPage: React.FC = () => {
     } else if (r.status === 'active') {
       actions.push({ key: 'execute', label: '开始执行', icon: <PlayCircleOutlined /> })
       actions.push({ key: 'terminate', label: '终止合同', icon: <StopOutlined />, danger: true })
+      // v1.3.1-5 用户拍板：上传后发现问题可驳回取消
+      actions.push({ key: 'reject', label: '驳回合同', icon: <CloseCircleOutlined />, danger: true })
     } else if (r.status === 'executing') {
       actions.push({ key: 'complete', label: '完成合同', icon: <CheckCircleOutlined /> })
       actions.push({ key: 'terminate', label: '终止合同', icon: <StopOutlined />, danger: true })
+      actions.push({ key: 'reject', label: '驳回合同', icon: <CloseCircleOutlined />, danger: true })
     }
     return actions
   }
@@ -276,6 +279,25 @@ const ContractListPage: React.FC = () => {
           okText: '终止',
           okButtonProps: { danger: true },
           onOk: () => handleLifecycle(r.id, 'terminated')
+        })
+        break
+      case 'reject':
+        // v1.3.1-5 用户拍板：驳回合同（发现写错可取消）
+        Modal.confirm({
+          title: '确认驳回该合同？',
+          content: `合同「${r.contract_name}」将标记为已驳回（取消），并自动发送通知`,
+          okText: '驳回',
+          okButtonProps: { danger: true },
+          onOk: async () => {
+            try {
+              const res = await invoke(IPC_CHANNELS.CONTRACT_REJECT, r.id)
+              if (res && res.success === false) { message.error(res.message || '驳回失败'); return }
+              setContracts(prev => prev.map(c => c.id === r.id ? { ...c, status: 'rejected' } : c))
+              message.success('合同已驳回')
+            } catch (err: any) {
+              message.error(err?.message || '驳回失败')
+            }
+          }
         })
         break
     }

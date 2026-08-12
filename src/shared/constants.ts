@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   CONTRACT_UPDATE: 'contract:update',
   CONTRACT_DELETE: 'contract:delete',
   CONTRACT_APPROVE: 'contract:approve',
+  CONTRACT_REJECT: 'contract:reject',
   CONTRACT_BATCH_APPROVE: 'contract:batch-approve',
   CONTRACT_SUMMARIZE: 'contract:summarize',
   CONTRACT_LIST_VERSIONS: 'contract:list-versions',
