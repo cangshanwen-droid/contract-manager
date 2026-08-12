@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { RegionRepository } from '../database/repositories/region.repo'
+import { requirePermission } from '../session'
+import { PERMISSIONS } from '../../shared/permissions'
 
 export function registerRegionHandlers(): void {
   const repo = new RegionRepository()
@@ -25,6 +27,7 @@ export function registerRegionHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.REGION_CREATE, (_e, data: Record<string, unknown>) => {
     try {
+      requirePermission(PERMISSIONS.REGION_MANAGE, '没有新建区域的权限')
       return repo.create(data)
     } catch (err: any) {
       console.error('REGION_CREATE failed:', err)
@@ -34,6 +37,7 @@ export function registerRegionHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.REGION_UPDATE, (_e, id: number, data: Record<string, unknown>) => {
     try {
+      requirePermission(PERMISSIONS.REGION_MANAGE, '没有修改区域的权限')
       return repo.update(id, data)
     } catch (err: any) {
       console.error('REGION_UPDATE failed:', err)
@@ -43,6 +47,7 @@ export function registerRegionHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.REGION_DELETE, (_e, id: number) => {
     try {
+      requirePermission(PERMISSIONS.REGION_MANAGE, '没有删除区域的权限')
       repo.delete(id)
       return { success: true }
     } catch (err: any) {

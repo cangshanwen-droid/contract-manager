@@ -75,7 +75,7 @@ describe('ROLE_PERMISSIONS 静态映射', () => {
   })
 
   it('权限点全集与中文标签一一对应', () => {
-    expect(ALL_PERMISSIONS).toHaveLength(11)
+    expect(ALL_PERMISSIONS).toHaveLength(13)
     expect(Object.keys(PERMISSION_LABELS).sort()).toEqual([...ALL_PERMISSIONS].sort())
   })
 

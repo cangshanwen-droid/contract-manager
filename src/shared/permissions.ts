@@ -24,7 +24,10 @@ export const PERMISSIONS = {
   USER_MANAGE: 'user.manage',
   ANNOUNCE_MANAGE: 'announce.manage',
   STOCK_TRADE: 'stock.trade',
-  SYSTEM_CONFIG: 'system.config'
+  SYSTEM_CONFIG: 'system.config',
+  // ── v1.3.1 审核加固：公司/区域管理（rep 只读，防篡改本地数据）──
+  COMPANY_MANAGE: 'company.manage',
+  REGION_MANAGE: 'region.manage'
 } as const
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
@@ -50,7 +53,9 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.ACCOUNT_CREATE,
     PERMISSIONS.ACCOUNT_TRANSACT,
     PERMISSIONS.STOCK_TRADE,
-    PERMISSIONS.ANNOUNCE_MANAGE
+    PERMISSIONS.ANNOUNCE_MANAGE,
+    PERMISSIONS.COMPANY_MANAGE,
+    PERMISSIONS.REGION_MANAGE
   ],
 
   // 管理端：全部
@@ -69,7 +74,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'user.manage': '用户管理',
   'announce.manage': '公告管理',
   'stock.trade': '股票交易',
-  'system.config': '系统设置（备份/导入导出）'
+  'system.config': '系统设置（备份/导入导出）',
+  'company.manage': '公司管理（增改停用）',
+  'region.manage': '区域管理（增改删）'
 }
 
 /** 判断用户是否拥有某权限点 */

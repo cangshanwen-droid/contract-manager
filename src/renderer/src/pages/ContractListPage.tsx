@@ -200,7 +200,14 @@ const ContractListPage: React.FC = () => {
           land_area: it.land_area,
           tax_rate: it.tax_rate,
           skill_level: it.skill_level,
-          carbon_factor: it.carbon_factor
+          carbon_factor: it.carbon_factor,
+          // v1.3.1 金融化投资字段（审核 P0：缺传会被云端重建清空）
+          investment_type: it.investment_type,
+          equity_ratio: it.equity_ratio,
+          expected_return_rate: it.expected_return_rate,
+          investment_period: it.investment_period,
+          total_cost: it.total_cost,
+          expected_income: it.expected_income
         })),
         updated_by: user?.username || ''
       })
