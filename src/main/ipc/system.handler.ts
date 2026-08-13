@@ -54,7 +54,7 @@ export function registerSystemHandlers(): void {
       // 并行健康检查：云端数据 API 与 股票行情 API（同一台服务器不同服务）
       const [cloud, stock] = await Promise.all([
         ping(`${API_BASE}/api/regions`, '云端数据 API'),
-        ping(`${API_BASE}/market/stocks`, '股票行情 API'),
+        ping(`${API_BASE}/market`, '股票行情 API'),  // stock-api 实际路由是 /market（非 /market/stocks）
       ])
 
       let dbOk = true

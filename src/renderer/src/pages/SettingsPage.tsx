@@ -26,9 +26,9 @@ const SettingsPage: React.FC = () => {
   const loadHealth = useCallback(async () => {
     setHealthLoading(true)
     try {
-      const r = await invoke(IPC_CHANNELS.SYSTEM_HEALTH) as any
+      // system:health 是本地综合诊断（云端API+股票API+本地DB）——走主进程 handler，不走 cloudApi /api/health
+      const r = await window.api.invoke(IPC_CHANNELS.SYSTEM_HEALTH) as any
       if (r?.success) setHealth(r.health)
-      else if (r?.status) setHealth({ status: r.status, version: r.version, message: 'ok' })
       else message.error(r?.message || '健康检查失败')
     } catch (e: any) {
       message.error('健康检查失败：' + (e?.message || '未知错误'))
