@@ -133,6 +133,8 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
       // v1.3.1-4 云端建号失败明确指引：本地账号无云端权限时提示改用云端账号
       if (/401|403|权限|云端 API/.test(msg)) {
         message.error('云端建号失败：请使用管理端云端账号（admin/admin123）登录后再创建用户')
+      } else if (/400|已存在/.test(msg)) {
+        message.error('该用户名已被占用（云端已有同名账号），请换一个用户名')
       } else {
         message.error(msg)
       }
