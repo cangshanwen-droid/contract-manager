@@ -245,7 +245,8 @@ const ROUTE_MAP: Partial<Record<IpcChannel, RouteEntry>> = {
   'auth:register':         { method: 'POST',   path: '/api/auth/register' },
   'auth:change-password':  { method: 'POST',   path: '/api/auth/change-password',
                              body: (args: unknown[]) => ({ old_password: args[0], new_password: args[1] }) },
-  'auth:reset-password':   { method: 'POST',   path: (id: unknown) => `/api/auth/users/${id}/reset-password` },
+  'auth:reset-password':   { method: 'POST',   path: (id: unknown) => `/api/auth/users/${id}/reset-password`,
+                              body: (args) => ({ new_password: args[1] }) },
 
   'account:summary':      { method: 'GET',    path: '/api/accounts/summary/all' },
   'account:list':         { method: 'GET',    path: '/api/accounts' },
