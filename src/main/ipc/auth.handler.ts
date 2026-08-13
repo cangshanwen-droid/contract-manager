@@ -172,7 +172,7 @@ export function registerAuthHandlers(): void {
         return { success: false, message: `登录尝试过多，请 ${limit.remaining} 秒后重试` }
       }
 
-      const user = queryOne(
+      let user = queryOne(
         `SELECT u.id, u.username, u.role, u.password, u.company_id, c.name AS company_name
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id

@@ -19,6 +19,7 @@ const PORTFOLIO_POLL_MS = 30000
 
 type StockQuote = { symbol: string; name: string; current_price?: number; price?: number; change_pct?: number; changePct?: number; change?: number }
 type Position = { symbol: string; name: string; shares: number; avgCost: number; currentPrice: number; marketValue: number; pnl: number; pnlRatio: number }
+type Candle = { round: number; time: string; open: number; high: number; low: number; close: number; volume: number }
 type OrderRow = Record<string, unknown>
 
 function fmtMoney(v: number | undefined | null): string {
@@ -34,6 +35,51 @@ function trendColor(v: number | undefined | null): string {
   return n > 0 ? '#e74c3c' : n < 0 ? '#2ecc71' : T.textMuted
 }
 
+function KlinePanel({ candles, loading }: { candles: Candle[]; loading: boolean }) {
+  if (loading) return <div style={{ height: 230, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="small" tip="K线加载中…" /></div>
+  if (!candles.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 K 线数据" />
+  const high = Math.max(...candles.map((c) => c.high))
+  const low = Math.min(...candles.map((c) => c.low))
+  const range = Math.max(high - low, high * 0.02, 1)
+  const upper = high + range * 0.12
+  const lower = low - range * 0.12
+  const y = (price: number) => 18 + ((upper - price) / (upper - lower)) * 188
+  const step = 680 / candles.length
+  const bodyWidth = Math.max(3, Math.min(14, step * 0.58))
+  const latest = candles[candles.length - 1]
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: 12, color: T.textMuted }}>
+        <span>开 <strong style={{ color: T.textPrimary }}>{latest.open.toFixed(2)}</strong></span>
+        <span>高 <strong style={{ color: '#e74c3c' }}>{latest.high.toFixed(2)}</strong></span>
+        <span>低 <strong style={{ color: '#2ecc71' }}>{latest.low.toFixed(2)}</strong></span>
+        <span>收 <strong style={{ color: trendColor(latest.close - latest.open) }}>{latest.close.toFixed(2)}</strong></span>
+        <span>成交量 <strong style={{ color: T.textPrimary }}>{latest.volume.toLocaleString('zh-CN')}</strong></span>
+      </div>
+      <svg viewBox="0 0 720 238" role="img" aria-label="股票 K 线图" style={{ width: '100%', height: 238, display: 'block', background: '#061A33', border: `1px solid ${T.border}` }}>
+        {[18, 80, 142, 206].map((line) => <line key={line} x1="28" x2="708" y1={line} y2={line} stroke={T.border} strokeWidth="1" />)}
+        <text x="4" y="22" fill={T.textMuted} fontSize="11">{upper.toFixed(2)}</text>
+        <text x="4" y="210" fill={T.textMuted} fontSize="11">{lower.toFixed(2)}</text>
+        {candles.map((c, index) => {
+          const x = 28 + step * index + step / 2
+          const rising = c.close >= c.open
+          const color = rising ? '#e74c3c' : '#2ecc71'
+          const openY = y(c.open)
+          const closeY = y(c.close)
+          return <g key={`${c.time}-${c.round}`}>
+            <line x1={x} x2={x} y1={y(c.high)} y2={y(c.low)} stroke={color} strokeWidth="1.5" />
+            <rect x={x - bodyWidth / 2} y={Math.min(openY, closeY)} width={bodyWidth} height={Math.max(2, Math.abs(closeY - openY))} fill={color} />
+          </g>
+        })}
+        <text x="28" y="228" fill={T.textMuted} fontSize="11">{candles[0].time.slice(0, 10)}</text>
+        <text x="620" y="228" fill={T.textMuted} fontSize="11">{latest.time.slice(0, 10)}</text>
+      </svg>
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 11, color: T.textMuted }}><span><i style={{ display: 'inline-block', width: 8, height: 8, background: '#e74c3c', marginRight: 4 }} />上涨</span><span><i style={{ display: 'inline-block', width: 8, height: 8, background: '#2ecc71', marginRight: 4 }} />下跌</span><span>数据按已成交订单聚合</span></div>
+    </div>
+  )
+}
+
 export function StockMarketPage() {
   const { user } = useAuth()
   const role = user?.role || 'admin'
@@ -45,6 +91,8 @@ export function StockMarketPage() {
   const [marketState, setMarketState] = useState('open')
   const [round, setRound] = useState(1)
   const [selected, setSelected] = useState('JGONG')
+  const [candles, setCandles] = useState<Candle[]>([])
+  const [klineLoading, setKlineLoading] = useState(false)
   const [portfolio, setPortfolio] = useState<{ user?: { balance?: number }; summary?: { marketValue?: number; totalAssets?: number; totalPnl?: number; pnlRatio?: number }; positions?: Position[]; orders?: OrderRow[]; recentTrades?: OrderRow[] } | null>(null)
   const [orderSide, setOrderSide] = useState<'buy' | 'sell'>('buy')
   const [orderShares, setOrderShares] = useState<number>(100)
@@ -68,23 +116,18 @@ export function StockMarketPage() {
   // ── 登录云端 stock（safeStorage 凭据 → /auth/login → token）──
   const ensureToken = useCallback(async (): Promise<{ token: string; username: string } | null> => {
     try {
-      let uname = 'admin'
-      let pwd = 'admin123'
       const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
       const saved = r?.success ? r.credentials : null
-      if (saved?.username && saved?.password) {
-        uname = saved.username
-        pwd = saved.password
-      }
+      if (!saved?.username || !saved?.password) return null
       const res = await fetch(`${STOCK_API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: uname, password: pwd }),
+        body: JSON.stringify({ username: saved.username, password: saved.password }),
       })
       if (!res.ok) throw new Error('登录失败')
       const data = await res.json()
       if (!data?.token) throw new Error('登录失败')
-      return { token: data.token, username: uname }
+      return { token: data.token, username: saved.username }
     } catch {
       return null
     }
@@ -107,6 +150,22 @@ export function StockMarketPage() {
       }
     } catch {
       setMarketFailed(true)
+    }
+  }, [])
+
+  // ── K 线（公开行情，按已成交订单聚合）──
+  const loadKline = useCallback(async (symbol: string) => {
+    setKlineLoading(true)
+    try {
+      const res = await fetch(`${STOCK_API}/stocks/${encodeURIComponent(symbol)}/kline`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (!Array.isArray(data)) throw new Error('K线数据格式错误')
+      setCandles(data.filter((c): c is Candle => Number.isFinite(Number(c?.open)) && Number.isFinite(Number(c?.high)) && Number.isFinite(Number(c?.low)) && Number.isFinite(Number(c?.close))))
+    } catch {
+      setCandles([])
+    } finally {
+      setKlineLoading(false)
     }
   }, [])
 
@@ -135,6 +194,7 @@ export function StockMarketPage() {
         loadPortfolio(auth.token, auth.username)
       }
       await loadMarket()
+      await loadKline(selected)
       setLoading(false)
     })()
     return () => { aliveRef.current = false }
@@ -147,12 +207,18 @@ export function StockMarketPage() {
     return () => clearInterval(t)
   }, [loadMarket])
 
-  // 持仓轮询（非 rep）
   useEffect(() => {
-    if (!isTrader || !token) return
+    loadKline(selected)
+    const t = setInterval(() => { loadKline(selected) }, PORTFOLIO_POLL_MS)
+    return () => clearInterval(t)
+  }, [selected, loadKline])
+
+  // 持仓轮询（全角色；rep 只读展示资产）
+  useEffect(() => {
+    if (!token || !username) return
     const t = setInterval(() => { loadPortfolio(token, username) }, PORTFOLIO_POLL_MS)
     return () => clearInterval(t)
-  }, [isTrader, token, username, loadPortfolio])
+  }, [token, username, loadPortfolio])
 
   // 选中股票联动价格
   useEffect(() => {
@@ -168,6 +234,8 @@ export function StockMarketPage() {
     const price = orderPrice ?? quotePrice(stock)
     if (!orderShares || orderShares <= 0) { message.warning('请输入数量'); return }
     if (price <= 0) { message.warning('请输入有效价格'); return }
+    const available = portfolio?.positions?.find((p) => p.symbol === selected)?.shares ?? 0
+    if (orderSide === 'sell' && orderShares > available) { message.warning(`可卖数量不足，当前可卖 ${available} 股`); return }
     setOrderSubmitting(true)
     try {
       const idem = `${orderSide}-${selected}-${username}-${Date.now()}`
@@ -184,12 +252,13 @@ export function StockMarketPage() {
       message.success(`${orderSide === 'buy' ? '买入' : '卖出'}成功：${selected} ${orderShares}股 @ ¥${price}`)
       loadPortfolio(token, username)
       loadMarket()
+      loadKline(selected)
     } catch (e: any) {
       message.error(e?.message || '下单失败')
     } finally {
       setOrderSubmitting(false)
     }
-  }, [token, username, market, selected, orderSide, orderShares, orderPrice, loadPortfolio, loadMarket])
+  }, [token, username, market, selected, orderSide, orderShares, orderPrice, portfolio, loadPortfolio, loadMarket, loadKline])
 
   // ── 调整可用资金 Modal（仅 operator/admin）──
   const openAdjust = useCallback(async () => {
@@ -211,14 +280,12 @@ export function StockMarketPage() {
     if (!adjustAmount || adjustAmount === 0) { message.warning('请输入调整金额（正数=注入，负数=扣减）'); return }
     setAdjustSubmitting(true)
     try {
-      let uname = 'admin'
-      let pwd = 'admin123'
       const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
       const saved = r?.success ? r.credentials : null
-      if (saved?.username && saved?.password) { uname = saved.username; pwd = saved.password }
+      if (!saved?.username || !saved?.password) throw new Error('登录凭据不可用，请退出后重新登录')
       const loginRes = await fetch(`${STOCK_API}/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: uname, password: pwd }),
+        body: JSON.stringify({ username: saved.username, password: saved.password }),
       })
       if (!loginRes.ok) throw new Error('登录失败，请重新登录')
       const data = await loginRes.json()
@@ -268,6 +335,7 @@ export function StockMarketPage() {
   ]
 
   const selectedStock = market.find((s) => s.symbol === selected)
+  const selectedPosition = portfolio?.positions?.find((p) => p.symbol === selected)
 
   return (
     <div className="page-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 4px' }}>
@@ -408,7 +476,8 @@ export function StockMarketPage() {
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
                       <span style={{ fontSize: 12, color: T.textMuted, width: 60 }}>数量(股)</span>
-                      <InputNumber min={1} max={1000000} value={orderShares} onChange={(v) => setOrderShares(v ?? 0)} style={{ width: 140 }} />
+                      <InputNumber min={1} max={orderSide === 'sell' ? selectedPosition?.shares : 1000000} value={orderShares} onChange={(v) => setOrderShares(v ?? 0)} style={{ width: 140 }} />
+                      {orderSide === 'sell' && <span style={{ fontSize: 11, color: T.textMuted }}>可卖 {selectedPosition?.shares?.toLocaleString('zh-CN') ?? 0} 股</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
                       <span style={{ fontSize: 12, color: T.textMuted, width: 60 }}>价格(元)</span>
@@ -450,6 +519,10 @@ export function StockMarketPage() {
             </Card>
           </div>
 
+          <Card size="small" style={{ background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>K线走势</span>} extra={<span style={{ fontSize: 11, color: T.textMuted }}>30s 刷新 · 已成交订单聚合</span>}>
+            <KlinePanel candles={candles} loading={klineLoading} />
+          </Card>
+
           {/* ── 下：持仓 + 成交记录（仅 admin/operator）── */}
           {isTrader && (
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -468,6 +541,15 @@ export function StockMarketPage() {
                 )}
               </Card>
             </div>
+          )}
+          {!isTrader && (
+            <Card size="small" style={{ background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>我的持仓（只读）</span>}>
+              {(portfolio?.positions?.length ?? 0) > 0 ? (
+                <Table size="small" rowKey="symbol" columns={positionColumns as any} dataSource={portfolio!.positions!} pagination={false} />
+              ) : (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无持仓" />
+              )}
+            </Card>
           )}
         </>
       )}

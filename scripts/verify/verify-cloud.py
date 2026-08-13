@@ -7,7 +7,7 @@ verify-cloud.py — Gipfel 云端 API 验证（仅标准库 urllib）
   1. GET /api/health            → 200
   2. GET /market                → 200 且返回股票数组
   3. POST /auth/login           → admin/admin123 拿到 token
-  4. GET /admin/accounts        → X-Admin-Key 正确 → 200 列表
+  4. GET /admin/accounts        → X-Admin-Key 正确 → 200 列表（需 GIPFEL_ADMIN_KEY）
   5. GET /admin/accounts        → X-Admin-Key 错误 → 403
 
 特性：
@@ -26,9 +26,8 @@ import urllib.error
 import urllib.request
 
 BASE = os.environ.get("GIPFEL_CLOUD_URL", "http://106.54.26.86")
-# 默认取线上环境变量 ADMIN_KEY（2026-08-10 ssh 实测 = gipfel-admin-prod-2026；
-# 仓库内硬编码的 gipfel-admin 为 dev 默认值，线上已 403）
-ADMIN_KEY = os.environ.get("GIPFEL_ADMIN_KEY", "gipfel-admin-prod-2026")
+# 仅从环境变量读取管理密钥；不得把生产凭据提交到仓库。
+ADMIN_KEY = os.environ.get("GIPFEL_ADMIN_KEY", "")
 TIMEOUT = 10
 
 # 云端证书可能是自签名/临时配置，跳过证书校验
@@ -168,6 +167,8 @@ def main():
     check("POST /auth/login admin/admin123 → 拿到 token", _test_login)
 
     def _test_admin_ok():
+        if not ADMIN_KEY:
+            raise NetError("未设置 GIPFEL_ADMIN_KEY，跳过需管理密钥的正向检查")
         c, b, _ = request("GET", "/admin/accounts", headers={"X-Admin-Key": ADMIN_KEY})
         assert c == 200, "期望 200，实际 {}".format(c)
         data = parse_json(b, "/admin/accounts")
