@@ -130,11 +130,15 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
     } catch (err: any) {
       if (err?.errorFields) return
       const msg = err?.message || '创建失败'
-      // v1.3.1-4 云端建号失败明确指引：本地账号无云端权限时提示改用云端账号
-      if (/401|403|权限|云端 API/.test(msg)) {
-        message.error('云端建号失败：请使用管理端云端账号（admin/admin123）登录后再创建用户')
-      } else if (/400|已存在/.test(msg)) {
+      // v1.3.1-4 云端建号失败明确指引（分支顺序：先具体错误，再权限，最后兜底）
+      if (/400|已存在|占用/.test(msg)) {
         message.error('该用户名已被占用（云端已有同名账号），请换一个用户名')
+      } else if (/401|403|权限/.test(msg)) {
+        message.error('云端建号失败：请使用管理端云端账号（admin/admin123）登录后再创建用户')
+      } else if (/云端 API/.test(msg)) {
+        // 透传云端 detail（去掉笼统前缀）
+        const m = msg.match(/detail\??[:\"]+([^\"]+)/)
+        message.error(m ? m[1] : msg)
       } else {
         message.error(msg)
       }
