@@ -74,42 +74,37 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
     } catch { message.error('操作失败') } finally { setLoading(false) }
   }
 
-  const roleBriefs = [
-    { role: '管理端', scope: '全局配置、账户权限与业务治理' },
-    { role: '操作端', scope: '合同执行、资金操作与市场交易' },
-    { role: '代表端', scope: '区域数据、个人持仓与信息查阅' },
-  ]
-
   return (
     <main className="gipfel-login-v2">
-      <section className="gipfel-login-v2__brief" aria-label="平台介绍">
-        <header className="gipfel-login-v2__brand">
-          <LogoFull width={116} />
-          <span>机构业务工作台</span>
-        </header>
+      <section className="gipfel-login-v2__brief" aria-label="Gipfel 品牌视觉">
+        <div className="gipfel-login-art" aria-hidden="true">
+          <span className="gipfel-login-art__corner is-nw" />
+          <span className="gipfel-login-art__corner is-ne" />
+          <span className="gipfel-login-art__corner is-sw" />
+          <span className="gipfel-login-art__corner is-se" />
 
-        <div className="gipfel-login-v2__statement">
-          <p className="gipfel-login-v2__edition">GIPFEL / INSTITUTIONAL DESKTOP</p>
-          <h1>把合同、区域、资金与市场<br />放在同一张工作桌上。</h1>
-          <p className="gipfel-login-v2__lead">
-            面向管理、操作与代表三类岗位的统一业务入口。数据同源，权限分明，关键动作可追溯。
-          </p>
+          <div className="gipfel-login-art__orbit is-outer">
+            <span className="gipfel-login-art__node is-a" />
+            <span className="gipfel-login-art__node is-b" />
+          </div>
+          <div className="gipfel-login-art__orbit is-middle">
+            <span className="gipfel-login-art__node is-a" />
+            <span className="gipfel-login-art__node is-b" />
+          </div>
+          <div className="gipfel-login-art__orbit is-inner" />
+
+          <span className="gipfel-login-art__axis is-horizontal" />
+          <span className="gipfel-login-art__axis is-vertical" />
+          <span className="gipfel-login-art__tick is-north" />
+          <span className="gipfel-login-art__tick is-east" />
+          <span className="gipfel-login-art__tick is-south" />
+          <span className="gipfel-login-art__tick is-west" />
+
+          <div className="gipfel-login-art__core">
+            <span className="gipfel-login-art__core-frame" />
+            <LogoFull width={220} />
+          </div>
         </div>
-
-        <div className="gipfel-login-v2__roles" aria-label="岗位工作范围">
-          {roleBriefs.map((item, index) => (
-            <div className="gipfel-login-v2__role" key={item.role}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <strong>{item.role}</strong>
-              <p>{item.scope}</p>
-            </div>
-          ))}
-        </div>
-
-        <footer className="gipfel-login-v2__meta">
-          <span>GIPFEL MANAGEMENT SYSTEM</span>
-          <span>DESKTOP EDITION · 2026</span>
-        </footer>
       </section>
 
       <section className="gipfel-login-v2__access" aria-label="账号登录">
