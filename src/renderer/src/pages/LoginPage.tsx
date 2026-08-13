@@ -27,7 +27,15 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
   const [hoveredCap, setHoveredCap] = useState<number | null>(null)
 
   useEffect(() => {
-    (async () => { try { const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any; if (r?.success && Array.isArray(r.users) && r.users.length === 0) setIsFirstUse(true) } catch {/* */} })()
+    (async () => {
+      try {
+        const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
+        const list = Array.isArray(r) ? r : (r?.users && Array.isArray(r.users) ? r.users : [])
+        if (list.length === 0) setIsFirstUse(true)
+      } catch {
+        /* 静默 */
+      }
+    })()
     const c = canvasRef.current; if (!c) return
     const ctx = c.getContext('2d'); if (!ctx) return
     let W = c.width = window.innerWidth, H = c.height = window.innerHeight

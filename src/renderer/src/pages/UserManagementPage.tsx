@@ -69,9 +69,9 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
     setLoading(true)
     try {
       const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
-      if (r?.success && Array.isArray(r.users)) {
-        setUsers(r.users)
-      }
+      // 兼容云端纯数组与本地 {success, users} 两种返回结构
+      const list = Array.isArray(r) ? r : (r?.users && Array.isArray(r.users) ? r.users : null)
+      if (list) setUsers(list)
     } catch (err: any) {
       message.error('加载用户列表失败')
     } finally {

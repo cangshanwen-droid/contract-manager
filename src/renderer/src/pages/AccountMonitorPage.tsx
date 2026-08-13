@@ -130,7 +130,9 @@ const AccountMonitorPage: React.FC = () => {
     setUsersLoading(true)
     try {
       const r = await invoke(IPC_CHANNELS.AUTH_LIST_USERS) as any
-      if (r?.success && Array.isArray(r.users)) setUsers(r.users as LocalUser[])
+      // 兼容云端纯数组与本地 {success, users} 两种返回结构
+      const list = Array.isArray(r) ? r : (r?.users && Array.isArray(r.users) ? r.users : null)
+      if (list) setUsers(list as LocalUser[])
       return true
     } catch (e: any) {
       message.error(`系统用户加载失败：${e?.message || '未知'}`)
