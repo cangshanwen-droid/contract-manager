@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Button, Tag, Space, InputNumber, Segmented, Table, Empty, Spin, Modal, Select, message } from 'antd'
-import { WalletOutlined, ReloadOutlined, SwapOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons'
+import { WalletOutlined, ReloadOutlined, SwapOutlined, RiseOutlined, FallOutlined, StarOutlined, StarFilled } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { invoke } from '../api/cloudApi'
@@ -20,6 +20,7 @@ const PORTFOLIO_POLL_MS = 30000
 type StockQuote = { symbol: string; name: string; current_price?: number; price?: number; change_pct?: number; changePct?: number; change?: number }
 type Position = { symbol: string; name: string; shares: number; avgCost: number; currentPrice: number; marketValue: number; pnl: number; pnlRatio: number }
 type Candle = { round: number; time: string; open: number; high: number; low: number; close: number; volume: number }
+type OrderBook = { bids: { price: number; quantity: number }[]; asks: { price: number; quantity: number }[]; largeTrades: { side: string; price: number; quantity: number; created_at: string }[] }
 type OrderRow = Record<string, unknown>
 
 function fmtMoney(v: number | undefined | null): string {
@@ -93,6 +94,10 @@ export function StockMarketPage() {
   const [selected, setSelected] = useState('JGONG')
   const [candles, setCandles] = useState<Candle[]>([])
   const [klineLoading, setKlineLoading] = useState(false)
+  const [orderBook, setOrderBook] = useState<OrderBook | null>(null)
+  const [watchlist, setWatchlist] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('gipfel_stock_watchlist') || '[]') } catch { return [] }
+  })
   const [portfolio, setPortfolio] = useState<{ user?: { balance?: number }; summary?: { marketValue?: number; totalAssets?: number; totalPnl?: number; pnlRatio?: number }; positions?: Position[]; orders?: OrderRow[]; recentTrades?: OrderRow[] } | null>(null)
   const [orderSide, setOrderSide] = useState<'buy' | 'sell'>('buy')
   const [orderShares, setOrderShares] = useState<number>(100)
@@ -169,6 +174,26 @@ export function StockMarketPage() {
     }
   }, [])
 
+  const loadOrderBook = useCallback(async (symbol: string) => {
+    try {
+      const res = await fetch(`${STOCK_API}/stocks/${encodeURIComponent(symbol)}/order-book`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (!Array.isArray(data?.bids) || !Array.isArray(data?.asks) || !Array.isArray(data?.largeTrades)) throw new Error('盘口数据格式错误')
+      setOrderBook(data as OrderBook)
+    } catch {
+      setOrderBook(null)
+    }
+  }, [])
+
+  const toggleWatchlist = useCallback((symbol: string) => {
+    setWatchlist((current) => {
+      const next = current.includes(symbol) ? current.filter((item) => item !== symbol) : [...current, symbol]
+      try { localStorage.setItem('gipfel_stock_watchlist', JSON.stringify(next)) } catch { /* 本地存储不可用时仅保留本次会话 */ }
+      return next
+    })
+  }, [])
+
   // ── 持仓拉取（/portfolio?username= 需 token）──
   const loadPortfolio = useCallback(async (tok: string, uname: string) => {
     if (!tok) return
@@ -195,6 +220,7 @@ export function StockMarketPage() {
       }
       await loadMarket()
       await loadKline(selected)
+      await loadOrderBook(selected)
       setLoading(false)
     })()
     return () => { aliveRef.current = false }
@@ -209,9 +235,10 @@ export function StockMarketPage() {
 
   useEffect(() => {
     loadKline(selected)
-    const t = setInterval(() => { loadKline(selected) }, PORTFOLIO_POLL_MS)
+    loadOrderBook(selected)
+    const t = setInterval(() => { loadKline(selected); loadOrderBook(selected) }, PORTFOLIO_POLL_MS)
     return () => clearInterval(t)
-  }, [selected, loadKline])
+  }, [selected, loadKline, loadOrderBook])
 
   // 持仓轮询（全角色；rep 只读展示资产）
   useEffect(() => {
@@ -253,12 +280,13 @@ export function StockMarketPage() {
       loadPortfolio(token, username)
       loadMarket()
       loadKline(selected)
+      loadOrderBook(selected)
     } catch (e: any) {
       message.error(e?.message || '下单失败')
     } finally {
       setOrderSubmitting(false)
     }
-  }, [token, username, market, selected, orderSide, orderShares, orderPrice, portfolio, loadPortfolio, loadMarket, loadKline])
+  }, [token, username, market, selected, orderSide, orderShares, orderPrice, portfolio, loadPortfolio, loadMarket, loadKline, loadOrderBook])
 
   // ── 调整可用资金 Modal（仅 operator/admin）──
   const openAdjust = useCallback(async () => {
@@ -399,7 +427,11 @@ export function StockMarketPage() {
                       }}
                     >
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? T.gold : T.textPrimary }}>{s.symbol}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? T.gold : T.textPrimary }}>
+                          <button onClick={(event) => { event.stopPropagation(); toggleWatchlist(s.symbol) }} aria-label={`${watchlist.includes(s.symbol) ? '取消自选' : '加入自选'} ${s.symbol}`} style={{ padding: 0, marginRight: 5, border: 0, background: 'transparent', color: watchlist.includes(s.symbol) ? T.gold : T.textMuted, cursor: 'pointer' }}>
+                            {watchlist.includes(s.symbol) ? <StarFilled /> : <StarOutlined />}
+                          </button>{s.symbol}
+                        </div>
                         <div style={{ fontSize: 11, color: T.textMuted }}>{s.name}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -421,6 +453,7 @@ export function StockMarketPage() {
             } extra={
               <Space size={4}>
                 <Button size="small" icon={<ReloadOutlined />} onClick={() => loadMarket()} />
+                <Button size="small" icon={watchlist.includes(selected) ? <StarFilled /> : <StarOutlined />} aria-label={watchlist.includes(selected) ? '取消自选' : '加入自选'} style={{ color: watchlist.includes(selected) ? T.gold : undefined }} onClick={() => toggleWatchlist(selected)} />
                 {isTrader && <Button size="small" icon={<SwapOutlined />} onClick={() => setOrderSide(orderSide === 'buy' ? 'sell' : 'buy')}>{orderSide === 'buy' ? '买入' : '卖出'}</Button>}
               </Space>
             }>
@@ -522,6 +555,27 @@ export function StockMarketPage() {
           <Card size="small" style={{ background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>K线走势</span>} extra={<span style={{ fontSize: 11, color: T.textMuted }}>30s 刷新 · 已成交订单聚合</span>}>
             <KlinePanel candles={candles} loading={klineLoading} />
           </Card>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Card size="small" style={{ flex: 1, minWidth: 300, background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>五档成交参考</span>} extra={<span style={{ fontSize: 11, color: T.textMuted }}>已成交订单聚合</span>}>
+              <div style={{ display: 'flex', gap: 20 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 6 }}>买入成交</div>
+                  {Array.from({ length: 5 }, (_, index) => orderBook?.bids[index]).map((level, index) => <div key={`bid-${index}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, lineHeight: '24px', color: T.textMuted }}><span>买{index + 1}</span><span style={{ color: level ? '#e74c3c' : T.textMuted }}>{level ? level.price.toFixed(2) : '--'}</span><span>{level ? `${Number(level.quantity).toLocaleString('zh-CN')} 股` : '--'}</span></div>)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#2ecc71', marginBottom: 6 }}>卖出成交</div>
+                  {Array.from({ length: 5 }, (_, index) => orderBook?.asks[index]).map((level, index) => <div key={`ask-${index}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, lineHeight: '24px', color: T.textMuted }}><span>卖{index + 1}</span><span style={{ color: level ? '#2ecc71' : T.textMuted }}>{level ? level.price.toFixed(2) : '--'}</span><span>{level ? `${Number(level.quantity).toLocaleString('zh-CN')} 股` : '--'}</span></div>)}
+                </div>
+              </div>
+            </Card>
+            <Card size="small" style={{ flex: 1, minWidth: 300, background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>大单提示</span>} extra={<span style={{ fontSize: 11, color: T.textMuted }}>单笔 ≥ 1,000 股</span>}>
+              {(orderBook?.largeTrades?.length ?? 0) > 0 ? orderBook!.largeTrades.map((trade, index) => <div key={`${trade.created_at}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, lineHeight: '25px', borderBottom: index === orderBook!.largeTrades.length - 1 ? 'none' : `1px solid ${T.border}` }}><span style={{ color: trade.side === 'buy' ? '#e74c3c' : '#2ecc71' }}>{trade.side === 'buy' ? '买入大单' : '卖出大单'}</span><span>{fmtMoney(trade.price)} · {Number(trade.quantity).toLocaleString('zh-CN')} 股</span><span style={{ color: T.textMuted }}>{String(trade.created_at).slice(5, 16)}</span></div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无达到提示阈值的大单" />}
+            </Card>
+            <Card size="small" style={{ flex: 1, minWidth: 230, background: T.cardBg, borderColor: T.border }} title={<span style={{ fontSize: 13, color: T.textPrimary }}>涨跌榜</span>}>
+              {[...market].sort((a, b) => quotePct(b) - quotePct(a)).slice(0, 3).map((stock, index) => <div key={stock.symbol} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, lineHeight: '26px' }}><span style={{ color: T.textMuted }}>{index + 1} · {stock.symbol}</span><span style={{ color: trendColor(quotePct(stock)) }}>{fmtPct(quotePct(stock))}</span></div>)}
+            </Card>
+          </div>
 
           {/* ── 下：持仓 + 成交记录（仅 admin/operator）── */}
           {isTrader && (
