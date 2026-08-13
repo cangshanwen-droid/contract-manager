@@ -67,11 +67,17 @@ const DashboardPage: React.FC = () => {
 
   const loadStockData = useCallback(async (): Promise<boolean> => {
     try {
-      const result = await invoke(IPC_CHANNELS.STOCK_GET_MARKET)
-      if (result?.success && result.data?.stocks) {
+      const result = await invoke(IPC_CHANNELS.STOCK_GET_MARKET) as any
+      // 兼容云端纯数组（/market 返回 [{symbol,current_price,change_pct}]）与本地 {success,data:{stocks}} 结构
+      const stocks = Array.isArray(result) ? result : (result?.data?.stocks || result?.stocks || null)
+      if (stocks && stocks.length) {
         const quotes: Record<string, any> = {}
-        for (const s of result.data.stocks) {
-          quotes[s.symbol] = { price: s.price, change: s.change, changePct: s.changePct }
+        for (const s of stocks) {
+          quotes[s.symbol] = {
+            price: s.current_price ?? s.price ?? 0,
+            change: s.change ?? 0,
+            changePct: s.change_pct ?? s.changePct ?? 0,
+          }
         }
         setStockQuotes(quotes)
         setQuoteFailed(false)
