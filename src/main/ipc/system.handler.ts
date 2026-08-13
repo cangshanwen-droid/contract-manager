@@ -52,8 +52,9 @@ export function registerSystemHandlers(): void {
       if (!perm.ok) return perm.response
 
       // 并行健康检查：云端数据 API 与 股票行情 API（同一台服务器不同服务）
+      // 云端 API 用 /api/health（无鉴权 200）——/api/regions 需 JWT，主进程 ping 会 401
       const [cloud, stock] = await Promise.all([
-        ping(`${API_BASE}/api/regions`, '云端数据 API'),
+        ping(`${API_BASE}/api/health`, '云端数据 API'),
         ping(`${API_BASE}/market`, '股票行情 API'),  // stock-api 实际路由是 /market（非 /market/stocks）
       ])
 
