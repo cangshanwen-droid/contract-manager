@@ -115,7 +115,7 @@ Use tight corners consistently. Controls use the medium radius; data surfaces ma
 
 Tables use a dark surface header, fine row dividers, tabular numbers, and a restrained gold-tinted hover state. Buttons, inputs, menus, tags, modals, and drawers use the same edge treatment and visible keyboard focus outline. Icon-only controls carry accessible names.
 
-Executive metrics are composed as one ledger surface with shared dividers: one leading financial value and compact secondary cells. Do not return to rows of unrelated equal KPI cards. The login surface pairs a silent brand instrument with a dedicated secure-access column: the left side contains no product copy or role explanation, only the centered static mark inside measured axes, orbit geometry, and square registration details. Continuous supporting motion is low-frequency and transform-only; one-time entrances may also use opacity, and reduced-motion preferences collapse every animation to a single imperceptible frame.
+Executive metrics are composed as one ledger surface with shared dividers: one leading financial value and compact secondary cells. Do not return to rows of unrelated equal KPI cards. The login surface pairs a silent brand instrument with a dedicated secure-access column: the left side contains no product copy or role explanation, only the centered mark inside measured axes, orbit geometry, and square registration details. The mark uses a subtle eight-second breathing cycle; all continuous supporting motion is low-frequency and transform-only. One-time entrances may also use opacity, and reduced-motion preferences collapse every animation to a single imperceptible frame.
 
 ## Role surfaces
 
