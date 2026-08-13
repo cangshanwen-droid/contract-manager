@@ -4,11 +4,10 @@
  */
 import React, { useState, useEffect } from 'react'
 import { Form, Input, Button, message } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, ArrowRightOutlined } from '@ant-design/icons'
 import { LogoFull } from '../components/LogoSystem'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { setAuthToken, cloudLogin } from '../api/cloudApi'
-import { tokens as T } from '../styles/design-tokens'
 
 const invoke = (ch: string, ...args: unknown[]) => window.api.invoke(ch, ...args)
 
@@ -75,104 +74,78 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
     } catch { message.error('操作失败') } finally { setLoading(false) }
   }
 
-  const caps = [
-    { zh: '实时分析', en: 'Real-time Analytics' },
-    { zh: '风险预测', en: 'Risk Intelligence' },
-    { zh: '资产管理', en: 'Asset Management' },
+  const roleBriefs = [
+    { role: '管理端', scope: '全局配置、账户权限与业务治理' },
+    { role: '操作端', scope: '合同执行、资金操作与市场交易' },
+    { role: '代表端', scope: '区域数据、个人持仓与信息查阅' },
   ]
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', position: 'relative', overflow: 'hidden',
-      background: T.bgRoot,
-      fontFamily: "'Inter','SF Pro Display','Helvetica Neue','HarmonyOS Sans','Microsoft YaHei',sans-serif",
-    }} className="gipfel-login">
+    <main className="gipfel-login-v2">
+      <section className="gipfel-login-v2__brief" aria-label="平台介绍">
+        <header className="gipfel-login-v2__brand">
+          <LogoFull width={116} />
+          <span>机构业务工作台</span>
+        </header>
 
-      {/* LEFT - Brand */}
-      <div style={{ flex: '0 0 52%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', zIndex: 1, padding: 48, borderRight: `1px solid ${T.border}` }}>
-        <div style={{ textAlign: 'center', maxWidth: 440 }}>
-          <div style={{ display: 'inline-block', marginBottom: 20 }}><LogoFull width={180} /></div>
-
-          <div style={{ marginTop: 8, fontSize: 14, fontWeight: 400, color: T.textSecondary, letterSpacing: '.16em' }}>
-            智能金融管理平台
-          </div>
-          <div style={{ fontSize: 11, color: 'rgba(138,155,181,0.4)', letterSpacing: '.12em', marginTop: 2 }}>
-            Financial Intelligence Platform
-          </div>
-
-          <div style={{ marginTop: 44, display: 'flex', gap: 12, justifyContent: 'center' }}>
-            {caps.map((t, idx) => (
-              <div key={t.zh}
-                style={{
-                  padding: '12px 16px', borderRadius: 4, textAlign: 'center',
-                  background: T.bgPanel, border: `1px solid ${T.border}`,
-                  minWidth: 110,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#D4AF37', letterSpacing: '.04em', marginBottom: 4 }}>{t.zh}</div>
-                <div style={{ fontSize: 11, color: 'rgba(138,155,181,0.5)', letterSpacing: '.05em', position: 'relative' }}>
-                  {t.en}
-                  <div style={{ width: 14, height: 1, margin: '3px auto 0', background: 'rgba(212,175,55,0.15)', borderRadius: .5 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 36, display: 'flex', gap: 32, justifyContent: 'center' }}>
-            {['MARKET DATA', 'AI ANALYTICS', 'RISK ENGINE'].map((s) => (
-              <span key={s} style={{
-                fontSize: 11, letterSpacing: '.12em', color: T.textSecondary,
-                opacity: 0.65,
-              }}>{s}</span>
-            ))}
-          </div>
+        <div className="gipfel-login-v2__statement">
+          <p className="gipfel-login-v2__edition">GIPFEL / INSTITUTIONAL DESKTOP</p>
+          <h1>把合同、区域、资金与市场<br />放在同一张工作桌上。</h1>
+          <p className="gipfel-login-v2__lead">
+            面向管理、操作与代表三类岗位的统一业务入口。数据同源，权限分明，关键动作可追溯。
+          </p>
         </div>
-      </div>
 
-      {/* RIGHT - Login card */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1, minWidth: 370, padding: 32 }}>
-        <div style={{
-          width: '100%', maxWidth: 370, padding: '38px 34px 32px',
-          background: T.bgPanel, borderRadius: 4, border: `1px solid ${T.border}`,
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: 26 }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: T.textPrimary, letterSpacing: '.03em' }}>欢迎回来</div>
-            <div style={{ width: 28, height: 2, margin: '8px auto 0', background: T.primary }} />
-            <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 8, letterSpacing: '.05em' }}>登录 Gipfel 智能金融平台</div>
-            <div style={{ fontSize: 11, color: 'rgba(138,155,181,0.35)', marginTop: 4, letterSpacing: '.06em' }}>Secure access · Intelligent finance</div>
+        <div className="gipfel-login-v2__roles" aria-label="岗位工作范围">
+          {roleBriefs.map((item, index) => (
+            <div className="gipfel-login-v2__role" key={item.role}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <strong>{item.role}</strong>
+              <p>{item.scope}</p>
+            </div>
+          ))}
+        </div>
+
+        <footer className="gipfel-login-v2__meta">
+          <span>GIPFEL MANAGEMENT SYSTEM</span>
+          <span>DESKTOP EDITION · 2026</span>
+        </footer>
+      </section>
+
+      <section className="gipfel-login-v2__access" aria-label="账号登录">
+        <div className="gipfel-login-v2__form-wrap">
+          <div className="gipfel-login-v2__form-head">
+            <span className="gipfel-login-v2__session">安全会话</span>
+            <h2>{isFirstUse ? '创建管理账户' : '进入工作台'}</h2>
+            <p>{isFirstUse ? '完成初始设置后将自动进入管理端' : '使用已分配的机构账号继续'}</p>
           </div>
 
-          {isFirstUse && <div style={{ marginBottom: 18, padding: '9px 12px', borderRadius: 4, background: T.warmDim, border: `1px solid ${T.border}`, textAlign: 'center', fontSize: 11, color: T.primary }}>首次使用 · 创建管理员账号</div>}
+          {isFirstUse && <div className="gipfel-login-v2__notice">当前设备尚未配置账户，请创建首位管理员。</div>}
 
-          <Form form={form} onFinish={handleSubmit} layout="vertical" size="large">
-            <Form.Item label={<span style={{ color: T.textSecondary, fontSize: 12 }}>账号名称 · 例如 admin</span>} name="username" rules={[{ required: true, message: '请输入用户名' }]} style={{ marginBottom: 16 }}>
-              <Input prefix={<UserOutlined style={{ color: T.textSecondary, fontSize: 14 }} />}
-                placeholder="用户名" autoFocus
-                style={{ height: 44, borderRadius: 4, fontSize: 13, background: T.bgRoot, borderColor: T.border, color: T.textPrimary, caretColor: T.primary }} />
+          <Form form={form} onFinish={handleSubmit} layout="vertical" size="large" className="gipfel-login-v2__form">
+            <Form.Item label="账号名称" name="username" extra="例如 admin" rules={[{ required: true, message: '请输入用户名' }]}>
+              <Input prefix={<UserOutlined aria-hidden="true" />} placeholder="请输入账号" autoFocus autoComplete="username" />
             </Form.Item>
-            <Form.Item label={<span style={{ color: T.textSecondary, fontSize: 12 }}>登录密码 · 至少 6 位</span>} name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]} style={{ marginBottom: isFirstUse ? 16 : 22 }}>
-              <Input.Password prefix={<LockOutlined style={{ color: T.textSecondary, fontSize: 14 }} />}
-                placeholder="密码"
-                style={{ height: 44, borderRadius: 4, fontSize: 13, background: T.bgRoot, borderColor: T.border, color: T.textPrimary, caretColor: T.primary }} />
+            <Form.Item label="登录密码" name="password" extra="至少 6 位" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]}>
+              <Input.Password prefix={<LockOutlined aria-hidden="true" />} placeholder="请输入密码" autoComplete={isFirstUse ? 'new-password' : 'current-password'} />
             </Form.Item>
-            {isFirstUse && <Form.Item label={<span style={{ color: T.textSecondary, fontSize: 12 }}>确认密码 · 再次输入密码</span>} name="confirm" rules={[{ required: true, message: '请确认密码' }]} style={{ marginBottom: 22 }}>
-              <Input.Password prefix={<LockOutlined style={{ color: T.textSecondary, fontSize: 14 }} />} placeholder="确认密码"
-                style={{ height: 44, borderRadius: 4, fontSize: 13, background: T.bgRoot, borderColor: T.border, color: T.textPrimary, caretColor: T.primary }} />
+            {isFirstUse && <Form.Item label="确认密码" name="confirm" rules={[{ required: true, message: '请确认密码' }]}>
+              <Input.Password prefix={<LockOutlined aria-hidden="true" />} placeholder="请再次输入密码" autoComplete="new-password" />
             </Form.Item>}
-            <Form.Item style={{ marginBottom: 0 }}>
-              <Button type="primary" htmlType="submit" loading={loading} block
-                style={{ height: 44, fontSize: 14, fontWeight: 700, borderRadius: 4, letterSpacing: '.05em', background: T.primary, borderColor: T.primary, color: T.bgRoot }}>
-                {isFirstUse ? '创建管理员账号' : (<>登录 <span className="gipfel-login__arrow" style={{ marginLeft: 3 }}>→</span></>)}
+            <Form.Item className="gipfel-login-v2__submit">
+              <Button type="primary" htmlType="submit" loading={loading} block>
+                {isFirstUse ? '创建并进入' : '进入系统'} <ArrowRightOutlined aria-hidden="true" />
               </Button>
             </Form.Item>
           </Form>
-          <div style={{ textAlign: 'center', marginTop: 22 }}>
-            <span style={{ fontSize: 11, color: 'rgba(138,155,181,.2)', letterSpacing: '.05em' }}>© 2026 Gipfel Financial Platform</span>
+
+          <div className="gipfel-login-v2__security">
+            <span aria-hidden="true" />
+            账号凭据由系统安全存储，登录行为将被记录
           </div>
         </div>
-      </div>
-
-    </div>
+      </section>
+    </main>
   )
 }
 export default LoginPage

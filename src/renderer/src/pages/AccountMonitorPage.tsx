@@ -72,7 +72,7 @@ const fmtMoney = (v: number): string =>
 /** 系统级指标卡片（管理端顶部行） */
 const MetricCard: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = T.textPrimary, sub }) => (
   <div style={{
-    background: T.panel, border: `1px solid ${T.border}`, borderLeft: '3px solid #D4AF37',
+    background: T.panel, border: `1px solid ${T.border}`, borderTop: '2px solid #D4AF37',
     borderRadius: 4, padding: '12px 16px', minWidth: 0,
   }}>
     <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 6, lineHeight: 1.5 }}>{label}</div>

@@ -178,7 +178,7 @@ const DashboardPage: React.FC = () => {
       <div className="page-fade-in" style={{ maxWidth: 1440, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[1,2,3,4].map(i => (
-            <div key={i} style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderLeft: `3px solid ${T.accent}`, borderRadius: 4, padding: '16px 20px' }}>
+            <div key={i} style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderTop: `2px solid ${T.accent}`, borderRadius: 4, padding: '16px 20px' }}>
               <Skeleton.Input active size="small" style={{ width: 60, marginBottom: 8 }} />
               <Skeleton.Input active style={{ width: 100, height: 24 }} />
             </div>
@@ -293,31 +293,28 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ════════════ SECTION 1: 核心 KPI 卡片行 ════════════ */}
-      <div className="kpi-grid-4" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 16,
-        marginBottom: 24,
-      }}>
-        <KPICard label="区域数" value={animRegionCount} />
-        <KPICard label="合同数" value={animContractCount} />
-        <KPICard label="公司数" value={animCompanyCount} />
-        <KPICard label="碳排放总量" value={formatCarbon(totalCarbon)} />
-      </div>
-
-      {/* ════════════ SECTION 1b: 财务 KPI ════════════ */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 16,
-        marginBottom: 16,
-      }}>
-        <KPICard label="合同总额" value={formatMoneyCNY(totalContractAmount)} />
-        <KPICard label="资金余额" value={formatMoneyCNY(totalAccountBalance)} />
-        <KPICard label="账户数" value={totalAccounts} />
-        <KPICard label="总人口" value={formatPopulation(totalPopulation)} />
-      </div>
+      <section className="gipfel-executive-board" aria-labelledby="executive-board-title">
+        <div className="gipfel-executive-board__head">
+          <div>
+            <h1 id="executive-board-title">经营总览</h1>
+            <p>区域、合同、资金与环境指标的实时汇总</p>
+          </div>
+          <span>{user?.role === 'admin' ? '全局口径' : user?.role === 'operator' ? '操作口径' : '只读口径'}</span>
+        </div>
+        <div className="gipfel-executive-board__metrics">
+          <div className="gipfel-executive-board__primary">
+            <span>合同总额</span>
+            <strong>{formatMoneyCNY(totalContractAmount)}</strong>
+            <small>{animContractCount} 份合同纳入统计</small>
+          </div>
+          <ExecutiveMetric label="资金余额" value={formatMoneyCNY(totalAccountBalance)} />
+          <ExecutiveMetric label="区域数" value={animRegionCount} />
+          <ExecutiveMetric label="公司数" value={animCompanyCount} />
+          <ExecutiveMetric label="账户数" value={totalAccounts} />
+          <ExecutiveMetric label="总人口" value={formatPopulation(totalPopulation)} />
+          <ExecutiveMetric label="碳排放总量" value={formatCarbon(totalCarbon)} />
+        </div>
+      </section>
 
       {/* ════════════ ADMIN: 系统概览 ════════════ */}
       {user?.role === 'admin' && (
@@ -337,13 +334,13 @@ const DashboardPage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 16 }}>
             {/* 左：用户构成 KPI */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, alignContent: 'start' }}>
-              <KPICard label="系统用户总数" value={systemStats?.total_users ?? 0} />
-              <KPICard label="操作员数" value={systemStats?.operator_count ?? 0} />
-              <KPICard label="代表数" value={systemStats?.rep_count ?? 0} />
-              <KPICard label="管理员数" value={systemStats?.admin_count ?? 0} />
-              <KPICard label="活跃用户（30天）" value={systemStats?.active_users_30d ?? 0} />
-              <KPICard label="今日登录" value={systemStats?.logins_24h ?? 0} />
+            <div className="gipfel-system-metrics">
+              <ExecutiveMetric label="系统用户总数" value={systemStats?.total_users ?? 0} />
+              <ExecutiveMetric label="操作员数" value={systemStats?.operator_count ?? 0} />
+              <ExecutiveMetric label="代表数" value={systemStats?.rep_count ?? 0} />
+              <ExecutiveMetric label="管理员数" value={systemStats?.admin_count ?? 0} />
+              <ExecutiveMetric label="活跃用户（30天）" value={systemStats?.active_users_30d ?? 0} />
+              <ExecutiveMetric label="今日登录" value={systemStats?.logins_24h ?? 0} />
             </div>
 
             {/* 右：最近创建用户 */}
@@ -624,29 +621,10 @@ const DashboardPage: React.FC = () => {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
 
-/** KPI card - left 3px accent border + large number + small label */
-const KPICard: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
-  <div className="gipfel-card" style={{
-    background: T.bgCard,
-    border: `1px solid ${T.border}`,
-    borderLeft: `3px solid ${T.accent}`,
-    borderRadius: 4,
-    padding: '16px 20px',
-  }}>
-    <div style={{ fontSize: 11, color: T.silverMut, marginBottom: 8, lineHeight: 1.6 }}>
-      {label}
-    </div>
-    <div style={{
-      fontFamily: "'Inter', 'SF Pro Display', 'JetBrains Mono', 'Consolas', monospace",
-      fontSize: 24,
-      fontWeight: 600,
-      color: T.silver,
-      fontVariantNumeric: 'tabular-nums',
-      lineHeight: 1.2,
-      letterSpacing: '-0.02em',
-    }}>
-      {typeof value === 'number' ? value.toLocaleString() : value}
-    </div>
+const ExecutiveMetric: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
+  <div className="gipfel-executive-metric">
+    <span>{label}</span>
+    <strong>{typeof value === 'number' ? value.toLocaleString() : value}</strong>
   </div>
 )
 
@@ -680,15 +658,18 @@ const RepMiniStat: React.FC<{ label: string; value: number | string }> = ({ labe
 
 /** 待办工作台卡片 - 可点击跳转到合同列表对应筛选 */
 const TodoCard: React.FC<{ label: string; count: number; color: string; onClick: () => void }> = ({ label, count, color, onClick }) => (
-  <div
+  <button
+    type="button"
+    className="gipfel-todo-card"
     onClick={onClick}
+    aria-label={`查看${label}合同`}
     style={{
       flex: 1, background: `${color}14`, borderRadius: 4,
-      padding: '12px 16px', borderLeft: `3px solid ${color}`,
-      cursor: 'pointer', transition: 'background 150ms ease', position: 'relative',
+      padding: '12px 16px', border: `1px solid ${color}55`, borderTop: `2px solid ${color}`,
+      cursor: 'pointer', transition: 'background 150ms ease', position: 'relative', textAlign: 'left',
     }}
-    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = `${color}26` }}
-    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = `${color}14` }}
+    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}26` }}
+    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = `${color}14` }}
   >
     <div style={{ fontSize: 24, fontWeight: 600, color, fontVariantNumeric: 'tabular-nums',
       fontFamily: "'Inter', 'SF Pro Display', 'JetBrains Mono', monospace", lineHeight: 1.2 }}>
@@ -696,7 +677,7 @@ const TodoCard: React.FC<{ label: string; count: number; color: string; onClick:
     </div>
     <div style={{ fontSize: 11, color: T.textMuted, marginTop: 4 }}>{label}</div>
     <div style={{ position: 'absolute', top: 12, right: 14, fontSize: 11, color, opacity: 0.75 }}>→</div>
-  </div>
+  </button>
 )
 
 /** Region info card for Section 2 */
@@ -729,6 +710,15 @@ const RegionInfoCard: React.FC<{
     <div
           className="gipfel-card"
           onClick={onClick}
+          role={!isPlaceholder && clickable ? 'button' : undefined}
+          tabIndex={!isPlaceholder && clickable ? 0 : undefined}
+          aria-label={!isPlaceholder && clickable ? `查看${region.name || '区域'}详情` : undefined}
+          onKeyDown={(event) => {
+            if (!isPlaceholder && clickable && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault()
+              onClick()
+            }
+          }}
           style={{
             background: T.bgCard,
             border: isPlaceholder ? `1px dashed ${T.border}` : `1px solid ${T.border}`,
@@ -762,7 +752,7 @@ const RegionInfoCard: React.FC<{
           }}>
             <span style={{ color: T.silverMut }}>{sym}</span>
             {q ? (
-              <span style={{ fontFamily: 'tabular-nums' }}>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ color: T.silver }}>{formatMoneyCNY(q.price)}</span>
                 <span style={{ color: q.change >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR, marginLeft: 8 }}>
                   {formatTrend(q.changePct)}{formatPercentWithSign(q.changePct)}

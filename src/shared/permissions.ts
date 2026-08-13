@@ -86,3 +86,8 @@ export function hasPermission(
 ): boolean {
   return !!user && Array.isArray(user.permissions) && user.permissions.includes(permission)
 }
+
+/** 股票写操作必须显式命中管理端或操作端；未知/缺失角色一律按只读处理。 */
+export function canTradeStocks(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'operator'
+}

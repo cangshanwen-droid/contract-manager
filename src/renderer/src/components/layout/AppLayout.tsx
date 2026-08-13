@@ -21,7 +21,7 @@
  */
 
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
-import { Layout, Menu, Breadcrumb, Tag } from 'antd'
+import { Layout, Menu, Breadcrumb, Button } from 'antd'
 import {
   DashboardOutlined, EnvironmentOutlined, FileTextOutlined,
   TeamOutlined, BarChartOutlined,
@@ -114,7 +114,7 @@ const menuOverrideCSS = `
   .gipfel-sidebar .ant-menu-item-selected {
     background-color: rgba(212, 175, 55, 0.10) !important;
     color: var(--gipfel-text-primary) !important;
-    border-left: 3px solid #D4AF37 !important;
+    box-shadow: inset 2px 0 0 #D4AF37 !important;
   }
   .gipfel-sidebar .ant-menu-item:not(.ant-menu-item-selected):hover {
     background-color: rgba(255, 255, 255, 0.04) !important;
@@ -132,7 +132,7 @@ const menuOverrideCSS = `
     line-height: 1.5 !important;
     margin: 0 !important;
     padding-left: 18px !important;
-    border-left: 3px solid transparent !important;
+    border-left: 0 !important;
     border-radius: 0 !important;
     height: 40px !important;
   }
@@ -218,6 +218,9 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
   const segments = location.pathname.split('/').filter(Boolean)
   const selected = '/' + (segments[0] || 'dashboard')
   const [collapsed, setCollapsed] = useState(false)
+  const pageTitle = role === 'rep' && segments[0] === 'stocks'
+    ? '股票行情'
+    : ROUTE_HIERARCHY[segments[0] || 'dashboard']?.label || segments[0] || '仪表盘'
 
   // ── 生成面包屑层级 ──
   const breadcrumbItems = useMemo(() => {
@@ -237,8 +240,9 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             })
           }
         }
+        const visibleLabel = role === 'rep' && segments[0] === 'stocks' ? '股票行情' : routeInfo.label
         crumbs.push({
-          title: <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 500 }}>{routeInfo.label}</span>
+          title: <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 500 }}>{visibleLabel}</span>
         })
       } else {
         crumbs.push({
@@ -247,7 +251,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
       }
     }
     return crumbs
-  }, [segments, navigate])
+  }, [segments, navigate, role])
 
   // ── 全局键盘快捷键：Escape 关闭弹窗 / Enter 提交表单 / Ctrl+Shift+N 新建区域 ──
   useEffect(() => {
@@ -305,7 +309,9 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           const need = (child as any).permission as string | undefined
           if (need) return userPermissions.includes(need)
           return true
-        })
+        }).map(child => role === 'rep' && child?.key === '/stocks'
+          ? { ...child, label: '股票行情' }
+          : child)
         return { ...group, children }
       })
       .filter(group => group.children && group.children.length > 0),
@@ -316,186 +322,65 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
   const toggleCollapse = useCallback(() => setCollapsed(v => !v), [])
 
   return (
-    <Layout className="gipfel-layout" style={{ height: '100vh' }}>
+    <Layout className="gipfel-layout gipfel-shell-v2">
       <style>{menuOverrideCSS}</style>
+      <a className="gipfel-skip-link" href="#main-content">跳到主要内容</a>
 
-      {/* Sidebar: 220px - 暗色 T.panel(#0F2748) */}
-      <Sider
-        width={220}
-        collapsedWidth={64}
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        theme="dark"
-        trigger={null}
-        style={{
-          background: T.panel,
-          borderRight: `1px solid ${T.border}`,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Logo 区域 - 64px 居中，无品牌名 */}
-        <div style={{
-          height: 64,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: collapsed ? '12px 8px' : '12px 16px',
-          borderBottom: `1px solid ${T.border}`,
-          flexShrink: 0,
-        }}>
-          <img src={LOGO_ICON} alt="GIPFEL"
-            style={{ height: collapsed ? 32 : 40, width: 'auto', objectFit: 'contain' }} />
+      <Sider width={248} collapsedWidth={72} collapsible collapsed={collapsed}
+        onCollapse={setCollapsed} theme="dark" trigger={null} className="gipfel-shell-v2__sider">
+        <div className={`gipfel-shell-v2__brand ${collapsed ? 'is-collapsed' : ''}`}>
+          <img src={LOGO_ICON} alt="GIPFEL" className="gipfel-shell-v2__brand-mark" />
+          {!collapsed && <div className="gipfel-shell-v2__brand-copy">
+            <strong>GIPFEL</strong>
+            <span>机构业务工作台</span>
+          </div>}
         </div>
 
-        {/* Navigation - 三组 + 分割线 */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <Menu
-            theme="dark"
-            mode="inline"
-            selectedKeys={[selected]}
-            items={filteredItems}
-            onClick={({ key }) => navigate(key)}
-            className="gipfel-sidebar"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '0',
-              fontSize: 13,
-            }}
-          />
-        </div>
+        <nav className="gipfel-shell-v2__nav" aria-label="主导航">
+          <Menu theme="dark" mode="inline" selectedKeys={[selected]} items={filteredItems}
+            onClick={({ key }) => navigate(key)} className="gipfel-sidebar" />
+        </nav>
 
-        {/* 底部用户区域 - 用户名 + 角色标签 + 点击退出 */}
-        <div style={{
-          borderTop: `1px solid ${T.border}`,
-          padding: collapsed ? '10px 8px' : '14px 16px',
-          cursor: onLogout ? 'pointer' : 'default',
-          transition: 'background 150ms ease',
-          flexShrink: 0,
-          textAlign: collapsed ? 'center' : 'left',
-        }}
-        onClick={onLogout}
-        onMouseEnter={e => {
-          if (onLogout) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLDivElement).style.background = 'transparent'
-        }}
-        >
-          {!collapsed ? (
-            <>
-              {/* 用户头像 + 名字 */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                marginBottom: 8,
-              }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: '50%',
-                  background: 'rgba(212, 175, 55, 0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <UserOutlined style={{ color: '#D4AF37', fontSize: 14 }} />
-                </div>
-                <span style={{
-                  fontSize: 13, color: T.textPrimary,
-                  lineHeight: 1.5, fontWeight: 500,
-                }}>
-                  {username || 'Admin'}
-                </span>
-              </div>
-
-              {/* 角色标签 */}
-              {role && (
-                <Tag color="gold" style={{ fontSize: 11, margin: 0, marginBottom: 6 }}>
-                  {ROLE_LABELS[role] || role}
-                </Tag>
-              )}
-
-              {/* 退出提示 */}
-              <div style={{
-                fontSize: 11, color: T.textMuted, marginTop: 4,
-                display: 'flex', alignItems: 'center',
-              }}>
-                <LogoutOutlined style={{ marginRight: 6, fontSize: 11 }} />
-                退出登录
-              </div>
-            </>
-          ) : (
-            <UserOutlined style={{ color: '#D4AF37', fontSize: 16 }} />
-          )}
+        <div className={`gipfel-shell-v2__account ${collapsed ? 'is-collapsed' : ''}`}
+          onClick={onLogout} role={onLogout ? 'button' : undefined} tabIndex={onLogout ? 0 : undefined}
+          aria-label={onLogout ? '退出当前账号' : undefined}
+          onKeyDown={event => {
+            if (onLogout && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault()
+              onLogout()
+            }
+          }}>
+          {!collapsed ? <div className="gipfel-shell-v2__account-row">
+            <div className="gipfel-shell-v2__avatar"><UserOutlined /></div>
+            <div className="gipfel-shell-v2__identity">
+              <strong>{username || 'Admin'}</strong>
+              <span>{ROLE_LABELS[role || 'rep'] || role}</span>
+            </div>
+            <LogoutOutlined className="gipfel-shell-v2__logout" />
+          </div> : <UserOutlined />}
         </div>
       </Sider>
 
-      {/* Main content area */}
-      <Layout style={{ background: T.bgRoot }}>
-        {/* Top bar - breadcrumb + collapse trigger */}
-        <Header className="gipfel-topbar" style={{
-          background: T.panel,
-          padding: '0 32px',
-          height: 52,
-          display: 'flex', alignItems: 'center',
-          borderBottom: `1px solid ${T.border}`,
-          gap: 16,
-        }}>
-          {/* 侧栏折叠按钮 */}
-          <span
-            onClick={toggleCollapse}
-            style={{
-              cursor: 'pointer',
-              fontSize: 16,
-              color: T.textSecondary,
-              transition: 'color 150ms',
-              lineHeight: '52px',
-              flexShrink: 0,
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textPrimary }}
-            onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textSecondary }}
-          >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          </span>
-
-          <Breadcrumb items={breadcrumbItems} />
-
-          {/* 全局搜索：合同/区域 (Ctrl+K) */}
-          <GlobalSearch />
-
-          {/* 通知中心：铃铛 + 未读红点 + 下拉面板 */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-            <NotificationBell />
+      <Layout className="gipfel-shell-v2__main">
+        <Header className="gipfel-topbar gipfel-shell-v2__topbar">
+          <Button type="text" aria-label={collapsed ? '展开侧边导航' : '收起侧边导航'}
+            aria-pressed={!collapsed} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={toggleCollapse} className="gipfel-shell-v2__collapse" />
+          <div className="gipfel-shell-v2__page-context">
+            <strong>{pageTitle}</strong>
+            <Breadcrumb items={breadcrumbItems} />
           </div>
+          <GlobalSearch />
+          <div className="gipfel-shell-v2__top-actions"><NotificationBell /></div>
         </Header>
 
-        {/* 全局网络状态条：断网时常驻警示，恢复自动消失 */}
         <NetworkStatusBar />
 
-        {/* Content - 32px padding, responsive */}
-        <Content className="gipfel-main-content" style={{
-          padding: 32,
-          overflow: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{ flex: 1 }}>
-            <Outlet />
-          </div>
-
-          {/* 底部版权 / 版本信息 */}
-          <div style={{
-            borderTop: `1px solid ${T.border}`,
-            marginTop: 24,
-            paddingTop: 12,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-            fontSize: 11,
-            color: T.textMuted,
-            lineHeight: 1.55,
-          }}>
-            <span>© 2026 Gipfel 机构平台 · 基础设施合同管理 + 区域模拟</span>
-            <span>Institutional Platform · v1.3.0 · {authUser?.role === 'operator' ? '操作端' : authUser?.role === 'admin' ? '管理端' : '代表端只读视图'}</span>
+        <Content id="main-content" className="gipfel-main-content gipfel-shell-v2__content">
+          <div className="gipfel-shell-v2__view"><Outlet /></div>
+          <div className="gipfel-shell-v2__statusbar">
+            <span>GIPFEL 机构业务工作台</span>
+            <span>v1.3.0 · {authUser?.role === 'operator' ? '操作端' : authUser?.role === 'admin' ? '管理端' : '代表端只读视图'}</span>
           </div>
         </Content>
       </Layout>

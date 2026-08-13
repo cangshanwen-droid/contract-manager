@@ -94,28 +94,16 @@ const RegionListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI 卡片 - 暖金点缀 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 12 }}>
+      <div className="gipfel-ledger-strip" aria-label="区域关键指标">
         {[
         { l: '区域数量', v: regions.length },
         { l: '总人口', v: (regions.reduce((s, r) => s + r.population, 0) / 10000).toFixed(0) + '万', warm: true },
         { l: '平均增长率', v: avgGrowth + '%', warm: true },
         { l: '总人才', v: regions.reduce((s, r) => s + r.talent_population, 0).toLocaleString(), warm: true },
         ].map((k, i) => (
-        <div key={i} style={{
-          background: T.bgCard,
-          border: `1px solid ${T.border}`,
-          borderLeft: k.warm ? `3px solid ${T.warmGold}` : `3px solid ${T.accent}`,
-          borderRadius: 4,
-          padding: '12px 16px',
-        }}>
-          <div style={{ fontSize: 11, color: T.silverMut }}>{k.l}</div>
-          <div style={{
-            fontFamily: "'JetBrains Mono', 'Consolas', monospace",
-            fontSize: 20, fontWeight: 700,
-            color: k.warm ? T.warmGold : T.accent,
-            marginTop: 4,
-          }}>{k.v}</div>
+        <div className="gipfel-ledger-strip__item" key={i}>
+          <span>{k.l}</span>
+          <strong>{k.v}</strong>
         </div>
         ))}
       </div>

@@ -12,7 +12,8 @@ import {
   PERMISSION_LABELS,
   PERMISSIONS,
   ROLE_PERMISSIONS,
-  hasPermission
+  hasPermission,
+  canTradeStocks
 } from '../src/shared/permissions'
 import {
   forbiddenResponse,
@@ -37,6 +38,14 @@ beforeEach(async () => {
 })
 
 describe('ROLE_PERMISSIONS 静态映射', () => {
+  it('股票写操作仅管理端和操作端可用，未知角色默认只读', () => {
+    expect(canTradeStocks('admin')).toBe(true)
+    expect(canTradeStocks('operator')).toBe(true)
+    expect(canTradeStocks('rep')).toBe(false)
+    expect(canTradeStocks(undefined)).toBe(false)
+    expect(canTradeStocks('unexpected')).toBe(false)
+  })
+
   it('rep：只读--有 contract.view/account.view/stock.trade（股票面板只读视图），无任何写权限', () => {
     const perms = ROLE_PERMISSIONS.rep
     expect(perms).toContain(PERMISSIONS.CONTRACT_VIEW)

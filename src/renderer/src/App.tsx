@@ -85,9 +85,9 @@ const appTheme = {
     colorTextTertiary: T.textMuted,
     colorTextQuaternary: T.textMuted,
 
-    // ── Shape: 4px 金融克制圆角 ──
+    // ── Shape: tight institutional corners ──
     borderRadius: 4,
-    borderRadiusLG: 4,
+    borderRadiusLG: 6,
     borderRadiusSM: 4,
     borderRadiusXS: 3,
 
@@ -113,10 +113,10 @@ const appTheme = {
     paddingMD: 20,
     paddingLG: 24,
 
-    // ── Zero box-shadow - hierarchy via luminance only ──
-    boxShadow: 'none',
-    boxShadowSecondary: 'none',
-    boxShadowTertiary: 'none',
+    // ── Hierarchy comes from surface and linework, not glow ──
+    boxShadow: '0 12px 30px rgba(1, 13, 29, 0.22)',
+    boxShadowSecondary: '0 18px 40px rgba(1, 13, 29, 0.28)',
+    boxShadowTertiary: '0 22px 56px rgba(1, 13, 29, 0.32)',
 
     wireframe: false,
   },
@@ -188,7 +188,7 @@ const appTheme = {
       borderRadius: 4,
       activeBorderColor: '#D4AF37',
       hoverBorderColor: '#253548',
-      activeShadow: '0 0 0 2px rgba(212, 175, 55, 0.25)',
+      activeShadow: 'none',
     },
 
     // ── Select ──

@@ -68,7 +68,7 @@ const LandAreaReport: React.FC = () => {
   const statCard: React.CSSProperties = {
     background: T.card,
     border: `1px solid ${T.border}`,
-    borderLeft: `3px solid ${T.warmGold}`,
+    borderTop: `2px solid ${T.warmGold}`,
     borderRadius: 4,
     padding: '10px 14px',
   }

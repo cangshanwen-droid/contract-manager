@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Button, Tag, Space, InputNumber, Segmented, Table, Empty, Spin, Modal, Select, message } from 'antd'
 import { WalletOutlined, ReloadOutlined, SwapOutlined, RiseOutlined, FallOutlined, StarOutlined, StarFilled } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
+import { canTradeStocks } from '../../../shared/permissions'
 import { IPC_CHANNELS } from '../../../shared/constants'
 import { invoke } from '../api/cloudApi'
 import { tokens as T } from '../styles/design-tokens'
@@ -82,9 +83,9 @@ function KlinePanel({ candles, loading }: { candles: Candle[]; loading: boolean 
 }
 
 export function StockMarketPage() {
-  const { user } = useAuth()
-  const role = user?.role || 'admin'
-  const isTrader = role !== 'rep' // 管理端/操作端可交易；代表端只读
+  const user = useAuth()
+  const role = user?.role || 'rep'
+  const isTrader = canTradeStocks(role)
 
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')

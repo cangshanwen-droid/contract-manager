@@ -24,11 +24,11 @@ export const colors = {
 } as const
 
 export const radii = {
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  xxl: 20,
+  sm: 3,
+  md: 4,
+  lg: 6,
+  xl: 8,
+  xxl: 10,
 } as const
 
 export const space = {
@@ -56,7 +56,7 @@ export const fontSize = {
 } as const
 
 export const fontFamily = {
-  sans: "'Inter','SF Pro Display','Helvetica Neue','HarmonyOS Sans',sans-serif",
+  sans: "'Microsoft YaHei','PingFang SC','Segoe UI',system-ui,sans-serif",
   mono: "'JetBrains Mono','SF Mono',monospace",
 } as const
 

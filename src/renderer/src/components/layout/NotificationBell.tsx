@@ -209,7 +209,8 @@ const NotificationBell: React.FC = () => {
           style={{
             cursor: 'pointer', fontSize: 16, color: T.textSecondary,
             lineHeight: '52px', display: 'inline-flex', alignItems: 'center',
-            transition: 'color 150ms ease', padding: '0 4px',
+            padding: '0 4px',
+            transition: 'color 150ms ease',
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textPrimary }}
           onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textSecondary }}
