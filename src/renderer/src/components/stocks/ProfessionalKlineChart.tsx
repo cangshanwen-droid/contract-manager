@@ -141,6 +141,8 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
         >
         <rect x="0" y="0" width={chart.width} height={chart.height} fill="#07182E" />
 
+        <text x={LEFT} y={chart.priceTop + 2} className="trading-kline__axis-title">价格（元）</text>
+
         {chart.priceTicks.map((tick, index) => {
           const y = chart.priceTop + ((chart.priceBottom - chart.priceTop) * index) / 5
           return (
@@ -165,7 +167,9 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
         })}
 
         <line x1={LEFT} x2={chart.plotRight} y1={chart.volumeTop - 10} y2={chart.volumeTop - 10} className="trading-kline__divider" />
-        <text x={LEFT} y={chart.volumeTop} className="trading-kline__section-label">VOL</text>
+        <text x={LEFT} y={chart.volumeTop} className="trading-kline__section-label">成交量（股）</text>
+        <text x={chart.plotRight + 12} y={chart.volumeTop + 4} className="trading-kline__axis-label">{chart.maxVolume.toLocaleString('zh-CN')}</text>
+        <text x={chart.plotRight + 12} y={chart.volumeBottom + 4} className="trading-kline__axis-label">0</text>
 
         {chart.visible.map((candle, index) => {
           const x = LEFT + chart.step * index + chart.step / 2
@@ -199,6 +203,11 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
                 fill={color}
                 opacity="0.52"
               />
+              {chart.sparse && (
+                <text x={x} y={chart.volumeBottom + 18} textAnchor="middle" className="trading-kline__round-label">
+                  第 {candle.round} 轮
+                </text>
+              )}
             </g>
           )
         })}
@@ -207,15 +216,17 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
         <rect x={chart.plotRight + 5} y={latestY - 11} width={RIGHT - 10} height="22" className="trading-kline__last-label-bg" />
         <text x={chart.plotRight + 12} y={latestY + 4} className="trading-kline__last-label">{priceLabel(latest.close)}</text>
 
-        {!chart.sparse && chart.highestIndex >= 0 && (() => {
+        {chart.highestIndex >= 0 && (() => {
           const x = LEFT + chart.step * chart.highestIndex + chart.step / 2
           const y = chart.y(chart.high)
-          return <g><line x1={x} x2={x + 34} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={x + 38} y={y + 4} className="trading-kline__extreme-label">{priceLabel(chart.high)}</text></g>
+          const placeLeft = x > chart.plotRight - 100
+          return <g><line x1={placeLeft ? x - 34 : x} x2={placeLeft ? x : x + 34} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={placeLeft ? x - 38 : x + 38} y={y - 6} textAnchor={placeLeft ? 'end' : 'start'} className="trading-kline__extreme-label is-high">最高 {priceLabel(chart.high)}</text></g>
         })()}
-        {!chart.sparse && chart.lowestIndex >= 0 && (() => {
+        {chart.lowestIndex >= 0 && (() => {
           const x = LEFT + chart.step * chart.lowestIndex + chart.step / 2
           const y = chart.y(chart.low)
-          return <g><line x1={x - 34} x2={x} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={x - 38} y={y + 4} textAnchor="end" className="trading-kline__extreme-label">{priceLabel(chart.low)}</text></g>
+          const placeRight = x < LEFT + 100
+          return <g><line x1={placeRight ? x : x - 34} x2={placeRight ? x + 34 : x} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={placeRight ? x + 38 : x - 38} y={y + 14} textAnchor={placeRight ? 'start' : 'end'} className="trading-kline__extreme-label is-low">最低 {priceLabel(chart.low)}</text></g>
         })()}
 
         {hoveredIndex !== null && (
@@ -225,6 +236,8 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
             <circle cx={activeX} cy={activeY} r="3.5" />
             <rect x={chart.plotRight + 5} y={activeY - 11} width={RIGHT - 10} height="22" />
             <text x={chart.plotRight + 12} y={activeY + 4}>{priceLabel(active.close)}</text>
+            <rect x={Math.max(LEFT, Math.min(activeX - 44, chart.plotRight - 88))} y={chart.height - 27} width="88" height="20" />
+            <text x={Math.max(LEFT + 44, Math.min(activeX, chart.plotRight - 44))} y={chart.height - 13} textAnchor="middle">{timeLabel(active.time, active.round)}</text>
           </g>
         )}
         </svg>

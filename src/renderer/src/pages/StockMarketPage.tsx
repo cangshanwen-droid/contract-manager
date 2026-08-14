@@ -591,11 +591,12 @@ export function StockMarketPage() {
                   <Button
                     className={`gipfel-trading__submit is-${orderSide}`}
                     block
+                    icon={<StockOutlined />}
                     loading={orderSubmitting}
                     disabled={marketState !== 'open' || !token}
                     onClick={submitOrder}
                   >
-                    {marketState !== 'open' ? '市场已收盘' : !token ? '账户未连接' : `${orderSide === 'buy' ? '确认买入' : '确认卖出'} ${selected}`}
+                    {marketState !== 'open' ? '市场已收盘' : !token ? '账户未连接' : `提交${orderSide === 'buy' ? '买入' : '卖出'}委托`}
                   </Button>
                 </section>
                 <section className="gipfel-trading__depth-snapshot">
