@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Button, Tag, InputNumber, Segmented, Table, Empty, Spin, Modal, Select, Input, message, Drawer, Alert } from 'antd'
-import { WalletOutlined, ReloadOutlined, StarOutlined, StarFilled, SearchOutlined, LineChartOutlined, ControlOutlined, SafetyCertificateOutlined, StockOutlined, PlusOutlined, BankOutlined } from '@ant-design/icons'
+import { WalletOutlined, ReloadOutlined, StarOutlined, StarFilled, SearchOutlined, LineChartOutlined, SafetyCertificateOutlined, StockOutlined, PlusOutlined, BankOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { canTradeStocks } from '../../../shared/permissions'
 import { IPC_CHANNELS } from '../../../shared/constants'
-import { createStock, invoke } from '../api/cloudApi'
+import { createStock } from '../api/cloudApi'
 import { companyApi } from '../api/company.api'
 import { tokens as T } from '../styles/design-tokens'
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
@@ -69,6 +69,7 @@ export function StockMarketPage() {
   const [marketQuery, setMarketQuery] = useState('')
   const [marketScope, setMarketScope] = useState<'all' | 'watch'>('all')
   const [ledgerView, setLedgerView] = useState<'positions' | 'trades'>('positions')
+  const [executionView, setExecutionView] = useState<'ticket' | 'book'>('ticket')
   const aliveRef = useRef(true)
 
   // 证券管理（仅管理端）：公司上市与云端股票创建保持同一流程
@@ -95,7 +96,7 @@ export function StockMarketPage() {
   // ── 登录云端 stock（safeStorage 凭据 → /auth/login → token）──
   const ensureToken = useCallback(async (): Promise<{ token: string; username: string } | null> => {
     try {
-      const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+      const r = await window.api.invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
       const saved = r?.success ? r.credentials : null
       if (!saved?.username || !saved?.password) return null
       const res = await fetch(`${STOCK_API}/auth/login`, {
@@ -367,7 +368,7 @@ export function StockMarketPage() {
     if (!adjustAmount || adjustAmount === 0) { message.warning('请输入调整金额（正数=注入，负数=扣减）'); return }
     setAdjustSubmitting(true)
     try {
-      const r = await invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
+      const r = await window.api.invoke(IPC_CHANNELS.CREDENTIAL_GET) as { success?: boolean; credentials?: { username?: string; password?: string } | null } | null
       const saved = r?.success ? r.credentials : null
       if (!saved?.username || !saved?.password) throw new Error('登录凭据不可用，请退出后重新登录')
       const loginRes = await fetch(`${STOCK_API}/auth/login`, {
@@ -463,9 +464,6 @@ export function StockMarketPage() {
           <button className="gipfel-trading__refresh" onClick={() => { loadMarket(); loadKline(selected); loadOrderBook(selected) }} aria-label="刷新行情">
             <ReloadOutlined />
           </button>
-          {isAdmin && (
-            <Button className="gipfel-trading__security-action" size="small" icon={<StockOutlined />} onClick={openSecurityManager}>证券管理</Button>
-          )}
           {isTrader && (
             <Button className="gipfel-trading__fund-action" size="small" icon={<WalletOutlined />} onClick={openAdjust}>资金调度</Button>
           )}
@@ -473,12 +471,20 @@ export function StockMarketPage() {
       </header>
 
       <section className="gipfel-trading__account-rail" aria-label="账户资产">
-        <div className="gipfel-trading__account-caption"><span>ACCOUNT</span><strong>{username || '账户未连接'}</strong></div>
-        <div className="is-primary"><span>总资产</span><strong>{fmtMoney(portfolio?.summary?.totalAssets)}</strong><small>{username || '账户尚未连接'}</small></div>
-        <div><span>可用资金</span><strong>{fmtMoney(portfolio?.user?.balance)}</strong></div>
-        <div><span>持仓市值</span><strong>{fmtMoney(portfolio?.summary?.marketValue)}</strong></div>
-        <div><span>浮动盈亏</span><strong style={{ color: trendColor(portfolio?.summary?.totalPnl) }}>{fmtMoney(portfolio?.summary?.totalPnl)}</strong><small style={{ color: trendColor(portfolio?.summary?.pnlRatio) }}>{fmtPct(portfolio?.summary?.pnlRatio)}</small></div>
-        <div className="gipfel-trading__access-mode"><span>权限模式</span><strong>{isTrader ? role === 'admin' ? '管理端' : '操作端' : '只读行情'}</strong><small>{isTrader ? '交易已启用' : '无买卖入口'}</small></div>
+        {!token ? (
+          <div className="gipfel-trading__account-offline"><SafetyCertificateOutlined /><span><strong>交易账户未连接</strong><small>行情浏览正常；退出后重新登录即可恢复资产与委托功能</small></span><b>{isTrader ? role === 'admin' ? '管理端' : '操作端' : '只读行情'}</b></div>
+        ) : !portfolio ? (
+          <div className="gipfel-trading__account-offline"><Spin size="small" /><span><strong>正在同步账户资产</strong><small>{username}</small></span></div>
+        ) : (
+          <>
+            <div className="gipfel-trading__account-caption"><span>ACCOUNT</span><strong>{username}</strong></div>
+            <div className="is-primary"><span>总资产</span><strong>{fmtMoney(portfolio.summary?.totalAssets)}</strong><small>{username}</small></div>
+            <div><span>可用资金</span><strong>{fmtMoney(portfolio.user?.balance)}</strong></div>
+            <div><span>持仓市值</span><strong>{fmtMoney(portfolio.summary?.marketValue)}</strong></div>
+            <div><span>浮动盈亏</span><strong style={{ color: trendColor(portfolio.summary?.totalPnl) }}>{fmtMoney(portfolio.summary?.totalPnl)}</strong><small style={{ color: trendColor(portfolio.summary?.pnlRatio) }}>{fmtPct(portfolio.summary?.pnlRatio)}</small></div>
+            <div className="gipfel-trading__access-mode"><span>权限模式</span><strong>{isTrader ? role === 'admin' ? '管理端' : '操作端' : '只读行情'}</strong><small>{isTrader ? '交易已启用' : '无买卖入口'}</small></div>
+          </>
+        )}
       </section>
 
       {loading ? (
@@ -495,7 +501,10 @@ export function StockMarketPage() {
             <aside className="gipfel-trading__tape" aria-label="股票行情列表">
               <div className="gipfel-trading__panel-head">
                 <div><strong>市场行情</strong><span>{market.length} 只 · 15 秒同步</span></div>
-                <LineChartOutlined />
+                <div className="gipfel-trading__panel-actions">
+                  <LineChartOutlined />
+                  {isAdmin && <button onClick={openSecurityManager}><PlusOutlined /> 创建股票</button>}
+                </div>
               </div>
               <Input
                 className="gipfel-trading__search"
@@ -547,21 +556,32 @@ export function StockMarketPage() {
             </main>
 
             <aside className="gipfel-trading__execution">
-              {isTrader ? (
+              {isTrader && (
+                <div className="gipfel-trading__execution-tabs" role="tablist" aria-label="交易工具">
+                  <button role="tab" aria-selected={executionView === 'ticket'} className={executionView === 'ticket' ? 'is-active' : ''} onClick={() => setExecutionView('ticket')}>委托</button>
+                  <button role="tab" aria-selected={executionView === 'book'} className={executionView === 'book' ? 'is-active' : ''} onClick={() => setExecutionView('book')}>盘口</button>
+                </div>
+              )}
+              {isTrader && executionView === 'ticket' ? (
+                <>
                 <section className="gipfel-trading__ticket">
                   <div className="gipfel-trading__panel-head"><div><strong>委托下单</strong><span>限价撮合 · {selected}</span></div><SafetyCertificateOutlined /></div>
                   <Segmented
                     className={`gipfel-trading__side-switch is-${orderSide}`}
                     block
+                    disabled={!token || marketState !== 'open'}
                     value={orderSide}
                     onChange={(value) => setOrderSide(value as 'buy' | 'sell')}
                     options={[{ label: '买入', value: 'buy' }, { label: '卖出', value: 'sell' }]}
                   />
-                  <label className="gipfel-trading__field"><span>委托价格（元）</span><InputNumber min={0.01} step={0.01} precision={2} prefix="¥" value={orderPrice} onChange={setOrderPrice} /></label>
-                  <label className="gipfel-trading__field"><span>委托数量（股）</span><InputNumber min={1} max={orderSide === 'sell' ? selectedPosition?.shares : 1000000} precision={0} value={orderShares} onChange={(value) => setOrderShares(value ?? 0)} /></label>
+                  {!token && <div className="gipfel-trading__connection-note">交易账户未连接。退出后重新登录即可恢复委托权限。</div>}
+                  <div className="gipfel-trading__field-grid">
+                    <label className="gipfel-trading__field"><span>价格（元）</span><InputNumber disabled={!token || marketState !== 'open'} min={0.01} step={0.01} precision={2} prefix="¥" value={orderPrice} onChange={setOrderPrice} /></label>
+                    <label className="gipfel-trading__field"><span>数量（股）</span><InputNumber disabled={!token || marketState !== 'open'} min={1} max={orderSide === 'sell' ? selectedPosition?.shares : 1000000} precision={0} value={orderShares} onChange={(value) => setOrderShares(value ?? 0)} /></label>
+                  </div>
                   <div className="gipfel-trading__quick-size">
-                    {[100, 500, 1000].map((size) => <button key={size} onClick={() => setOrderShares(size)}>{size.toLocaleString('zh-CN')}</button>)}
-                    {orderSide === 'sell' && <button onClick={() => setOrderShares(selectedPosition?.shares ?? 0)}>全部</button>}
+                    {[100, 500, 1000].map((size) => <button key={size} disabled={!token || marketState !== 'open'} onClick={() => setOrderShares(size)}>{size.toLocaleString('zh-CN')}</button>)}
+                    {orderSide === 'sell' && <button disabled={!token || marketState !== 'open'} onClick={() => setOrderShares(selectedPosition?.shares ?? 0)}>全部</button>}
                   </div>
                   <dl className="gipfel-trading__order-summary">
                     <div><dt>可卖数量</dt><dd>{(selectedPosition?.shares ?? 0).toLocaleString('zh-CN')} 股</dd></div>
@@ -578,15 +598,22 @@ export function StockMarketPage() {
                     {marketState !== 'open' ? '市场已收盘' : !token ? '账户未连接' : `${orderSide === 'buy' ? '确认买入' : '确认卖出'} ${selected}`}
                   </Button>
                 </section>
-              ) : (
+                <section className="gipfel-trading__depth-snapshot">
+                  <div className="gipfel-trading__depth-snapshot-head"><span>盘口快照</span><button onClick={() => setExecutionView('book')}>查看完整五档</button></div>
+                  <div className="gipfel-trading__depth-snapshot-row is-ask"><span>卖一</span><b>{orderBook?.asks?.[0] ? orderBook.asks[0].price.toFixed(2) : '--'}</b><span>{orderBook?.asks?.[0] ? Number(orderBook.asks[0].quantity).toLocaleString('zh-CN') : '--'}</span></div>
+                  <div className="gipfel-trading__depth-snapshot-mid" style={{ color: trendColor(selectedPct) }}><strong>{selectedPrice.toFixed(2)}</strong><span>{fmtPct(selectedPct)}</span></div>
+                  <div className="gipfel-trading__depth-snapshot-row is-bid"><span>买一</span><b>{orderBook?.bids?.[0] ? orderBook.bids[0].price.toFixed(2) : '--'}</b><span>{orderBook?.bids?.[0] ? Number(orderBook.bids[0].quantity).toLocaleString('zh-CN') : '--'}</span></div>
+                </section>
+                </>
+              ) : !isTrader ? (
                 <section className="gipfel-trading__readonly">
                   <SafetyCertificateOutlined />
                   <strong>只读行情模式</strong>
                   <p>代表端可以查看行情、K 线和个人持仓，不显示任何买卖或资金操作入口。</p>
                 </section>
-              )}
+              ) : null}
 
-              <section className="gipfel-trading__book">
+              {(!isTrader || executionView === 'book') && <section className="gipfel-trading__book">
                 <div className="gipfel-trading__panel-head"><div><strong>{orderBook?.mode === 'trade-distribution' ? '成交价位分布' : '五档盘口'}</strong><span>{orderBook?.mode === 'trade-distribution' ? '历史成交聚合，非实时挂单' : '实时委托'}</span></div><span className="gipfel-trading__spread">现价 {selectedPrice.toFixed(2)}</span></div>
                 <div className="gipfel-trading__book-head"><span>档位</span><span>价格</span><span>数量</span></div>
                 <div className="gipfel-trading__levels is-ask">
@@ -596,7 +623,7 @@ export function StockMarketPage() {
                 <div className="gipfel-trading__levels is-bid">
                   {Array.from({ length: 5 }, (_, index) => orderBook?.bids[index]).map((level, index) => <div key={`bid-${index}`}><span>买 {index + 1}</span><b>{level ? level.price.toFixed(2) : '--'}</b><span>{level ? Number(level.quantity).toLocaleString('zh-CN') : '--'}</span></div>)}
                 </div>
-              </section>
+              </section>}
             </aside>
           </section>
 
@@ -604,7 +631,6 @@ export function StockMarketPage() {
             <div className="gipfel-trading__ledger-tabs" role="tablist" aria-label="账户明细">
               <button id="positions-tab" role="tab" aria-controls="ledger-panel" aria-selected={ledgerView === 'positions'} className={ledgerView === 'positions' ? 'is-active' : ''} onClick={() => setLedgerView('positions')}>持仓资产 <span>{portfolio?.positions?.length ?? 0}</span></button>
               <button id="trades-tab" role="tab" aria-controls="ledger-panel" aria-selected={ledgerView === 'trades'} className={ledgerView === 'trades' ? 'is-active' : ''} onClick={() => setLedgerView('trades')}>最近成交 <span>{portfolio?.recentTrades?.length ?? 0}</span></button>
-              {role === 'admin' && <button className="gipfel-trading__admin-link" onClick={openAdjust}><ControlOutlined /> 管理端资金控制</button>}
             </div>
             <div id="ledger-panel" role="tabpanel" aria-labelledby={`${ledgerView}-tab`} className="gipfel-trading__table-wrap">
               {ledgerView === 'positions' ? (
@@ -668,7 +694,7 @@ export function StockMarketPage() {
       <Drawer
         className="gipfel-security-drawer"
         title={<div className="gipfel-security-drawer__title"><StockOutlined /><span>证券管理</span><small>公司上市与市场标的一体化管理</small></div>}
-        width={520}
+        width="min(520px, calc(100vw - 24px))"
         open={securityOpen}
         onClose={() => setSecurityOpen(false)}
         extra={<Tag color="gold">仅管理端</Tag>}

@@ -205,7 +205,7 @@ const NotificationBell: React.FC = () => {
       placement="bottomRight"
       open={open}
       onOpenChange={setOpen}
-      overlayInnerStyle={{ padding: 0, background: T.bgCard, borderRadius: 4, border: `1px solid ${T.border}` }}
+      styles={{ body: { padding: 0, background: T.bgCard, borderRadius: 4, border: `1px solid ${T.border}` } }}
     >
       <Badge count={unread} size="small" offset={[-4, 4]} style={{ boxShadow: 'none' }}>
         <button

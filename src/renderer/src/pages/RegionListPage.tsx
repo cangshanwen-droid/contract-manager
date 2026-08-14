@@ -165,7 +165,7 @@ const RegionListPage: React.FC = () => {
         onOk={handleSubmit}
         width={440}
         confirmLoading={submitting}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" className="compact-form">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}>

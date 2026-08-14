@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Empty, Spin } from 'antd'
 
 export type TradingCandle = {
@@ -17,16 +17,10 @@ type Props = {
   symbol: string
 }
 
-const WIDTH = 1000
-const HEIGHT = 452
 const LEFT = 18
 const RIGHT = 82
-const PRICE_TOP = 22
-const PRICE_BOTTOM = 330
-const VOLUME_TOP = 354
-const VOLUME_BOTTOM = 414
-const PLOT_RIGHT = WIDTH - RIGHT
-const PLOT_WIDTH = PLOT_RIGHT - LEFT
+const DEFAULT_WIDTH = 1000
+const DEFAULT_HEIGHT = 520
 
 const upColor = '#E74C3C'
 const downColor = '#2ECC71'
@@ -45,27 +39,57 @@ function timeLabel(value: string, round: number) {
 
 export function ProfessionalKlineChart({ candles, loading = false, symbol }: Props) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const plotRef = useRef<HTMLDivElement>(null)
+  const [plotSize, setPlotSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
+
+  useEffect(() => {
+    const element = plotRef.current
+    if (!element) return
+    const update = () => {
+      const bounds = element.getBoundingClientRect()
+      setPlotSize({
+        width: Math.max(360, Math.round(bounds.width)),
+        height: Math.max(340, Math.round(bounds.height)),
+      })
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   const chart = useMemo(() => {
     if (!candles.length) return null
     const visible = candles.slice(-72)
+    const width = plotSize.width
+    const height = plotSize.height
+    const priceTop = 22
+    const priceBottom = height - 132
+    const volumeTop = height - 104
+    const volumeBottom = height - 38
+    const plotRight = width - RIGHT
+    const plotWidth = plotRight - LEFT
     const high = Math.max(...visible.map((item) => Number(item.high)))
     const low = Math.min(...visible.map((item) => Number(item.low)))
-    const rawRange = Math.max(high - low, Math.abs(high) * 0.018, 0.1)
-    const upper = high + rawRange * 0.08
-    const lower = Math.max(0, low - rawRange * 0.08)
+    const sparse = visible.length < 4
+    const referencePrice = Math.max(Math.abs(high), Math.abs(low), 1)
+    const expandedSparseScale = sparse && (high - low) < referencePrice * 0.02
+    const rawRange = Math.max(high - low, referencePrice * (expandedSparseScale ? 0.05 : 0.018), 0.1)
+    const padding = expandedSparseScale ? 0.48 : 0.08
+    const upper = high + rawRange * padding
+    const lower = Math.max(0, low - rawRange * padding)
     const range = Math.max(upper - lower, 0.01)
     const maxVolume = Math.max(...visible.map((item) => Number(item.volume) || 0), 1)
-    const step = PLOT_WIDTH / visible.length
+    const step = plotWidth / visible.length
     const bodyWidth = Math.max(3, Math.min(11, step * 0.58))
-    const y = (price: number) => PRICE_TOP + ((upper - price) / range) * (PRICE_BOTTOM - PRICE_TOP)
-    const volumeY = (volume: number) => VOLUME_BOTTOM - (Math.max(0, volume) / maxVolume) * (VOLUME_BOTTOM - VOLUME_TOP)
+    const y = (price: number) => priceTop + ((upper - price) / range) * (priceBottom - priceTop)
+    const volumeY = (volume: number) => volumeBottom - (Math.max(0, volume) / maxVolume) * (volumeBottom - volumeTop)
     const priceTicks = Array.from({ length: 6 }, (_, index) => upper - (range * index) / 5)
     const timeTickIndexes = Array.from(new Set([0, Math.floor((visible.length - 1) * 0.25), Math.floor((visible.length - 1) * 0.5), Math.floor((visible.length - 1) * 0.75), visible.length - 1]))
     const highestIndex = visible.findIndex((item) => item.high === high)
     const lowestIndex = visible.findIndex((item) => item.low === low)
-    return { visible, high, low, upper, lower, maxVolume, step, bodyWidth, y, volumeY, priceTicks, timeTickIndexes, highestIndex, lowestIndex }
-  }, [candles])
+    return { visible, width, height, priceTop, priceBottom, volumeTop, volumeBottom, plotRight, high, low, upper, lower, maxVolume, step, bodyWidth, y, volumeY, priceTicks, timeTickIndexes, highestIndex, lowestIndex, sparse }
+  }, [candles, plotSize])
 
   if (loading) {
     return <div className="trading-chart-state"><Spin size="small" /><span>K 线数据加载中</span></div>
@@ -84,8 +108,8 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
-    const x = ((event.clientX - bounds.left) / bounds.width) * WIDTH
-    if (x < LEFT || x > PLOT_RIGHT) {
+    const x = ((event.clientX - bounds.left) / bounds.width) * chart.width
+    if (x < LEFT || x > chart.plotRight) {
       setHoveredIndex(null)
       return
     }
@@ -102,25 +126,27 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
         <span>低 <b className="is-down">{priceLabel(active.low)}</b></span>
         <span>收 <b style={{ color: activeColor }}>{priceLabel(active.close)}</b></span>
         <span>量 <b>{Number(active.volume || 0).toLocaleString('zh-CN')}</b></span>
+        {chart.sparse && <span className="trading-kline__sample">样本 {chart.visible.length}/4 · 趋势仅供参考</span>}
         <span className="trading-kline__time">{timeLabel(active.time, active.round)}</span>
       </div>
 
-      <svg
-        className="trading-kline__canvas"
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={`${symbol} 蜡烛图，红色上涨、绿色下跌，下方为成交量`}
-        onPointerMove={onPointerMove}
-        onPointerLeave={() => setHoveredIndex(null)}
-      >
-        <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="#07182E" />
+      <div className="trading-kline__plot" ref={plotRef}>
+        <svg
+          className="trading-kline__canvas"
+          viewBox={`0 0 ${chart.width} ${chart.height}`}
+          role="img"
+          aria-label={`${symbol} 蜡烛图，红色上涨、绿色下跌，下方为成交量`}
+          onPointerMove={onPointerMove}
+          onPointerLeave={() => setHoveredIndex(null)}
+        >
+        <rect x="0" y="0" width={chart.width} height={chart.height} fill="#07182E" />
 
         {chart.priceTicks.map((tick, index) => {
-          const y = PRICE_TOP + ((PRICE_BOTTOM - PRICE_TOP) * index) / 5
+          const y = chart.priceTop + ((chart.priceBottom - chart.priceTop) * index) / 5
           return (
             <g key={tick}>
-              <line x1={LEFT} x2={PLOT_RIGHT} y1={y} y2={y} className="trading-kline__grid" />
-              <text x={PLOT_RIGHT + 12} y={y + 4} className="trading-kline__axis-label">{priceLabel(tick)}</text>
+              <line x1={LEFT} x2={chart.plotRight} y1={y} y2={y} className="trading-kline__grid" />
+              <text x={chart.plotRight + 12} y={y + 4} className="trading-kline__axis-label">{priceLabel(tick)}</text>
             </g>
           )
         })}
@@ -130,16 +156,16 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
           const candle = chart.visible[index]
           return (
             <g key={`${candle.time}-${index}`}>
-              <line x1={x} x2={x} y1={PRICE_TOP} y2={VOLUME_BOTTOM} className="trading-kline__grid is-vertical" />
-              <text x={x} y={HEIGHT - 12} textAnchor={index === 0 ? 'start' : index === chart.visible.length - 1 ? 'end' : 'middle'} className="trading-kline__axis-label">
+              <line x1={x} x2={x} y1={chart.priceTop} y2={chart.volumeBottom} className="trading-kline__grid is-vertical" />
+              <text x={x} y={chart.height - 12} textAnchor={index === 0 ? 'start' : index === chart.visible.length - 1 ? 'end' : 'middle'} className="trading-kline__axis-label">
                 {timeLabel(candle.time, candle.round)}
               </text>
             </g>
           )
         })}
 
-        <line x1={LEFT} x2={PLOT_RIGHT} y1={VOLUME_TOP - 10} y2={VOLUME_TOP - 10} className="trading-kline__divider" />
-        <text x={LEFT} y={VOLUME_TOP} className="trading-kline__section-label">VOL</text>
+        <line x1={LEFT} x2={chart.plotRight} y1={chart.volumeTop - 10} y2={chart.volumeTop - 10} className="trading-kline__divider" />
+        <text x={LEFT} y={chart.volumeTop} className="trading-kline__section-label">VOL</text>
 
         {chart.visible.map((candle, index) => {
           const x = LEFT + chart.step * index + chart.step / 2
@@ -169,7 +195,7 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
                 x={x - chart.bodyWidth / 2}
                 y={volumeY}
                 width={chart.bodyWidth}
-                height={Math.max(1, VOLUME_BOTTOM - volumeY)}
+                height={Math.max(1, chart.volumeBottom - volumeY)}
                 fill={color}
                 opacity="0.52"
               />
@@ -177,16 +203,16 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
           )
         })}
 
-        <line x1={LEFT} x2={PLOT_RIGHT} y1={latestY} y2={latestY} className="trading-kline__last-line" />
-        <rect x={PLOT_RIGHT + 5} y={latestY - 11} width={RIGHT - 10} height="22" className="trading-kline__last-label-bg" />
-        <text x={PLOT_RIGHT + 12} y={latestY + 4} className="trading-kline__last-label">{priceLabel(latest.close)}</text>
+        <line x1={LEFT} x2={chart.plotRight} y1={latestY} y2={latestY} className="trading-kline__last-line" />
+        <rect x={chart.plotRight + 5} y={latestY - 11} width={RIGHT - 10} height="22" className="trading-kline__last-label-bg" />
+        <text x={chart.plotRight + 12} y={latestY + 4} className="trading-kline__last-label">{priceLabel(latest.close)}</text>
 
-        {chart.highestIndex >= 0 && (() => {
+        {!chart.sparse && chart.highestIndex >= 0 && (() => {
           const x = LEFT + chart.step * chart.highestIndex + chart.step / 2
           const y = chart.y(chart.high)
           return <g><line x1={x} x2={x + 34} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={x + 38} y={y + 4} className="trading-kline__extreme-label">{priceLabel(chart.high)}</text></g>
         })()}
-        {chart.lowestIndex >= 0 && (() => {
+        {!chart.sparse && chart.lowestIndex >= 0 && (() => {
           const x = LEFT + chart.step * chart.lowestIndex + chart.step / 2
           const y = chart.y(chart.low)
           return <g><line x1={x - 34} x2={x} y1={y} y2={y} className="trading-kline__extreme-line" /><text x={x - 38} y={y + 4} textAnchor="end" className="trading-kline__extreme-label">{priceLabel(chart.low)}</text></g>
@@ -194,14 +220,15 @@ export function ProfessionalKlineChart({ candles, loading = false, symbol }: Pro
 
         {hoveredIndex !== null && (
           <g className="trading-kline__crosshair" aria-hidden="true">
-            <line x1={activeX} x2={activeX} y1={PRICE_TOP} y2={VOLUME_BOTTOM} />
-            <line x1={LEFT} x2={PLOT_RIGHT} y1={activeY} y2={activeY} />
+            <line x1={activeX} x2={activeX} y1={chart.priceTop} y2={chart.volumeBottom} />
+            <line x1={LEFT} x2={chart.plotRight} y1={activeY} y2={activeY} />
             <circle cx={activeX} cy={activeY} r="3.5" />
-            <rect x={PLOT_RIGHT + 5} y={activeY - 11} width={RIGHT - 10} height="22" />
-            <text x={PLOT_RIGHT + 12} y={activeY + 4}>{priceLabel(active.close)}</text>
+            <rect x={chart.plotRight + 5} y={activeY - 11} width={RIGHT - 10} height="22" />
+            <text x={chart.plotRight + 12} y={activeY + 4}>{priceLabel(active.close)}</text>
           </g>
         )}
-      </svg>
+        </svg>
+      </div>
     </div>
   )
 }

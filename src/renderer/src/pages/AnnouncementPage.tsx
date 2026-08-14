@@ -157,7 +157,7 @@ const AnnouncementPage: React.FC = () => {
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
       <Modal title="发布公告" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={handleCreate}
-        okText="发布" width={560} destroyOnClose>
+        okText="发布" width={560} destroyOnHidden>
         <Form form={form} layout="vertical" size="small">
           <Form.Item name="title" label="标题" rules={[{required:true,message:'请输入标题'}]}>
             <Input placeholder="例如：A区基础设施招标公告" />
@@ -182,7 +182,7 @@ const AnnouncementPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="公告详情" open={!!detail} onCancel={() => setDetail(null)} footer={null} width={600} destroyOnClose>
+      <Modal title="公告详情" open={!!detail} onCancel={() => setDetail(null)} footer={null} width={600} destroyOnHidden>
         {detail && (
           <>
             <Typography.Title level={4} style={{marginTop:0}}>{detail.title}</Typography.Title>

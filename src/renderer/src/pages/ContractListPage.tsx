@@ -792,7 +792,7 @@ const ContractListPage: React.FC = () => {
         width={720}
         okText="保存合同"
         confirmLoading={submitting}
-        destroyOnClose
+        destroyOnHidden
         afterOpenChange={(open) => { if (open) setTimeout(() => nameInputRef.current?.focus(), 60) }}
       >
         <Form form={form} layout="vertical" size="small">
@@ -897,7 +897,7 @@ const ContractListPage: React.FC = () => {
         </Typography.Text>
       </Modal>
 
-      <Modal title="编辑合同" open={editOpen} onCancel={() => setEditOpen(false)} onOk={handleEditSave} width={560} confirmLoading={editSubmitting} destroyOnClose>
+      <Modal title="编辑合同" open={editOpen} onCancel={() => setEditOpen(false)} onOk={handleEditSave} width={560} confirmLoading={editSubmitting} destroyOnHidden>
         {editingContract && (
           <Form layout="vertical" size="small">
             <Form.Item label="合同名称">
@@ -987,7 +987,7 @@ const ContractListPage: React.FC = () => {
         )}
       </Modal>
 
-      <Modal title="合同详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={760} destroyOnClose>
+      <Modal title="合同详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={760} destroyOnHidden>
         {detail && (
           <Tabs
             size="small"
@@ -1082,7 +1082,7 @@ const ContractListPage: React.FC = () => {
         onCancel={() => setVersionDetail(null)}
         footer={null}
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         {versionDetail && (
           <>

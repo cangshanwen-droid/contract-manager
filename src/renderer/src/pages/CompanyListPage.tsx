@@ -202,7 +202,7 @@ const CompanyListPage: React.FC = () => {
       )}
 
       <Modal title={editing ? '编辑公司' : '新增公司'} open={modalOpen} onOk={handleSave}
-        onCancel={() => setModalOpen(false)} width={520} confirmLoading={submitting} destroyOnClose>
+        onCancel={() => setModalOpen(false)} width={520} confirmLoading={submitting} destroyOnHidden>
         <Form form={form} layout="vertical" size="small">
           <Form.Item name="name" label="公司名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Row gutter={12}>

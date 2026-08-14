@@ -376,7 +376,7 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
         onOk={handleCreate}
         okText="创建"
         width={420}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={createForm} layout="vertical" size="small">
           <Form.Item
@@ -493,7 +493,7 @@ const UserManagementPage: React.FC<Props> = ({ currentUserId }) => {
         okText="重置"
         confirmLoading={resetSubmitting}
         width={420}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={resetForm} layout="vertical" size="small">
           <Form.Item

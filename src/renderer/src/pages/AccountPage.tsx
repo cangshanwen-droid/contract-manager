@@ -276,7 +276,7 @@ const AccountPage: React.FC = () => {
         onOk={handleCreate}
         okText="创建"
         width={420}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={createForm} layout="vertical" size="small">
           <Form.Item name="account_name" label="账户名称" rules={[{required:true, message:'请输入账户名称'}]}>
@@ -300,7 +300,7 @@ const AccountPage: React.FC = () => {
         title={`交易流水${filterYear ? ` · ${filterYear}年` : ''}`}
         open={txOpen} onCancel={() => setTxOpen(false)}
         footer={null} width={760}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 12, display:'flex', gap:8 }}>
           <Select placeholder="筛选年度" size="small" style={{ width:100 }} allowClear
