@@ -121,27 +121,20 @@ async function cloudFetch(path: string, options: RequestInit = {}): Promise<any>
 /** 云端完整版地址（股票交易 Arena） */
 export const CLOUD_ARENA_URL = `${CLOUD_API_BASE}`
 
-/** 管理端密钥缓存（仅成功获取后缓存，未配置时不缓存以便重试） */
-let cachedAdminKey: string | null = null
-
 /**
  * 获取管理端密钥：经 IPC admin:get-key 由主进程提供
  * （环境变量 GIPFEL_ADMIN_KEY → userData/admin-key.txt），渲染进程不持有任何密钥常量。
  */
 export async function getAdminKey(): Promise<string | null> {
-  if (cachedAdminKey !== null) return cachedAdminKey
   try {
     const r = await window.api.invoke('admin:get-key') as { success?: boolean; key?: string } | null
-    if (r?.success && r.key) {
-      cachedAdminKey = r.key
-      return r.key
-    }
+    if (r?.success && r.key) return r.key
   } catch { /* 主进程不可用时返回 null */ }
   return null
 }
 
-/** 管理端监控 API 调用：带 X-Admin-Key 头（密钥来自主进程，不在渲染进程硬编码） */
-export async function fetchWithAdminKey(url: string): Promise<any> {
+/** 管理端 API 调用：带 X-Admin-Key 头（密钥来自主进程，不在渲染进程硬编码） */
+async function adminRequest(url: string, init: RequestInit = {}): Promise<any> {
   const key = await getAdminKey()
   if (!key) {
     throw new Error('未配置管理端密钥（请设置环境变量 GIPFEL_ADMIN_KEY 或 userData 下 admin-key.txt）')
@@ -151,8 +144,13 @@ export async function fetchWithAdminKey(url: string): Promise<any> {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await window.fetch(url, {
-      method: 'GET',
-      headers: { 'X-Admin-Key': key },
+      ...init,
+      method: init.method || 'GET',
+      headers: {
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers as Record<string, string> || {}),
+        'X-Admin-Key': key,
+      },
       cache: 'no-store' as RequestCache,
       signal: controller.signal,
     })
@@ -169,6 +167,11 @@ export async function fetchWithAdminKey(url: string): Promise<any> {
   } finally {
     clearTimeout(timeoutId)
   }
+}
+
+/** 管理端监控 API 调用（GET）。 */
+export async function fetchWithAdminKey(url: string): Promise<any> {
+  return adminRequest(url)
 }
 
 // ── 云端 invoke：将 IPC channel 映射到 REST ──
@@ -516,8 +519,16 @@ export async function createStock(data: {
   price?: number
   sector?: string
 }): Promise<StockItem> {
-  return cloudFetch('/market/stocks', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  })
+  const result = await window.api.invoke(IPC_CHANNELS.STOCK_CREATE, data) as {
+    success?: boolean
+    stock?: StockItem
+    message?: string
+    rollbackSafe?: boolean
+  }
+  if (!result?.success || !result.stock) {
+    const error = new Error(result?.message || '创建股票失败') as Error & { rollbackSafe?: boolean }
+    error.rollbackSafe = Boolean(result?.rollbackSafe)
+    throw error
+  }
+  return result.stock
 }

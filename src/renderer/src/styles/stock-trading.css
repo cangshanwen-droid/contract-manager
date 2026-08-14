@@ -12,6 +12,7 @@
   --trade-up: #e74c3c;
   --trade-down: #2ecc71;
   min-width: 0;
+  padding-bottom: 18px;
   color: var(--trade-text);
   font-variant-numeric: tabular-nums;
 }
@@ -21,24 +22,25 @@
 .gipfel-trading .is-down { color: var(--trade-down) !important; }
 
 .gipfel-trading__header {
-  min-height: 74px;
+  min-height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 0 18px;
+  padding: 0 22px;
   border: 1px solid var(--trade-line);
-  border-bottom-color: rgba(212, 175, 55, .26);
-  background: var(--trade-panel);
+  border-bottom: 0;
+  background: #081e39;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
 }
 
 .gipfel-trading__instrument,
 .gipfel-trading__identity,
 .gipfel-trading__status { display: flex; align-items: center; }
-.gipfel-trading__instrument { min-width: 0; gap: 18px; }
-.gipfel-trading__identity { min-width: 230px; gap: 9px; }
-.gipfel-trading__identity strong { overflow: hidden; color: var(--trade-text); font-size: 15px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
-.gipfel-trading__symbol { padding: 4px 7px; border: 1px solid rgba(212,175,55,.32); color: var(--trade-gold); font-family: var(--gipfel-font-mono); font-size: 11px; letter-spacing: .06em; }
+.gipfel-trading__instrument { min-width: 0; gap: 24px; }
+.gipfel-trading__identity { min-width: 250px; gap: 10px; }
+.gipfel-trading__identity strong { overflow: hidden; color: var(--trade-text); font-size: 17px; font-weight: 620; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
+.gipfel-trading__symbol { padding: 4px 7px; border-left: 2px solid var(--trade-gold); color: var(--trade-gold); font-family: var(--gipfel-font-mono); font-size: 11px; letter-spacing: .09em; }
 .gipfel-trading__watch,
 .gipfel-trading__refresh {
   width: 34px;
@@ -52,7 +54,7 @@
 }
 .gipfel-trading__watch:hover,
 .gipfel-trading__refresh:hover { color: var(--trade-gold); background: rgba(255,255,255,.035); }
-.gipfel-trading__price { font-family: var(--gipfel-font-mono); font-size: 25px; font-weight: 650; letter-spacing: -.035em; }
+.gipfel-trading__price { font-family: var(--gipfel-font-mono); font-size: 30px; font-weight: 650; letter-spacing: -.045em; }
 .gipfel-trading__change { font-family: var(--gipfel-font-mono); font-size: 12px; white-space: nowrap; }
 .gipfel-trading__status { gap: 12px; }
 .gipfel-trading__status > div { display: flex; flex-direction: column; gap: 2px; }
@@ -62,42 +64,49 @@
 .gipfel-trading__live-dot.is-open { background: var(--trade-down); }
 .gipfel-trading__live-dot.is-closed { background: var(--trade-up); }
 .gipfel-trading__fund-action { height: 32px !important; margin-left: 4px; }
+.gipfel-trading__security-action { height: 32px !important; border-color: rgba(212,175,55,.38) !important; color: var(--trade-gold) !important; background: rgba(212,175,55,.045) !important; }
+.gipfel-trading__security-action:hover { border-color: var(--trade-gold) !important; background: rgba(212,175,55,.09) !important; }
 
-.gipfel-trading__asset-ledger {
+.gipfel-trading__account-rail {
   display: grid;
-  grid-template-columns: 1.25fr repeat(4, minmax(0, 1fr));
-  margin-top: 10px;
+  grid-template-columns: 112px 1.25fr repeat(4, minmax(0, 1fr));
   border: 1px solid var(--trade-line);
-  background: #081d36;
+  border-top-color: rgba(212,175,55,.22);
+  background: #071a31;
 }
-.gipfel-trading__asset-ledger > div {
+.gipfel-trading__account-rail > div {
   min-width: 0;
-  min-height: 72px;
+  min-height: 66px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 10px 15px;
   border-right: 1px solid var(--trade-line);
 }
-.gipfel-trading__asset-ledger > div:last-child { border-right: 0; }
-.gipfel-trading__asset-ledger > div.is-primary { padding-left: 20px; background: rgba(212,175,55,.035); }
-.gipfel-trading__asset-ledger span { color: var(--trade-muted); font-size: 11px; }
-.gipfel-trading__asset-ledger strong { margin-top: 5px; overflow: hidden; color: var(--trade-text); font-family: var(--gipfel-font-mono); font-size: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.gipfel-trading__asset-ledger .is-primary strong { color: var(--trade-gold); font-size: 20px; }
-.gipfel-trading__asset-ledger small { margin-top: 3px; overflow: hidden; color: var(--trade-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.gipfel-trading__account-rail > div:last-child { border-right: 0; }
+.gipfel-trading__account-rail > div.is-primary { background: rgba(212,175,55,.03); }
+.gipfel-trading__account-rail span { color: var(--trade-muted); font-size: 10px; letter-spacing: .04em; }
+.gipfel-trading__account-rail strong { margin-top: 4px; overflow: hidden; color: var(--trade-text); font-family: var(--gipfel-font-mono); font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.gipfel-trading__account-rail .is-primary strong { color: var(--trade-gold); font-size: 19px; }
+.gipfel-trading__account-rail small { margin-top: 2px; overflow: hidden; color: var(--trade-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.gipfel-trading__account-caption { align-items: flex-start; background: #06172c; }
+.gipfel-trading__account-caption span { color: var(--trade-gold); font-family: var(--gipfel-font-mono); font-size: 9px; letter-spacing: .16em; }
+.gipfel-trading__account-caption strong { max-width: 88px; font-size: 11px; }
 
 .gipfel-trading__state { min-height: 460px; display: grid; place-items: center; border: 1px solid var(--trade-line); border-top: 0; background: var(--trade-deep); }
+.gipfel-trading__loading { display: flex; align-items: center; gap: 10px; color: var(--trade-muted); font-size: 11px; }
 .gipfel-trading__workbench {
   min-width: 0;
   display: grid;
   grid-template-columns: 238px minmax(440px, 1fr) 300px;
-  margin-top: 10px;
+  margin-top: 12px;
   border: 1px solid var(--trade-line);
   background: var(--trade-deep);
+  box-shadow: 0 16px 38px rgba(0,0,0,.12);
 }
 .gipfel-trading__workbench.is-readonly { grid-template-columns: 238px minmax(520px, 1fr) 260px; }
 .gipfel-trading__tape,
-.gipfel-trading__execution { min-width: 0; background: #081c34; }
+.gipfel-trading__execution { min-width: 0; background: #071a31; }
 .gipfel-trading__tape { border-right: 1px solid var(--trade-line); }
 .gipfel-trading__execution { border-left: 1px solid var(--trade-line); }
 .gipfel-trading__panel-head {
@@ -106,11 +115,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 13px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--trade-line);
 }
 .gipfel-trading__panel-head > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.gipfel-trading__panel-head strong { color: var(--trade-text); font-size: 12px; font-weight: 620; }
+.gipfel-trading__panel-head strong { color: var(--trade-text); font-size: 12px; font-weight: 620; letter-spacing: .025em; }
 .gipfel-trading__panel-head span { color: var(--trade-muted); font-size: 11px; }
 .gipfel-trading__panel-head > .anticon { color: var(--trade-gold); font-size: 15px; }
 
@@ -123,9 +132,9 @@
 .gipfel-trading__tape-head { padding: 6px 10px; border-top: 1px solid var(--trade-line); border-bottom: 1px solid var(--trade-line); color: var(--trade-muted); font-size: 11px; }
 .gipfel-trading__tape-head span:not(:first-child) { text-align: right; }
 .gipfel-trading__quotes { height: 520px; overflow-y: auto; }
-.gipfel-trading__quote { width: 100%; min-height: 52px; padding: 7px 10px; border: 0; border-bottom: 1px solid rgba(138,155,181,.1); background: transparent; color: var(--trade-secondary); text-align: right; cursor: pointer; }
+.gipfel-trading__quote { position: relative; width: 100%; min-height: 56px; padding: 8px 10px; border: 0; border-bottom: 1px solid rgba(138,155,181,.09); background: transparent; color: var(--trade-secondary); text-align: right; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
 .gipfel-trading__quote:hover { background: rgba(255,255,255,.025); }
-.gipfel-trading__quote.is-active { background: rgba(212,175,55,.07); box-shadow: inset 2px 0 0 var(--trade-gold); }
+.gipfel-trading__quote.is-active { background: rgba(212,175,55,.075); box-shadow: inset 2px 0 0 var(--trade-gold); }
 .gipfel-trading__quote-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
 .gipfel-trading__quote-name b { color: var(--trade-text); font-family: var(--gipfel-font-mono); font-size: 11px; font-weight: 600; }
 .gipfel-trading__quote-name small { overflow: hidden; color: var(--trade-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -133,7 +142,7 @@
 .gipfel-trading__quote > span:last-child { font-family: var(--gipfel-font-mono); font-size: 11px; }
 .gipfel-trading__empty-list { padding: 38px 12px; color: var(--trade-muted); font-size: 11px; text-align: center; }
 
-.gipfel-trading__chart-panel { min-width: 0; background: var(--trade-deep); }
+.gipfel-trading__chart-panel { min-width: 0; background: #06172c; }
 .gipfel-trading__chart-head { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 9px 15px; border-bottom: 1px solid var(--trade-line); }
 .gipfel-trading__chart-head > div:first-child { display: flex; flex-direction: column; gap: 3px; }
 .gipfel-trading__chart-head strong { font-size: 12px; font-weight: 620; }
@@ -141,12 +150,12 @@
 .gipfel-trading__legend { display: flex; gap: 13px; }
 .gipfel-trading__legend span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; background: currentColor; }
 
-.trading-kline { min-width: 0; background: #07182e; }
+.trading-kline { min-width: 0; background: #06172c; }
 .trading-kline__readout { min-height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid rgba(138,155,181,.12); color: #74869f; font-family: var(--gipfel-font-mono); font-size: 11px; }
 .trading-kline__readout b { color: #e8edf5; font-weight: 500; }
 .trading-kline__symbol { color: #d4af37; font-weight: 650; }
 .trading-kline__time { margin-left: auto; }
-.trading-kline__canvas { width: 100%; height: 452px; display: block; touch-action: none; }
+.trading-kline__canvas { width: 100%; height: 474px; display: block; touch-action: none; }
 .trading-kline__grid { stroke: rgba(138,155,181,.14); stroke-width: 1; shape-rendering: crispEdges; }
 .trading-kline__grid.is-vertical { stroke-dasharray: 2 5; stroke-opacity: .62; }
 .trading-kline__divider { stroke: rgba(138,155,181,.25); stroke-width: 1; }
@@ -164,13 +173,13 @@
 .trading-kline__crosshair text { fill: #07182e; font-family: var(--gipfel-font-mono); font-size: 11px; font-weight: 700; }
 .trading-chart-state { height: 488px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--trade-muted); font-size: 11px; }
 .gipfel-trading__market-insight { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--trade-line); }
-.gipfel-trading__market-insight > div { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 10px 13px; border-right: 1px solid var(--trade-line); }
+.gipfel-trading__market-insight > div { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 12px 14px; border-right: 1px solid var(--trade-line); }
 .gipfel-trading__market-insight > div:last-child { border-right: 0; }
 .gipfel-trading__market-insight span { grid-column: 1 / -1; color: var(--trade-muted); font-size: 11px; }
 .gipfel-trading__market-insight strong { font-family: var(--gipfel-font-mono); font-size: 11px; }
 .gipfel-trading__market-insight b { font-family: var(--gipfel-font-mono); font-size: 11px; font-weight: 500; }
 
-.gipfel-trading__ticket { border-bottom: 1px solid var(--trade-line); }
+.gipfel-trading__ticket { border-bottom: 1px solid var(--trade-line); background: #081d36; }
 .gipfel-trading__side-switch { margin: 12px; width: calc(100% - 24px); }
 .gipfel-trading__side-switch .ant-segmented-item { min-height: 34px; line-height: 32px; border-radius: 3px !important; }
 .gipfel-trading__side-switch.is-buy .ant-segmented-item-selected { color: var(--trade-up) !important; }
@@ -185,7 +194,7 @@
 .gipfel-trading__order-summary div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
 .gipfel-trading__order-summary dt { color: var(--trade-muted); }
 .gipfel-trading__order-summary dd { margin: 0; color: var(--trade-text); font-family: var(--gipfel-font-mono); }
-.gipfel-trading__submit { width: calc(100% - 24px) !important; height: 40px !important; margin: 0 12px 14px; border: 0 !important; border-radius: 3px !important; color: #fff !important; font-weight: 650 !important; }
+.gipfel-trading__submit { width: calc(100% - 24px) !important; height: 42px !important; margin: 0 12px 14px; border: 0 !important; border-radius: 3px !important; color: #fff !important; font-weight: 650 !important; letter-spacing: .03em; }
 .gipfel-trading__submit.is-buy { background: #c44040 !important; }
 .gipfel-trading__submit.is-sell { background: #2ecc71 !important; }
 .gipfel-trading__submit:disabled { background: #1a2740 !important; color: #70829a !important; }
@@ -209,7 +218,7 @@
 .gipfel-trading__mid-price strong { font-size: 16px; }
 .gipfel-trading__mid-price span { font-size: 11px; }
 
-.gipfel-trading__ledger { margin-top: 10px; border: 1px solid var(--trade-line); background: var(--trade-panel); }
+.gipfel-trading__ledger { margin-top: 12px; border: 1px solid var(--trade-line); background: #081d36; }
 .gipfel-trading__ledger-tabs { min-height: 45px; display: flex; align-items: stretch; border-bottom: 1px solid var(--trade-line); }
 .gipfel-trading__ledger-tabs button { min-width: 120px; padding: 0 16px; border: 0; border-right: 1px solid var(--trade-line); border-bottom: 2px solid transparent; background: transparent; color: var(--trade-muted); font-size: 11px; cursor: pointer; }
 .gipfel-trading__ledger-tabs button.is-active { border-bottom-color: var(--trade-gold); color: var(--trade-text); }
@@ -218,14 +227,45 @@
 .gipfel-trading__table-wrap { min-height: 150px; padding: 8px 10px; }
 .gipfel-trading__table-wrap .ant-table { background: transparent !important; }
 
-@media (max-width: 1360px) {
+.gipfel-security-drawer .ant-drawer-header { border-bottom-color: rgba(138,155,181,.18) !important; background: #0b2240 !important; }
+.gipfel-security-drawer .ant-drawer-body { padding: 0 !important; background: #071a31 !important; }
+.gipfel-security-drawer__title { display: grid; grid-template-columns: 24px 1fr; align-items: center; column-gap: 8px; color: #edf1f7; }
+.gipfel-security-drawer__title > .anticon { grid-row: 1 / 3; color: #d4af37; font-size: 18px; }
+.gipfel-security-drawer__title span { font-size: 14px; font-weight: 650; }
+.gipfel-security-drawer__title small { color: #71839d; font-size: 10px; font-weight: 400; }
+.gipfel-security-drawer__section { padding: 24px; border-bottom: 1px solid rgba(138,155,181,.16); }
+.gipfel-security-drawer__section.is-list { border-bottom: 0; }
+.gipfel-security-drawer__eyebrow { color: #d4af37; font-family: var(--gipfel-font-mono); font-size: 9px; letter-spacing: .16em; }
+.gipfel-security-drawer__section h3 { margin: 7px 0 4px; color: #edf1f7; font-size: 17px; font-weight: 620; }
+.gipfel-security-drawer__section > p { margin: 0 0 15px; color: #8192aa; font-size: 12px; line-height: 1.7; }
+.gipfel-security-drawer__form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.gipfel-security-drawer__form label { display: flex; flex-direction: column; gap: 6px; color: #91a1b8; font-size: 11px; }
+.gipfel-security-drawer__form label > .ant-select,
+.gipfel-security-drawer__form label > .ant-input-number-group-wrapper,
+.gipfel-security-drawer__form label > .ant-input-number { width: 100%; }
+.gipfel-security-drawer__row { display: grid; grid-template-columns: 1.15fr .85fr; gap: 12px; }
+.gipfel-security-drawer__form > .ant-btn { height: 42px; margin-top: 3px; font-weight: 650; }
+.gipfel-security-drawer__list { margin-top: 14px; border-top: 1px solid rgba(138,155,181,.14); }
+.gipfel-security-drawer__list > div:not(.ant-empty) { min-height: 58px; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 9px; border-bottom: 1px solid rgba(138,155,181,.1); }
+.gipfel-security-drawer__list > div > .anticon { color: #687a94; }
+.gipfel-security-drawer__list > div > span { display: flex; flex-direction: column; gap: 2px; }
+.gipfel-security-drawer__list strong { color: #d4af37; font-family: var(--gipfel-font-mono); font-size: 11px; letter-spacing: .05em; }
+.gipfel-security-drawer__list small { color: #91a1b8; font-size: 11px; }
+.gipfel-security-drawer__list b { color: #edf1f7; font-family: var(--gipfel-font-mono); font-size: 11px; font-weight: 520; }
+
+@media (max-width: 1680px) {
+  .gipfel-trading__header { gap: 14px; padding: 0 16px; }
+  .gipfel-trading__instrument { gap: 14px; }
+  .gipfel-trading__identity { min-width: 190px; }
+  .gipfel-trading__identity strong { font-size: 15px; }
+  .gipfel-trading__price { font-size: 25px; }
+  .gipfel-trading__status { gap: 7px; }
   .gipfel-trading__workbench { grid-template-columns: 220px minmax(400px, 1fr) 280px; }
   .gipfel-trading__quotes { height: 480px; }
   .trading-kline__canvas { height: 410px; }
   .trading-chart-state { height: 446px; }
-  .gipfel-trading__asset-ledger { grid-template-columns: 1.25fr repeat(3, 1fr); }
-  .gipfel-trading__asset-ledger > div:last-child { display: none; }
-  .gipfel-trading__asset-ledger > div:nth-child(4) { border-right: 0; }
+  .gipfel-trading__account-caption { display: none !important; }
+  .gipfel-trading__account-rail { grid-template-columns: 1.25fr repeat(4, 1fr); }
 }
 
 @media (max-width: 1120px) {
@@ -241,9 +281,10 @@
   .gipfel-trading__header { align-items: flex-start; flex-direction: column; padding: 14px; }
   .gipfel-trading__instrument { width: 100%; flex-wrap: wrap; }
   .gipfel-trading__identity { min-width: 0; flex: 1; }
-  .gipfel-trading__asset-ledger { grid-template-columns: repeat(2, 1fr); }
-  .gipfel-trading__asset-ledger > div { border-bottom: 1px solid var(--trade-line); }
-  .gipfel-trading__asset-ledger > div:nth-child(2) { border-right: 0; }
+  .gipfel-trading__account-rail { grid-template-columns: repeat(2, 1fr); }
+  .gipfel-trading__account-rail > div { border-bottom: 1px solid var(--trade-line); }
+  .gipfel-trading__account-caption { display: none !important; }
+  .gipfel-trading__account-rail > div:nth-child(3) { border-right: 0; }
   .gipfel-trading__workbench,
   .gipfel-trading__workbench.is-readonly { display: block; }
   .gipfel-trading__tape { border-right: 0; border-bottom: 1px solid var(--trade-line); }

@@ -54,7 +54,9 @@ export function registerCredentialHandlers(): void {
       if (!session || session.role !== 'admin') {
         return { success: false, code: 'FORBIDDEN', message: '无管理权限' }
       }
-    } catch { /* 会话模块不可用时放行（保持原有行为） */ }
+    } catch {
+      return { success: false, code: 'FORBIDDEN', message: '无法校验管理权限' }
+    }
     const key = getAdminKey()
     if (!key) {
       return {

@@ -97,6 +97,7 @@ export const IPC_CHANNELS = {
   STOCK_GET_POSITIONS: 'stock:get-positions',
   STOCK_GET_ACCOUNTS: 'stock:get-accounts',
   STOCK_ACCOUNT_SUMMARY: 'stock:account-summary',
+  STOCK_CREATE: 'stock:create',
 
   CREDENTIAL_SET: 'credential:set',
   CREDENTIAL_GET: 'credential:get',

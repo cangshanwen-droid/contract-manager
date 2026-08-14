@@ -1,24 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Input, Select, Button, Modal, Form, Popconfirm, message, Skeleton, Empty, Row, Col, Switch, Tag } from 'antd'
+import { Input, Select, Button, Modal, Form, Popconfirm, message, Skeleton, Empty, Row, Col, Tag } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, StockOutlined } from '@ant-design/icons'
 import { companyApi } from '../api/company.api'
 import { regionApi } from '../api/region.api'
-import { createStock } from '../api/cloudApi'
 import { tokens as T } from '../styles/design-tokens'
 import type { Company, Region } from '../../../shared/types'
 
 const TYPE_OPTIONS = ['施工方', '设计方', '供应商', '投资方', '其他']
-
-/** 根据公司名称自动生成股票代码 (4位字母+2位数字) */
-function generateStockSymbol(name: string): string {
-  const chars = name.slice(0, 4).split('')
-  const letters = chars.map(c => {
-    const code = c.charCodeAt(0)
-    return String.fromCharCode(65 + (code % 26))
-  }).join('')
-  const suffix = Math.floor(Math.random() * 100).toString().padStart(2, '0')
-  return letters + suffix
-}
 
 const CompanyListPage: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([])
@@ -31,9 +19,6 @@ const CompanyListPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>()
   const [regionFilter, setRegionFilter] = useState<number>()
   const [form] = Form.useForm()
-  const [isListingOpen, setIsListingOpen] = useState(false)
-  const [stockSymbol, setStockSymbol] = useState('')
-  const [stockPrice, setStockPrice] = useState(100)
 
   const load = async () => {
     setLoading(true)
@@ -70,9 +55,6 @@ const CompanyListPage: React.FC = () => {
   const openCreate = () => { 
     setEditing(null)
     form.resetFields()
-    setIsListingOpen(false)
-    setStockSymbol('')
-    setStockPrice(100)
     setModalOpen(true) 
   }
   const openEdit = (c: Company) => { 
@@ -81,9 +63,6 @@ const CompanyListPage: React.FC = () => {
       ...c,
       region_id: c.region_id,
     })
-    setIsListingOpen(!!c.is_listed)
-    setStockSymbol(c.stock_symbol || '')
-    setStockPrice(c.stock_initial_price || 100)
     setModalOpen(true) 
   }
 
@@ -96,44 +75,14 @@ const CompanyListPage: React.FC = () => {
       const data = {
         ...values,
         region: selectedRegion?.name || '',
-        is_listed: isListingOpen ? 1 : 0,
-        stock_symbol: isListingOpen ? stockSymbol : '',
-        stock_initial_price: isListingOpen ? stockPrice : 100,
+        // 上市由“股票交易 → 证券管理”统一办理；公司编辑只保留既有上市资料。
+        is_listed: editing?.is_listed || 0,
+        stock_symbol: editing?.stock_symbol || '',
+        stock_initial_price: editing?.stock_initial_price || 100,
       }
-      // P1-7 修复：先保存公司，云端建股失败时回滚本地上市标记（is_listed=0 + 清空股票代码），
-      // 避免本地显示"已上市"但云端无股票的数据不一致
-      let savedId: number | undefined
-      if (editing) { await companyApi.update(editing.id, data); savedId = editing.id }
-      else { const saved = await companyApi.create(data); savedId = saved.id }
-
-      // 如果开启了上市，同时创建股票
-      if (isListingOpen && stockSymbol && savedId) {
-        try {
-          await createStock({
-            symbol: stockSymbol,
-            name: values.name || '',
-            price: stockPrice,
-          })
-          message.success(editing ? '更新成功，股票已同步' : '创建成功，股票已上市')
-        } catch (stockErr: any) {
-          // 云端建股失败 → 回滚本地上市状态，提示「上市失败已回滚」
-          try {
-            await companyApi.update(savedId, {
-              is_listed: 0,
-              stock_symbol: '',
-              stock_initial_price: 100,
-            })
-          } catch (rollbackErr: any) {
-            console.error('上市回滚失败:', rollbackErr)
-            message.error('上市失败，且本地回滚失败，请手动修改公司上市状态: ' + (rollbackErr?.message || '未知错误'))
-            setModalOpen(false); load()
-            return
-          }
-          message.warning('上市失败已回滚，公司保留但未上市: ' + (stockErr.message || '请确认股票服务已启动'))
-        }
-      } else {
-        message.success(editing ? '更新成功' : '创建成功')
-      }
+      if (editing) await companyApi.update(editing.id, data)
+      else await companyApi.create(data)
+      message.success(editing ? '更新成功' : '创建成功')
       setModalOpen(false); load()
     } catch (err: any) {
       if (err?.errorFields) return
@@ -283,55 +232,6 @@ const CompanyListPage: React.FC = () => {
           <Form.Item name="address" label="地址"><Input /></Form.Item>
           <Form.Item name="notes" label="备注"><Input.TextArea rows={2} /></Form.Item>
           
-          {/* ── 上市开关 ── */}
-          <div style={{ 
-            background: 'rgba(212,168,56,0.05)', border: '1px solid rgba(212,168,56,0.15)', 
-            borderRadius: 4, padding: '12px 16px', marginBottom: 16 
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontWeight: 600, fontSize: 13, color: T.textPrimary }}>
-                <StockOutlined style={{ marginRight: 6, color: T.warmGold }} />上市
-              </span>
-              <Switch 
-                checked={isListingOpen} 
-                onChange={(checked) => {
-                  setIsListingOpen(checked)
-                  if (checked) {
-                    const name = form.getFieldValue('name') || ''
-                    if (name && !stockSymbol) {
-                      setStockSymbol(generateStockSymbol(name))
-                    }
-                    setStockPrice(100)
-                  }
-                }}
-              />
-            </div>
-            {isListingOpen && (
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>股票代码</div>
-                  <Input 
-                    size="small" 
-                    value={stockSymbol} 
-                    onChange={e => setStockSymbol(e.target.value.toUpperCase())}
-                    placeholder="如 JGONG"
-                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>初始价格</div>
-                  <Input 
-                    size="small" 
-                    type="number"
-                    value={stockPrice} 
-                    onChange={e => setStockPrice(Number(e.target.value) || 100)}
-                    placeholder="100"
-                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
         </Form>
       </Modal>
     </div>
