@@ -9,7 +9,7 @@
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --win",
     "package:portable": "electron-vite build && electron-builder --win portable",
-    "verify": "bash scripts/verify/run-all.sh",
+    "verify": "node scripts/verify/run-all.js",
     "verify:local": "node scripts/verify/verify-local.js",
     "verify:cloud": "python scripts/verify/verify-cloud.py",
     "verify:ui": "node scripts/verify/verify-ui.js",

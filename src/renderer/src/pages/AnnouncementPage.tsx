@@ -32,6 +32,8 @@ const AnnouncementPage: React.FC = () => {
     try {
       const list = await invoke(IPC_CHANNELS.ANNOUNCEMENT_LIST, { priority: filterPriority }) as any[]
       setItems(list)
+    } catch (err: any) {
+      message.error(err?.message || '公告加载失败，请稍后重试')
     } finally { setLoading(false) }
   }
 
@@ -76,7 +78,7 @@ const AnnouncementPage: React.FC = () => {
 
   const columns = [
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true,
-      render: (v: string, r: any) => <a onClick={() => setDetail(r)} style={{color:T.accent}}>{v}</a> },
+      render: (v: string, r: any) => <Button type="link" size="small" onClick={() => setDetail(r)} style={{ color: T.accent, padding: 0, height: 'auto' }}>{v}</Button> },
     { title: '优先级', dataIndex: 'priority', key: 'priority', width: 70,
       render: (v: string) => <Tag color={priorityColors[v]}>{priorityLabels[v]}</Tag> },
     { title: '区域', dataIndex: 'region_name', key: 'region', width: 80,
@@ -87,7 +89,7 @@ const AnnouncementPage: React.FC = () => {
     { title: '操作', key: 'action', width: 60,
       render: (_: any, r: any) => (
         <Popconfirm title="确定删除此公告？" onConfirm={() => handleDelete(r.id)}>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+          <Button type="link" size="small" danger icon={<DeleteOutlined />} aria-label={`删除公告 ${r.title}`} title="删除公告" />
         </Popconfirm>
       )},
   ]

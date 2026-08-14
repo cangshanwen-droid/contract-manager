@@ -394,14 +394,14 @@ const DashboardPage: React.FC = () => {
             <div style={{ fontSize: 14, fontWeight: 600, color: T.textPrimary, lineHeight: 1.2 }}>
               待办工作台
             </div>
-            <span
+            <button type="button"
               onClick={() => navigate('/contracts')}
-              style={{ fontSize: 12, color: T.accent, cursor: 'pointer', lineHeight: 1.2 }}
-              onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.textDecoration = 'underline' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.textDecoration = 'none' }}
+              style={{ padding: 0, border: 0, background: 'transparent', font: 'inherit', fontSize: 12, color: T.accent, cursor: 'pointer', lineHeight: 1.2 }}
+              onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+              onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
             >
               查看全部合同 →
-            </span>
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <TodoCard
@@ -576,9 +576,11 @@ const DashboardPage: React.FC = () => {
               </div>
             ) : (
               recentContracts.map((c, i) => (
-                <div
+                <button type="button"
                   key={c.id}
+                  aria-label={`查看合同 ${c.contract_name || c.contract_no || c.id}`}
                   style={{
+                    width: '100%', border: 0, background: 'transparent', textAlign: 'left', font: 'inherit', color: 'inherit',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '7px 0',
                     borderBottom: i < recentContracts.length - 1 ? `1px solid ${T.border}` : 'none',
@@ -606,7 +608,7 @@ const DashboardPage: React.FC = () => {
                   }}>
                     {STATUS_LABELS[c.status] || c.status || '未知'}
                   </span>
-                </div>
+                </button>
               ))
             )}
           </div>
@@ -707,19 +709,13 @@ const RegionInfoCard: React.FC<{
     : '--'
 
   return (
-    <div
+    <button type="button"
           className="gipfel-card"
-          onClick={onClick}
-          role={!isPlaceholder && clickable ? 'button' : undefined}
-          tabIndex={!isPlaceholder && clickable ? 0 : undefined}
+          onClick={!isPlaceholder && clickable ? onClick : undefined}
+          disabled={isPlaceholder || !clickable}
           aria-label={!isPlaceholder && clickable ? `查看${region.name || '区域'}详情` : undefined}
-          onKeyDown={(event) => {
-            if (!isPlaceholder && clickable && (event.key === 'Enter' || event.key === ' ')) {
-              event.preventDefault()
-              onClick()
-            }
-          }}
           style={{
+            width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit',
             background: T.bgCard,
             border: isPlaceholder ? `1px dashed ${T.border}` : `1px solid ${T.border}`,
             borderRadius: 4,
@@ -766,7 +762,7 @@ const RegionInfoCard: React.FC<{
           </div>
         )
       })}
-    </div>
+    </button>
   )
 }
 

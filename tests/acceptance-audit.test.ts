@@ -106,7 +106,7 @@ describe('B. validateContractStatusTransition', () => {
 describe('C. 迁移 v20~v26', () => {
   beforeEach(async () => { await setupBase() })
 
-  it('C1 全新库：全部 25 个迁移执行成功，生成列口径正确', async () => {
+  it('C1 全新库：全部 26 个迁移执行成功，生成列口径正确', async () => {
     const db = getDatabase()
     const rows = db.exec('SELECT version FROM schema_migrations ORDER BY version')[0].values
     expect(rows.length).toBe(26)

@@ -201,10 +201,10 @@ const CompanyListPage: React.FC = () => {
                       {c.name}
                     </div>
                     <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginLeft: 8 }}>
-                      <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(c)}
+                      <Button type="link" size="small" icon={<EditOutlined />} aria-label={`编辑公司 ${c.name}`} title="编辑公司" onClick={() => openEdit(c)}
                         style={{ color: T.textMuted, padding: '0 4px', height: 22 }} />
                       <Popconfirm title="删除？" onConfirm={() => handleDelete(c.id)}>
-                        <Button type="link" size="small" danger icon={<DeleteOutlined />}
+                        <Button type="link" size="small" danger icon={<DeleteOutlined />} aria-label={`删除公司 ${c.name}`} title="删除公司"
                           style={{ padding: '0 4px', height: 22 }} />
                       </Popconfirm>
                     </div>

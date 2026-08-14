@@ -428,11 +428,12 @@ export function StockMarketPage() {
                 value={marketQuery}
                 onChange={(event) => setMarketQuery(event.target.value)}
                 placeholder="代码 / 公司"
+                aria-label="搜索股票代码或公司名称"
                 allowClear
               />
               <div className="gipfel-trading__scope" role="group" aria-label="行情范围">
-                <button className={marketScope === 'all' ? 'is-active' : ''} onClick={() => setMarketScope('all')}>全部</button>
-                <button className={marketScope === 'watch' ? 'is-active' : ''} onClick={() => setMarketScope('watch')}>自选 {watchlist.length || ''}</button>
+                <button aria-pressed={marketScope === 'all'} className={marketScope === 'all' ? 'is-active' : ''} onClick={() => setMarketScope('all')}>全部</button>
+                <button aria-pressed={marketScope === 'watch'} className={marketScope === 'watch' ? 'is-active' : ''} onClick={() => setMarketScope('watch')}>自选 {watchlist.length || ''}</button>
               </div>
               <div className="gipfel-trading__tape-head"><span>标的</span><span>最新</span><span>涨跌幅</span></div>
               <div className="gipfel-trading__quotes">
@@ -526,11 +527,11 @@ export function StockMarketPage() {
 
           <section className="gipfel-trading__ledger">
             <div className="gipfel-trading__ledger-tabs" role="tablist" aria-label="账户明细">
-              <button role="tab" aria-selected={ledgerView === 'positions'} className={ledgerView === 'positions' ? 'is-active' : ''} onClick={() => setLedgerView('positions')}>持仓资产 <span>{portfolio?.positions?.length ?? 0}</span></button>
-              <button role="tab" aria-selected={ledgerView === 'trades'} className={ledgerView === 'trades' ? 'is-active' : ''} onClick={() => setLedgerView('trades')}>最近成交 <span>{portfolio?.recentTrades?.length ?? 0}</span></button>
+              <button id="positions-tab" role="tab" aria-controls="ledger-panel" aria-selected={ledgerView === 'positions'} className={ledgerView === 'positions' ? 'is-active' : ''} onClick={() => setLedgerView('positions')}>持仓资产 <span>{portfolio?.positions?.length ?? 0}</span></button>
+              <button id="trades-tab" role="tab" aria-controls="ledger-panel" aria-selected={ledgerView === 'trades'} className={ledgerView === 'trades' ? 'is-active' : ''} onClick={() => setLedgerView('trades')}>最近成交 <span>{portfolio?.recentTrades?.length ?? 0}</span></button>
               {role === 'admin' && <button className="gipfel-trading__admin-link" onClick={openAdjust}><ControlOutlined /> 管理端资金控制</button>}
             </div>
-            <div className="gipfel-trading__table-wrap">
+            <div id="ledger-panel" role="tabpanel" aria-labelledby={`${ledgerView}-tab`} className="gipfel-trading__table-wrap">
               {ledgerView === 'positions' ? (
                 (portfolio?.positions?.length ?? 0) > 0
                   ? <Table size="small" rowKey="symbol" columns={positionColumns as any} dataSource={portfolio!.positions!} pagination={false} />

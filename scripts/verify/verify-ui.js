@@ -10,6 +10,8 @@
  *  4. design-tokens 统一引用：
  *     a. 无内联 `const T = {`（防三套 Token 并行）
  *     b. 使用 `T.` 的文件必须 import design-tokens
+ *  5. 页面使用的 IPC 通道在主进程有对应注册引用
+ *  6. 不使用无键盘语义的 div/span/a 点击控件
  *
  * 退出码：0=全部通过  1=存在失败
  */
@@ -143,6 +145,47 @@ for (const f of pageFiles) {
 if (hexWarn.length) {
   console.log(`  [WARN] 以下页面含内联 hex 颜色且未引用 design-tokens（供人工确认）: ${hexWarn.join(', ')}`)
 }
+
+// ── 5. 页面 IPC 通道与主进程注册保持连通 ───────────────────────────
+console.log('')
+console.log('[5] 页面 IPC 通道连通性')
+const uiRoots = [path.join(SRC, 'pages'), path.join(SRC, 'components')]
+const uiChannelFiles = uiRoots.flatMap((root) => walk(root, ['.tsx', '.ts']))
+uiChannelFiles.push(path.join(SRC, 'App.tsx'))
+const usedChannels = new Set()
+for (const f of uiChannelFiles) {
+  const matches = fs.readFileSync(f, 'utf8').matchAll(/IPC_CHANNELS\.([A-Z0-9_]+)/g)
+  for (const match of matches) usedChannels.add(match[1])
+}
+const mainIpcRoot = path.join(ROOT, 'src', 'main', 'ipc')
+const mainIpcSource = walk(mainIpcRoot, ['.ts']).map((f) => fs.readFileSync(f, 'utf8')).join('\n')
+const eventOnlyChannels = new Set(['NOTIFICATION_CHANGED_EVENT'])
+const disconnected = [...usedChannels].filter((name) =>
+  !eventOnlyChannels.has(name) && !mainIpcSource.includes(`IPC_CHANNELS.${name}`)
+)
+report(
+  disconnected.length === 0,
+  '页面使用的 IPC 通道均有主进程处理器',
+  disconnected.length ? `未注册: ${disconnected.join(', ')}` : ''
+)
+
+// ── 6. 交互元素使用原生键盘语义 ──────────────────────────────────
+console.log('')
+console.log('[6] 原生交互语义')
+const clickSemanticHits = []
+for (const f of uiChannelFiles.filter((x) => x.endsWith('.tsx'))) {
+  const content = fs.readFileSync(f, 'utf8')
+  const re = /<(div|span)\b[^>]*\bonClick\s*=/gs
+  for (const match of content.matchAll(re)) {
+    const line = content.slice(0, match.index).split('\n').length
+    clickSemanticHits.push(`${rel(f)}:${line}: <${match[1]}>`)
+  }
+}
+report(
+  clickSemanticHits.length === 0,
+  '无 div/span 冒充按钮',
+  clickSemanticHits.length ? `发现: ${clickSemanticHits.join(', ')}` : ''
+)
 
 console.log('')
 console.log(`结果: ${passed} 通过, ${failed} 失败`)

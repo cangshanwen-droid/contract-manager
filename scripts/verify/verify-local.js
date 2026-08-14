@@ -133,24 +133,24 @@ async function main() {
     const versions = schemaVersions(db)
     assertEq(versions.length, 26, 'schema_migrations 应恰好 26 条')
     const expected = Array.from({ length: 26 }, (_, i) => i + 1)
-    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..25')
+    assertEq(JSON.stringify(versions), JSON.stringify(expected), '迁移版本应为 1..26')
   })
 
   // 2. 迁移幂等（同库重跑）
   test('迁移幂等（同库重跑不重复应用）', () => {
     runMigrations(db)
-    assertEq(schemaVersions(db).length, 25, '重跑后仍应为 25 条')
+    assertEq(schemaVersions(db).length, 26, '重跑后仍应为 26 条')
   })
 
   // 3. 迁移幂等（已有 DB 文件重开）
-  test('迁移幂等（已有 DB 文件重开仍为 25 条）', () => {
+  test('迁移幂等（已有 DB 文件重开仍为 26 条）', () => {
     const buf = db.export()
     const tmp = path.join(os.tmpdir(), `gipfel-verify-${Date.now()}-${Math.random().toString(36).slice(2)}.db`)
     fs.writeFileSync(tmp, Buffer.from(buf))
     try {
       const db2 = new SQL.Database(fs.readFileSync(tmp))
       runMigrations(db2)
-      assertEq(schemaVersions(db2).length, 25, '重开已有库后仍应为 25 条')
+      assertEq(schemaVersions(db2).length, 26, '重开已有库后仍应为 26 条')
       db2.close()
     } finally {
       try { fs.unlinkSync(tmp) } catch { /* ignore */ }

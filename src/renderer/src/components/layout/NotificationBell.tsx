@@ -141,19 +141,22 @@ const NotificationBell: React.FC = () => {
           items.map(n => {
             const meta = TYPE_META[n.type] || TYPE_META.system
             return (
-              <div
+              <button
+                type="button"
                 key={n.id}
                 onClick={() => handleClickItem(n)}
+                aria-label={`${n.read ? '' : '未读'}${meta.label}：${n.title}`}
                 style={{
+                  width: '100%', border: 0, textAlign: 'left', font: 'inherit', color: 'inherit',
                   padding: '10px 14px',
                   borderBottom: '1px solid rgba(30,45,64,0.6)',
                   cursor: 'pointer',
                   background: n.read ? 'transparent' : 'rgba(212,175,55,0.06)',
                   transition: 'background 150ms ease',
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLDivElement).style.background = n.read ? 'transparent' : 'rgba(212,175,55,0.06)'
+                  (e.currentTarget as HTMLButtonElement).style.background = n.read ? 'transparent' : 'rgba(212,175,55,0.06)'
                 }}
               >
                 {/* 标题行：类型标签 + 标题 + 未读红点 */}
@@ -187,7 +190,7 @@ const NotificationBell: React.FC = () => {
                   <ClockCircleOutlined style={{ fontSize: 11 }} />
                   {timeAgo(n.created_at)}
                 </div>
-              </div>
+              </button>
             )
           })
         )}
@@ -205,8 +208,12 @@ const NotificationBell: React.FC = () => {
       overlayInnerStyle={{ padding: 0, background: T.bgCard, borderRadius: 4, border: `1px solid ${T.border}` }}
     >
       <Badge count={unread} size="small" offset={[-4, 4]} style={{ boxShadow: 'none' }}>
-        <span
+        <button
+          type="button"
+          aria-label={unread > 0 ? `通知中心，${unread} 条未读` : '通知中心，无未读通知'}
+          aria-expanded={open}
           style={{
+            border: 0, background: 'transparent',
             cursor: 'pointer', fontSize: 16, color: T.textSecondary,
             lineHeight: '52px', display: 'inline-flex', alignItems: 'center',
             padding: '0 4px',
@@ -215,8 +222,8 @@ const NotificationBell: React.FC = () => {
           onMouseEnter={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textPrimary }}
           onMouseLeave={e => { (e.currentTarget as HTMLSpanElement).style.color = T.textSecondary }}
         >
-          <BellOutlined />
-        </span>
+          <BellOutlined aria-hidden="true" />
+        </button>
       </Badge>
     </Popover>
   )

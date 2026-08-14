@@ -192,7 +192,7 @@ def main():
         sys.exit(1)
     if skipped > 0:
         print("verify-cloud: SKIP（部分检查因网络跳过）")
-        sys.exit(2 if skipped == len(RESULTS) else 0)
+        sys.exit(2)
     print("verify-cloud: PASS")
     sys.exit(0)
 

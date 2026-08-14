@@ -235,8 +235,8 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
           const parentInfo = ROUTE_HIERARCHY[routeInfo.parent]
           if (parentInfo) {
             crumbs.push({
-              title: <span style={{ color: T.textSecondary, fontSize: 12, cursor: 'pointer' }}
-                onClick={() => navigate('/' + routeInfo.parent)}>{parentInfo.label}</span>
+              title: <button type="button" className="gipfel-breadcrumb-link"
+                onClick={() => navigate('/' + routeInfo.parent)}>{parentInfo.label}</button>
             })
           }
         }
@@ -341,15 +341,8 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             onClick={({ key }) => navigate(key)} className="gipfel-sidebar" />
         </nav>
 
-        <div className={`gipfel-shell-v2__account ${collapsed ? 'is-collapsed' : ''}`}
-          onClick={onLogout} role={onLogout ? 'button' : undefined} tabIndex={onLogout ? 0 : undefined}
-          aria-label={onLogout ? '退出当前账号' : undefined}
-          onKeyDown={event => {
-            if (onLogout && (event.key === 'Enter' || event.key === ' ')) {
-              event.preventDefault()
-              onLogout()
-            }
-          }}>
+        <button type="button" className={`gipfel-shell-v2__account ${collapsed ? 'is-collapsed' : ''}`}
+          onClick={onLogout} disabled={!onLogout} aria-label={onLogout ? `退出账号 ${username || ''}`.trim() : '当前账号'}>
           {!collapsed ? <div className="gipfel-shell-v2__account-row">
             <div className="gipfel-shell-v2__avatar"><UserOutlined /></div>
             <div className="gipfel-shell-v2__identity">
@@ -358,7 +351,7 @@ const AppLayout: React.FC<{ onLogout?: () => void; username?: string; role?: str
             </div>
             <LogoutOutlined className="gipfel-shell-v2__logout" />
           </div> : <UserOutlined />}
-        </div>
+        </button>
       </Sider>
 
       <Layout className="gipfel-shell-v2__main">

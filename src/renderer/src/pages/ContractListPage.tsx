@@ -290,9 +290,9 @@ const ContractListPage: React.FC = () => {
           okButtonProps: { danger: true },
           onOk: async () => {
             try {
-              const res = await invoke(IPC_CHANNELS.CONTRACT_REJECT, r.id)
+              const res = await invoke(IPC_CHANNELS.CONTRACT_APPROVE, r.id, 'reject')
               if (res && res.success === false) { message.error(res.message || '驳回失败'); return }
-              setContracts(prev => prev.map(c => c.id === r.id ? { ...c, status: 'rejected' } : c))
+              setContracts(prev => prev.map(c => c.id === r.id ? { ...c, approval_status: 'rejected' } : c))
               message.success('合同已驳回')
             } catch (err: any) {
               message.error(err?.message || '驳回失败')
@@ -523,20 +523,20 @@ const ContractListPage: React.FC = () => {
         const menuItems = statusMenuItems(r)
         return (
           <Space size={2}>
-            {canEdit ? <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} /> : null}
-            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(r.id)} />
+            {canEdit ? <Button type="link" size="small" icon={<EditOutlined />} aria-label={`编辑合同 ${r.contract_name}`} title="编辑合同" onClick={() => openEdit(r)} /> : null}
+            <Button type="link" size="small" icon={<EyeOutlined />} aria-label={`查看合同 ${r.contract_name}`} title="查看详情" onClick={() => openDetail(r.id)} />
             {menuItems && menuItems.length > 0 && (
               <Dropdown
                 menu={{ items: menuItems, onClick: ({ key }) => onStatusAction(r, key as string) }}
                 trigger={['click']}
                 placement="bottomRight"
               >
-                <Button size="small" type="link" icon={<MoreOutlined />} title="更多操作" />
+                <Button size="small" type="link" icon={<MoreOutlined />} aria-label={`合同 ${r.contract_name} 的更多操作`} title="更多操作" />
               </Dropdown>
             )}
             {canEdit && (
               <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}>
-                <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+                <Button type="link" size="small" danger icon={<DeleteOutlined />} aria-label={`删除合同 ${r.contract_name}`} title="删除合同" />
               </Popconfirm>
             )}
           </Space>
