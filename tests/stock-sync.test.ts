@@ -3,14 +3,32 @@
  * 依赖注入：真实 sql.js 内存库 + mock getDatabase 抛错分支
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { net } from 'electron'
 import { setupTestDb } from './helpers/setup'
 import { getDatabase } from '../src/main/database/connection'
 import * as connectionModule from '../src/main/database/connection'
-import { getMappedSymbols, getRegionStockMap } from '../src/main/stock-sync'
+import { getMappedSymbols, getRegionStockMap, syncStockIndicators } from '../src/main/stock-sync'
 
 beforeEach(async () => {
   vi.restoreAllMocks() // 先清 spy，再建库（避免上个用例的 getDatabase spy 污染建库流程）
+  vi.mocked(net.fetch).mockReset()
+  delete process.env.GIPFEL_ADMIN_KEY
   await setupTestDb()
+})
+
+describe('syncStockIndicators 统一指标', () => {
+  it('幸福度和碳排放原值同步，不再加入随机扰动或单位换算', async () => {
+    process.env.GIPFEL_ADMIN_KEY = 'test-key'
+    vi.mocked(net.fetch).mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue('{"accepted":true}') } as any)
+    await syncStockIndicators({
+      regionName: 'A区', happiness: 35.678, carbonEmissions: 1234.56,
+      population: 50000, prevPopulation: 49000,
+    }, ['jgong'])
+    expect(net.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/admin\/stocks\/JGONG$/), expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ premium_rate: 35.68, carbon_price: 1234.56, revenue: 50000 }),
+    }))
+  })
 })
 
 describe('getRegionStockMap 动态映射', () => {

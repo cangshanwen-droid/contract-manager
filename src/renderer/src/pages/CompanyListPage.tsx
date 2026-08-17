@@ -5,10 +5,13 @@ import { companyApi } from '../api/company.api'
 import { regionApi } from '../api/region.api'
 import { tokens as T } from '../styles/design-tokens'
 import type { Company, Region } from '../../../shared/types'
+import { useAuth } from '../context/AuthContext'
 
 const TYPE_OPTIONS = ['施工方', '设计方', '供应商', '投资方', '其他']
 
 const CompanyListPage: React.FC = () => {
+  const user = useAuth()
+  const canDelete = user?.role === 'admin'
   const [companies, setCompanies] = useState<Company[]>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [loading, setLoading] = useState(true)
@@ -152,10 +155,10 @@ const CompanyListPage: React.FC = () => {
                     <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginLeft: 8 }}>
                       <Button type="link" size="small" icon={<EditOutlined />} aria-label={`编辑公司 ${c.name}`} title="编辑公司" onClick={() => openEdit(c)}
                         style={{ color: T.textMuted, padding: '0 4px', height: 22 }} />
-                      <Popconfirm title="删除？" onConfirm={() => handleDelete(c.id)}>
+                      {canDelete && <Popconfirm title={`确认删除公司“${c.name}”？`} description="删除后无法恢复，仅管理端可以执行。" okText="删除公司" cancelText="取消" onConfirm={() => handleDelete(c.id)}>
                         <Button type="link" size="small" danger icon={<DeleteOutlined />} aria-label={`删除公司 ${c.name}`} title="删除公司"
                           style={{ padding: '0 4px', height: 22 }} />
-                      </Popconfirm>
+                      </Popconfirm>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>

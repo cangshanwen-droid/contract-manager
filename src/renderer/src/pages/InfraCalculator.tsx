@@ -149,7 +149,7 @@ const InfraCalculator: React.FC = () => {
       title: '经营净成本', dataIndex: 'net_operating_cost', width: 80,
       render: (v: number) => v > 0 ? <span style={{color:T.red}}>+{(v/10000).toFixed(0)}万</span> : v < 0 ? <span style={{color:T.green}}>{(v/10000).toFixed(0)}万</span> : '-'
     },
-    { title: '减排/年', dataIndex: 'actual_carbon_reduction', width: 70, render: (v: number) => v > 0 ? <span style={{color:T.green}}>{v}吨</span> : '' },
+    { title: '减排值', dataIndex: 'actual_carbon_reduction', width: 70, render: (v: number) => v > 0 ? <span style={{color:T.green}}>{v}</span> : '' },
   ]
 
   return (
@@ -210,8 +210,8 @@ const InfraCalculator: React.FC = () => {
                 { l: '维护费', v: (data.total_maintenance/10000).toFixed(0)+'万', c: T.warmGold },
                 { l: '需投入', v: (data.total_build_cost/10000).toFixed(0)+'万', c: data.total_build_cost>0?T.red:T.green },
                 { l: '净收益', v: ((data.total_revenue-data.total_maintenance)/10000).toFixed(0)+'万', c: (data.total_revenue-data.total_maintenance)>=0?T.green:T.red },
-                { l: '碳排', v: data.baseline_carbon+'吨', c: T.red },
-                { l: '减排', v: data.effective_carbon_reduction+'吨', c: T.green },
+                { l: '碳排放', v: data.baseline_carbon, c: T.red },
+                { l: '减排值', v: data.effective_carbon_reduction, c: T.green },
               ].map((k, i) => (
                 <div key={i} style={{
                   background: T.card,
@@ -251,7 +251,7 @@ const InfraCalculator: React.FC = () => {
               <span>
                 需建 {data.items.filter(i => i.gap > 0).length} 项 ·
                 总投资 <span style={{ color: T.warmGold, fontWeight: 600 }}>{(data.total_build_cost / 10000).toFixed(0)}万</span> ·
-                年减排 <span style={{ color: T.green, fontWeight: 600 }}>{data.total_carbon_reduction}吨</span>
+                减排值 <span style={{ color: T.green, fontWeight: 600 }}>{data.total_carbon_reduction}</span>
               </span>
             </div>
             <style>{`

@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { CompanyRepository } from '../database/repositories/company.repo'
-import { requirePermission } from '../session'
+import { getSessionUser, requirePermission } from '../session'
 import { PERMISSIONS } from '../../shared/permissions'
 
 export function registerCompanyHandlers(): void {
@@ -27,7 +27,8 @@ export function registerCompanyHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.COMPANY_CREATE, (_e, data: Record<string, unknown>) => {
     try {
-      requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有新建公司的权限')
+      const permission = requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有新建公司的权限')
+      if (!permission.ok) return permission.response
       return repo.create(data)
     } catch (err: any) {
       console.error('COMPANY_CREATE failed:', err)
@@ -37,7 +38,8 @@ export function registerCompanyHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.COMPANY_UPDATE, (_e, id: number, data: Record<string, unknown>) => {
     try {
-      requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有修改公司的权限')
+      const permission = requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有修改公司的权限')
+      if (!permission.ok) return permission.response
       return repo.update(id, data)
     } catch (err: any) {
       console.error('COMPANY_UPDATE failed:', err)
@@ -47,7 +49,9 @@ export function registerCompanyHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.COMPANY_DELETE, (_e, id: number) => {
     try {
-      requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有停用公司的权限')
+      const permission = requirePermission(PERMISSIONS.COMPANY_MANAGE, '没有停用公司的权限')
+      if (!permission.ok) return permission.response
+      if (getSessionUser()?.role !== 'admin') return { success: false, code: 'FORBIDDEN', message: '仅管理端可以删除公司' }
       repo.delete(id)
       return { success: true }
     } catch (err: any) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
   Table, Button, Modal, Form, Input, Select, DatePicker, Space, Popconfirm, Dropdown, Tooltip,
-  Typography, message, Skeleton, Empty, Tag, InputNumber, Card, Row, Col, Divider, Checkbox, Tabs, Segmented
+  Typography, message, Skeleton, Empty, Tag, InputNumber, Card, Row, Col, Divider, Checkbox, Tabs, Segmented, Alert
 } from 'antd'
 import type { MenuProps } from 'antd'
 import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined, SearchOutlined, FilterOutlined, HistoryOutlined, SendOutlined, CheckCircleOutlined, StopOutlined, PlayCircleOutlined, MoreOutlined , CloseCircleOutlined } from '@ant-design/icons'
@@ -12,7 +12,7 @@ import { api } from '../api/dashboard.api'
 import { invoke } from '../api/cloudApi'
 import { tokens as T } from '../styles/design-tokens'
 import { formatMoneyCNY, formatNumber, POSITIVE_COLOR, NEGATIVE_COLOR } from '../utils/format'
-import type { Contract, ContractWithItems, Company, Region, ContractType, ContractVersion, ContractItem } from '../../../shared/types'
+import type { Contract, ContractWithItems, Company, Region, ContractType, ContractVersion, ContractItem, InfrastructureType } from '../../../shared/types'
 import { useAuth } from '../context/AuthContext'
 import dayjs from 'dayjs'
 
@@ -23,6 +23,17 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   draft: '草稿', active: '有效', executing: '执行中',
   completed: '完成', terminated: '终止'
+}
+
+const CONTRACT_GUIDES: Record<number, { purpose: string; fill: string; effect: string }> = {
+  1: { purpose: '建设基础设施并形成区域人口、就业、幸福度或减排效果。', fill: '选择基础设施字典中的项目名称，填写工程量和单价；金额会自动计算。', effect: '合同执行后纳入区域基础设施汇总。' },
+  2: { purpose: '记录矿产或原材料开采。', fill: '填写矿种、开采量和单价；碳排放由开采量与碳排系数参与计算。', effect: '影响区域供应量与碳排放。' },
+  3: { purpose: '采购设备、材料或商品。', fill: '填写品名、采购数量和单价；金额会自动计算。', effect: '计入合同成本和区域供应。' },
+  4: { purpose: '招聘人才或雇佣劳动力。', fill: '填写岗位、人数和月薪；金额按人数×月薪计算。', effect: '影响区域人口、人才和就业。' },
+  5: { purpose: '对项目或公司进行股权、债权或基金投资。', fill: '填写投资金额和投资类型；涉及股权时再填写占股比例、股数和股价。', effect: '计入投资成本，不直接生成销售收入。' },
+  6: { purpose: '向指定项目配置专项、运营或其他拨款。', fill: '填写项目名称、拨款金额和拨款类型。', effect: '计入合同成本，不直接生成销售收入。' },
+  7: { purpose: '销售商品或产出。', fill: '填写品名、销售数量和单价；金额会自动计算。', effect: '数量计入销量，数量×单价计入预期收入。' },
+  8: { purpose: '记录碳排放配额交易或减排项目。', fill: '填写项目名称、减碳量和碳单价；碳排放与减排值均不附加显示单位。', effect: '减排值进入区域碳排放计算，并间接影响幸福度和股票收盘价。' },
 }
 
 // v1.3.1 金融化：审批流已废弃（approval 状态保留兼容历史数据，不再展示）
@@ -92,6 +103,7 @@ const ContractListPage: React.FC = () => {
   const [versionDetail, setVersionDetail] = useState<ContractVersion | null>(null)
   const [companies, setCompanies] = useState<Company[]>([])
   const [regions, setRegions] = useState<Region[]>([])
+  const [infraTypes, setInfraTypes] = useState<InfrastructureType[]>([])
   const [contractTypeId, setContractTypeId] = useState<number | null>(null)
   const [items, setItems] = useState<Partial<any>[]>([])
   const [editItems, setEditItems] = useState<Partial<ContractItem>[]>([])
@@ -115,14 +127,16 @@ const ContractListPage: React.FC = () => {
       // 显式传大 limit 兼容全量（本地 IPC 返回裸数组，两种格式统一解包）
       const contractsRaw = await invoke(IPC_CHANNELS.CONTRACT_LIST, undefined, { limit: 10000 }) as any
       const contractsList: Contract[] = Array.isArray(contractsRaw) ? contractsRaw : (contractsRaw?.items || [])
-      const [ctList, comps, regs] = await Promise.all([
+      const [ctList, comps, regs, infrastructureTypes] = await Promise.all([
         api.contractType.list(),
         api.company.list(),
         api.region.list(),
+        api.infraType.list(),
       ])
       setContractTypes(ctList as ContractType[])
       setCompanies(comps as Company[])
       setRegions(regs as Region[])
+      setInfraTypes(infrastructureTypes as InfrastructureType[])
       setContracts(contractsList)
     } finally {
       setLoading(false)
@@ -367,7 +381,19 @@ const ContractListPage: React.FC = () => {
     setSubmitting(true)
     try {
       const values = await form.validateFields()
+      if (!contractTypeId) { message.warning('请选择合同类型后再填写明细'); return }
       if (items.length === 0) { message.warning('请至少添加一个明细项'); setSubmitting(false); return }
+      const invalidName = items.findIndex((item) => !String(item.item_name || '').trim())
+      if (invalidName >= 0) { message.warning(`请填写第 ${invalidName + 1} 条明细的项目或品名`); return }
+      if ([5, 6].includes(contractTypeId)) {
+        const invalidAmount = items.findIndex((item) => Number(item.total_cost || 0) <= 0)
+        if (invalidAmount >= 0) { message.warning(`第 ${invalidAmount + 1} 条明细的金额必须大于 0`); return }
+      } else {
+        const invalidQuantity = items.findIndex((item) => Number(item.quantity || 0) <= 0)
+        const invalidPrice = items.findIndex((item) => Number(item.unit_price || 0) <= 0)
+        if (invalidQuantity >= 0) { message.warning(`第 ${invalidQuantity + 1} 条明细的数量必须大于 0`); return }
+        if (invalidPrice >= 0) { message.warning(`第 ${invalidPrice + 1} 条明细的单价必须大于 0`); return }
+      }
 
       // 获取选中的公司名称
       const selectedCompany = companies.find(c => c.id === values.party_b_id)
@@ -403,12 +429,19 @@ const ContractListPage: React.FC = () => {
       item_name: '', quantity: 0, unit_price: 0,
       investment_type: defaultType,
       equity_ratio: 0, shares: 0, price: 0,
-      total_cost: 0, expected_income: 0
+      total_cost: Number(form.getFieldValue('contract_amount') || 0), expected_income: 0,
+      carbon_factor: 1,
     }])
   }
   const updateItem = (idx: number, field: string, value: unknown) => {
     const newItems = [...items]
     newItems[idx] = { ...newItems[idx], [field]: value }
+    if (['quantity', 'unit_price'].includes(field)) {
+      newItems[idx].total_cost = Number(newItems[idx].quantity || 0) * Number(newItems[idx].unit_price || 0)
+    }
+    if (contractTypeId === 5 && ['shares', 'price'].includes(field) && Number(newItems[idx].shares || 0) > 0 && Number(newItems[idx].price || 0) > 0) {
+      newItems[idx].total_cost = Number(newItems[idx].shares) * Number(newItems[idx].price)
+    }
     setItems(newItems)
   }
   const removeItem = (idx: number) => {
@@ -416,6 +449,8 @@ const ContractListPage: React.FC = () => {
   }
 
   const contractTypeName = contractTypes.find(t => t.id === contractTypeId)?.name || ''
+  const selectedType = contractTypes.find(t => t.id === contractTypeId)
+  const selectedGuide = contractTypeId ? CONTRACT_GUIDES[contractTypeId] : null
 
   // 渲染历史快照字段值（解析 ID 为名称，状态为中文标签）
   const renderSnapValue = (key: string, v: unknown): React.ReactNode => {
@@ -547,7 +582,7 @@ const ContractListPage: React.FC = () => {
 
   const renderItemFields = () => {
     // 字段定义：每个类型对应的列（label / 宽度 / 绑定字段 / 控件类型）
-    type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number; options?: { value: string; label: string }[] }
+    type FieldDef = { label: string; span: number; field: string; type: 'text' | 'num' | 'select'; placeholder: string; step?: number; disabled?: boolean; options?: { value: string; label: string }[] }
     // v1.3.1-3 类型化明细模板：各合同类型字段与类型严格对应（用户拍板：投资类=投资项目，交易类不要税率）
     const INVESTMENT_FIELDS: FieldDef[] = [
       { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：产业园一期' },
@@ -566,24 +601,31 @@ const ContractListPage: React.FC = () => {
     ]
     // 工程类（基建/开采）：工程量×单价
     const ENGINEERING_FIELDS: FieldDef[] = [
-      { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：道路硬化工程' },
+      { label: '基础设施项目', span: 7, field: 'item_name', type: 'select', placeholder: '选择基础设施字典项目', options: infraTypes.map((item) => ({ value: item.name, label: item.name })) },
       { label: '工程量', span: 5, field: 'quantity', type: 'num', placeholder: '如：1000' },
       { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：350' },
-      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：350000' },
+      { label: '金额(自动)', span: 5, field: 'total_cost', type: 'num', placeholder: '工程量×单价', disabled: true },
+    ]
+    const EXTRACTION_FIELDS: FieldDef[] = [
+      { label: '矿种/原材料', span: 7, field: 'item_name', type: 'text', placeholder: '如：铁矿石' },
+      { label: '开采量', span: 4, field: 'quantity', type: 'num', placeholder: '如：1000' },
+      { label: '单价(元)', span: 4, field: 'unit_price', type: 'num', placeholder: '如：350' },
+      { label: '碳排系数', span: 4, field: 'carbon_factor', type: 'num', placeholder: '如：1.2', step: 0.1 },
+      { label: '金额(自动)', span: 4, field: 'total_cost', type: 'num', placeholder: '开采量×单价', disabled: true },
     ]
     // 交易类（采购/销售）：数量×单价（用户拍板：不要税率）
     const TRADE_FIELDS: FieldDef[] = [
       { label: '品名', span: 7, field: 'item_name', type: 'text', placeholder: '如：钢材' },
       { label: '数量', span: 5, field: 'quantity', type: 'num', placeholder: '如：100' },
       { label: '单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：1200' },
-      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：120000' },
+      { label: '金额(自动)', span: 5, field: 'total_cost', type: 'num', placeholder: '数量×单价', disabled: true },
     ]
     // 劳动力：岗位×人数×月薪
     const LABOR_FIELDS: FieldDef[] = [
       { label: '岗位名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：土建工程师' },
       { label: '人数', span: 5, field: 'quantity', type: 'num', placeholder: '如：10' },
       { label: '月薪(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：8000' },
-      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：80000' },
+      { label: '金额(自动)', span: 5, field: 'total_cost', type: 'num', placeholder: '人数×月薪', disabled: true },
     ]
     // 拨款：项目+金额+用途
     const ALLOCATION_FIELDS: FieldDef[] = [
@@ -600,26 +642,25 @@ const ContractListPage: React.FC = () => {
     // 减碳：项目+减碳量×碳单价
     const CARBON_FIELDS: FieldDef[] = [
       { label: '项目名称', span: 7, field: 'item_name', type: 'text', placeholder: '如：光伏发电项目' },
-      { label: '减碳量(吨CO₂)', span: 5, field: 'quantity', type: 'num', placeholder: '如：5000' },
-      { label: '碳单价(元/吨)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：60' },
-      { label: '金额(元)', span: 5, field: 'total_cost', type: 'num', placeholder: '如：300000' },
+      { label: '减碳量', span: 5, field: 'quantity', type: 'num', placeholder: '如：5000' },
+      { label: '碳单价(元)', span: 5, field: 'unit_price', type: 'num', placeholder: '如：60' },
+      { label: '金额(自动)', span: 5, field: 'total_cost', type: 'num', placeholder: '减碳量×碳单价', disabled: true },
     ]
-    const FIELD_SETS: Record<number, { title: string; hint: string; fields: FieldDef[] }> = {
-      1: { title: '工程明细', hint: '基建合同 - 项目名称、工程量、单价与金额', fields: ENGINEERING_FIELDS },
-      2: { title: '开采明细', hint: '开采合同 - 矿种、开采量、单价与金额', fields: ENGINEERING_FIELDS },
-      3: { title: '采购明细', hint: '采购合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
-      4: { title: '岗位明细', hint: '劳动力雇佣合同 - 岗位、人数、月薪与金额', fields: LABOR_FIELDS },
-      5: { title: '投资项目', hint: '投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
-      6: { title: '拨款明细', hint: '拨款合同 - 项目名称、拨款金额与拨款类型', fields: ALLOCATION_FIELDS },
-      7: { title: '销售明细', hint: '销售合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
-      8: { title: '减碳明细', hint: '减碳合同 - 项目名称、减碳量、碳单价与金额', fields: CARBON_FIELDS },
+    const FIELD_SETS: Record<number, { title: string; addLabel: string; hint: string; fields: FieldDef[] }> = {
+      1: { title: '工程明细', addLabel: '工程明细', hint: '基建合同 - 项目名称、工程量、单价与金额', fields: ENGINEERING_FIELDS },
+      2: { title: '开采明细', addLabel: '开采明细', hint: '开采合同 - 矿种、开采量、单价与碳排系数；金额自动计算', fields: EXTRACTION_FIELDS },
+      3: { title: '采购明细', addLabel: '采购明细', hint: '采购合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
+      4: { title: '岗位明细', addLabel: '岗位', hint: '劳动力雇佣合同 - 岗位、人数、月薪与金额', fields: LABOR_FIELDS },
+      5: { title: '投资项目', addLabel: '投资项目', hint: '投资合同 - 项目名称、投资金额、投资类型、占股比例、股数与股价', fields: INVESTMENT_FIELDS },
+      6: { title: '拨款明细', addLabel: '拨款明细', hint: '拨款合同 - 项目名称、拨款金额与拨款类型', fields: ALLOCATION_FIELDS },
+      7: { title: '销售明细', addLabel: '销售明细', hint: '销售合同 - 品名、数量、单价与金额', fields: TRADE_FIELDS },
+      8: { title: '减碳明细', addLabel: '减碳明细', hint: '减碳合同 - 项目名称、减碳量、碳单价与金额', fields: CARBON_FIELDS },
     }
     const config = FIELD_SETS[contractTypeId || 1]
-    const addLabel = config.title.replace('项', '').replace('岗位', '')
 
     return (
       <Card title={config.title} size="small"
-        extra={<Button size="small" onClick={addItem}>+ 添加{addLabel}</Button>}
+        extra={<Button size="small" icon={<PlusOutlined />} onClick={addItem}>添加{config.addLabel}</Button>}
         style={itemCardStyle} styles={{ header: itemCardHeaderStyle, body: itemCardBodyStyle }}>
         <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 10, fontSize: 12 }}>
           {config.hint}
@@ -644,7 +685,7 @@ const ContractListPage: React.FC = () => {
                     <Input placeholder={f.placeholder} value={(item as any)[f.field] || ''}
                       onChange={e => updateItem(idx, f.field, e.target.value)} />
                   ) : (
-                    <InputNumber placeholder={f.placeholder} style={{ width: '100%' }} min={0}
+                    <InputNumber placeholder={f.placeholder} style={{ width: '100%' }} min={0} disabled={f.disabled}
                       step={f.step} value={(item as any)[f.field]}
                       onChange={v => updateItem(idx, f.field, v)} />
                   )}
@@ -809,6 +850,10 @@ const ContractListPage: React.FC = () => {
                   value={contractTypeId}
                   onChange={(v) => { setContractTypeId(v); setItems([]) }}
                   options={contractTypes.map(t => ({ value: t.id, label: t.name }))}
+                  optionRender={(option) => {
+                    const type = contractTypes.find((item) => item.id === option.value)
+                    return <div><div>{type?.name}</div><small style={{ color: T.textMuted }}>{type?.description}</small></div>
+                  }}
                 />
               </Form.Item>
             </Col>
@@ -882,6 +927,13 @@ const ContractListPage: React.FC = () => {
 
         {contractTypeId && (
           <>
+            {selectedGuide && <Alert
+              type="info"
+              showIcon
+              message={`${selectedType?.name || contractTypeName}：${selectedGuide.purpose}`}
+              description={<div><div><strong>怎么填：</strong>{selectedGuide.fill}</div><div><strong>产生什么影响：</strong>{selectedGuide.effect}</div></div>}
+              style={{ marginBottom: 12 }}
+            />}
             <Divider />
             {renderItemFields()}
           </>
@@ -1026,7 +1078,6 @@ const ContractListPage: React.FC = () => {
                             { title: '股数', dataIndex: 'shares', width: 70, render: (v: any) => (v ? formatNumber(v) : '-') },
                             { title: '股价(元/股)', dataIndex: 'price', width: 90, render: (v: any) => (v ? `¥${formatNumber(v)}` : '-') },
                             { title: '预期收益', dataIndex: 'expected_income', width: 110, render: (v: any) => (v ? formatMoneyCNY(v) : '-') },
-                            { title: '占股比例', dataIndex: 'equity_ratio', width: 80, render: (v: any) => (v ? `${formatNumber(v)}%` : '-') }
                           ]}
                         />
                       </>

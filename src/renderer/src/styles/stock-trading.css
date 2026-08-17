@@ -199,6 +199,10 @@
 .gipfel-trading__chart-head > div:first-child { display: flex; flex-direction: column; gap: 3px; }
 .gipfel-trading__chart-head strong { font-size: 12px; font-weight: 620; }
 .gipfel-trading__chart-head span { color: var(--trade-muted); font-size: 11px; }
+.gipfel-trading__fundamentals { margin-left: auto; display: grid; grid-template-columns: auto auto; gap: 2px 14px; padding: 5px 10px; border: 1px solid rgba(138,155,181,.16); background: rgba(255,255,255,.018); }
+.gipfel-trading__fundamentals span { color: var(--trade-secondary); white-space: nowrap; }
+.gipfel-trading__fundamentals b { margin-left: 5px; color: var(--trade-text); font-family: var(--gipfel-font-mono); font-weight: 600; }
+.gipfel-trading__fundamentals small { grid-column: 1 / -1; color: var(--trade-muted); font-size: 9px; }
 .gipfel-trading__legend { display: flex; gap: 13px; }
 .gipfel-trading__legend span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; background: currentColor; }
 
@@ -407,6 +411,7 @@
   .gipfel-trading__workbench,
   .gipfel-trading__workbench.is-readonly { grid-template-columns: 208px minmax(400px, 1fr) 286px; }
   .gipfel-trading__legend { display: none; }
+  .gipfel-trading__fundamentals { margin-left: auto; }
   .gipfel-trading__identity { min-width: 180px; }
   .gipfel-trading__price { font-size: 24px; }
   .trading-kline__plot { height: 430px; }
@@ -447,6 +452,8 @@
   .gipfel-trading__ticket,
   .gipfel-trading__readonly { border-right: 0; border-bottom: 1px solid var(--trade-line); }
   .gipfel-trading__legend { display: none; }
+  .gipfel-trading__chart-head { align-items: flex-start; flex-direction: column; }
+  .gipfel-trading__fundamentals { width: 100%; margin-left: 0; }
   .trading-kline__plot { height: 360px; }
   .is-chart-focus .trading-kline__plot { height: 480px; }
   .gipfel-trading__modebar { align-items: flex-start; flex-direction: column; gap: 4px; padding: 0 8px 8px; }

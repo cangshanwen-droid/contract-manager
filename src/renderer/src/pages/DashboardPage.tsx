@@ -154,9 +154,7 @@ const DashboardPage: React.FC = () => {
 
   // ── Carbon display format ──
   const formatCarbon = (v: number): string => {
-    if (v >= 10000) return `${(v / 10000).toFixed(1)} 万`
-    if (v >= 1000) return `${(v / 1000).toFixed(1)} 千`
-    return `${v.toFixed(0)}`
+    return Math.round(v).toLocaleString('zh-CN')
   }
 
   // ── Population display format ──

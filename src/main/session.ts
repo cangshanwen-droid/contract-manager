@@ -86,12 +86,13 @@ export function resolveUserPermissions(userId: number): string[] {
       operator: [
         'contract.view', 'contract.create', 'contract.approve', 'contract.edit',
         'account.view', 'account.create', 'account.transact',
-        'stock.trade', 'announce.manage'
+        'stock.trade', 'announce.manage', 'company.manage', 'region.manage'
       ],
       admin: [
         'contract.view', 'contract.create', 'contract.approve', 'contract.edit',
         'account.view', 'account.create', 'account.transact',
-        'user.manage', 'announce.manage', 'stock.trade', 'system.config'
+        'user.manage', 'announce.manage', 'stock.trade', 'system.config',
+        'company.manage', 'region.manage'
       ]
     }
     if (role && fallback[role]) fallback[role].forEach((p) => perms.add(p))

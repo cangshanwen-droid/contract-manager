@@ -4,7 +4,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { IPC_CHANNELS } from '../../shared/constants'
 import { PERMISSIONS } from '../../shared/permissions'
-import { readSyncLog } from '../stock-sync'
+import { readSyncLog, syncStockIndicators, syncStockPrices } from '../stock-sync'
 import { getSessionUser, requirePermission } from '../session'
 import { CLOUD_API_BASE } from '../../shared/cloud-config'
 import { getAdminKey } from '../credential-store'
@@ -23,6 +23,31 @@ function setToken(token: string): void {
 }
 
 export function registerStockHandlers(): void {
+  ipcMain.handle(IPC_CHANNELS.STOCK_SYNC_INDICATORS, async (_event, payload: any) => {
+    const session = getSessionUser()
+    if (!session || !['admin', 'operator'].includes(session.role)) {
+      return { success: false, code: 'FORBIDDEN', message: '仅管理端和操作端可同步区域股票指标' }
+    }
+    const symbols = Array.isArray(payload?.symbols) ? payload.symbols.map(String) : []
+    const happiness = Number(payload?.happiness)
+    const carbonEmissions = Number(payload?.carbonEmissions)
+    const population = Number(payload?.population)
+    if (![happiness, carbonEmissions, population].every(Number.isFinite)) {
+      return { success: false, code: 'INVALID_ARGUMENT', message: '区域股票指标不完整' }
+    }
+    const context = {
+      regionName: String(payload?.regionName || '未命名区域'),
+      happiness,
+      carbonEmissions,
+      population,
+      prevPopulation: Number(payload?.prevPopulation || population),
+    }
+    const results = symbols.length
+      ? await syncStockIndicators(context, symbols)
+      : await syncStockPrices(context)
+    return { success: true, results }
+  })
+
   ipcMain.handle(IPC_CHANNELS.STOCK_ADMIN, async (_event, payload: { action?: unknown; symbol?: unknown }) => {
     const session = getSessionUser()
     if (!session || session.role !== 'admin') {

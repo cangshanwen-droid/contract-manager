@@ -307,7 +307,7 @@ const GlobeView: React.FC<GlobeViewProps> = ({ regions, width = 520, height = 52
                 fontFamily: "'JetBrains Mono', monospace",
                 color: T.textPrimary,
                 fontWeight: 500,
-              }}>{hovered.carbon_emissions.toLocaleString()} 吨</span>
+              }}>{hovered.carbon_emissions.toLocaleString()}</span>
             </div>
           )}
           {hovered.happiness != null && (

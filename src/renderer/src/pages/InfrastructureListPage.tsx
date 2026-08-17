@@ -30,7 +30,7 @@ const InfrastructureListPage: React.FC = () => {
     { title: '占地面积', dataIndex: 'default_land_area', width: 70, render: (v: number) => <span style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace" }}>{v?.toLocaleString()}</span> },
     { title: '就业加成', dataIndex: 'population_addition', width: 70, render: (v: number) => v || '-' },
     { title: '引才', dataIndex: 'talent_addition', width: 50, render: (v: number) => v > 0 ? <span style={{color: T.warmGold}}>{v}</span> : '-' },
-    { title: '年减排(吨)', dataIndex: 'carbon_reduction', width: 80, render: (v: number) => v > 0 ? <span style={{color: T.green}}>{v}</span> : '-' },
+    { title: '减排值', dataIndex: 'carbon_reduction', width: 80, render: (v: number) => v > 0 ? <span style={{color: T.green}}>{v}</span> : '-' },
     {
       title: '幸福指数', dataIndex: 'happiness_index', width: 70,
       render: (v: number) => v ? <span style={{ fontFamily: "'JetBrains Mono', 'Consolas', monospace" }}>{v.toFixed(1)}</span> : '-'

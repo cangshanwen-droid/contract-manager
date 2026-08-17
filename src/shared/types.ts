@@ -13,6 +13,7 @@ export interface Region {
   carbon_emissions: number
   population_capacity: number
   base_growth_rate: number
+  infra_carbon_reduction: number
   current_happiness: number | null
   current_employment_rate: number | null
   created_at: string
@@ -267,6 +268,11 @@ export interface FormulaOutput {
   actual_infra_employment_bonus: number
   total_employment_rate: number
   next_population: number
+  population_carbon: number
+  extraction_carbon: number
+  infra_carbon_reduction: number
+  remaining_extraction_carbon: number
+  total_carbon: number
 }
 
 export interface AuditLog {

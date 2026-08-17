@@ -20,7 +20,7 @@ const STOCK_API = `${CLOUD_API_BASE}`
 const MARKET_POLL_MS = 15000
 const PORTFOLIO_POLL_MS = 30000
 
-type StockQuote = { symbol: string; name: string; current_price?: number; price?: number; change_pct?: number; changePct?: number; change?: number }
+type StockQuote = { symbol: string; name: string; current_price?: number; price?: number; change_pct?: number; changePct?: number; change?: number; premium_rate?: number; carbon_price?: number; revenue?: number }
 type Position = { symbol: string; name: string; shares: number; avgCost: number; currentPrice: number; marketValue: number; pnl: number; pnlRatio: number }
 type Candle = { round: number; time: string; open: number; high: number; low: number; close: number; volume: number }
 type OrderBook = { mode?: 'trade-distribution'; bids: { price: number; quantity: number }[]; asks: { price: number; quantity: number }[]; largeTrades: { side: string; price: number; quantity: number; created_at: string }[] }
@@ -594,6 +594,11 @@ export function StockMarketPage() {
               </div>}
               <div className="gipfel-trading__chart-head">
                 <div><strong>轮次 K 线</strong><span>每轮一根真实蜡烛 · 30 秒同步</span></div>
+                <div className="gipfel-trading__fundamentals" aria-label="股票区域基础指标">
+                  <span>幸福度 <b>{selectedStock?.premium_rate != null ? Number(selectedStock.premium_rate).toFixed(2) : '--'}</b></span>
+                  <span>碳排放 <b>{selectedStock?.carbon_price != null ? Number(selectedStock.carbon_price).toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '--'}</b></span>
+                  <small>区域同步值 · 下次收盘参与定价</small>
+                </div>
                 <div className="gipfel-trading__legend"><span className="is-up">上涨</span><span className="is-down">下跌</span><span className="is-ma5">MA5</span><span className="is-ma10">MA10</span><span>十字光标查看 OHLC</span></div>
               </div>
               <ProfessionalKlineChart candles={candles} loading={klineLoading} symbol={selected} />

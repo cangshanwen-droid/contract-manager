@@ -109,20 +109,24 @@ export async function syncStockPrices(ctx: SyncContext): Promise<string[]> {
     return []
   }
 
-  const cp = ctx.population > 0 ? ctx.carbonEmissions / ctx.population : 0
-  const pc = ctx.prevPopulation > 0 ? (ctx.population - ctx.prevPopulation) / ctx.prevPopulation : 0
+  return syncStockIndicators(ctx, symbols)
+}
 
-  // 模拟市场随机波动：基础值 ± 随机偏移，让股价不可完全预测
-  const jitter = (base: number, pct: number) => Math.round(base * (1 + (Math.random() - 0.5) * 2 * pct))
-  const premiumRate = jitter(Math.round(ctx.happiness), 0.05)       // 幸福度 ±5%
-  const carbonPrice = Math.min(500, jitter(Math.round(cp * 10), 0.10)) // 碳排 ±10%
-
+/** 使用调用方提供的上市证券映射同步指标，适用于云端业务数据模式。 */
+export async function syncStockIndicators(ctx: SyncContext, symbols: string[]): Promise<string[]> {
+  const normalizedSymbols = Array.from(new Set(symbols.map((symbol) => String(symbol || '').trim().toUpperCase()).filter(Boolean)))
+  if (!normalizedSymbols.length) return []
+  const premiumRate = Math.round(ctx.happiness * 100) / 100
+  const carbonPrice = Math.round(ctx.carbonEmissions * 100) / 100
   const results: string[] = []
-  appendLog(`区域=${ctx.regionName} 幸福=${ctx.happiness.toFixed(1)} 碳排=${ctx.carbonEmissions.toFixed(0)} 人口=${ctx.population.toLocaleString()} → 股票=[${symbols.join(',')}]`)
+  appendLog(`区域=${ctx.regionName} 幸福度=${premiumRate.toFixed(2)} 碳排放=${carbonPrice.toFixed(2)} 人口=${ctx.population.toLocaleString()} → 股票=[${normalizedSymbols.join(',')}]`)
 
-  for (const sym of symbols) {
-    const p: StockUpdatePayload = { premium_rate: premiumRate, carbon_price: carbonPrice }
-    if (Math.abs(pc) > 0.001) p.revenue = Math.round((1 + pc) * 100) / 100
+  for (const sym of normalizedSymbols) {
+    const p: StockUpdatePayload = {
+      premium_rate: premiumRate,
+      carbon_price: carbonPrice,
+      revenue: Math.round(ctx.population),
+    }
 
     const r = await callStockAPI(sym, p)
     const line = `${r.accepted ? '✓' : '✗'} ${sym} premium=${premiumRate} carbon=${carbonPrice}` + (r.error ? ` (${r.error})` : '')
@@ -135,9 +139,9 @@ export async function syncStockPrices(ctx: SyncContext): Promise<string[]> {
 
 /** 无数据库上市数据时的回退映射（与 v2 一致，保证演示可跑） */
 const FALLBACK_MAP: Record<string, string[]> = {
-  A区: ['JGONG'],
+  A区: ['JGONG', 'JIANSHE'],
   B区: ['JXIAO'],
-  C区: ['WULIU', 'YLIAO'],
+  C区: ['WULIU', 'YLIAO', 'NENGYUAN'],
 }
 function fallbackSymbols(regionName: string): string[] {
   return FALLBACK_MAP[regionName] || []

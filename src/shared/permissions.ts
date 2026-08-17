@@ -73,7 +73,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'account.view': '查看资金',
   'user.manage': '用户管理',
   'announce.manage': '公告管理',
-  'stock.trade': '股票交易',
+  'stock.trade': '股票行情（管理/操作端可交易，代表端只读）',
   'system.config': '系统设置（备份/导入导出）',
   'company.manage': '公司管理（增改停用）',
   'region.manage': '区域管理（增改删）'

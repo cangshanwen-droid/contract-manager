@@ -65,18 +65,28 @@ const CalculatePage: React.FC = () => {
         infra_population_delta: values.infra_population_delta || 0,
         population_capacity: values.population_capacity || region.population_capacity,
         base_growth_rate: values.base_growth_rate ?? region.base_growth_rate,
+        infra_carbon_reduction: summary?.infra_carbon_reduction || 0,
       }
-      setResult(await formulaApi.calculate(input) as FormulaOutput)
+      const calculated = await formulaApi.calculate(input) as FormulaOutput
+      setResult(calculated)
       setRegions(await api.region.list() as Region[])
       if (selectedRegion) loadLogs(selectedRegion)
       message.success('模拟完成')
       try {
-        const syncLog = await invoke(IPC_CHANNELS.STOCK_SYNC_LOG) as any
-        if (syncLog?.lines?.length) {
-          const last = syncLog.lines[syncLog.lines.length - 1]
-          if (last.includes('✓')) message.info(`${last.slice(20)}`, 5)
-        }
-      } catch { /* stock sync not critical */ }
+        const companies = await api.company.list() as any[]
+        const symbols = companies
+          .filter((company) => Number(company.region_id) === selectedRegion && company.is_listed && company.stock_symbol)
+          .map((company) => String(company.stock_symbol))
+        const sync = await window.api.invoke(IPC_CHANNELS.STOCK_SYNC_INDICATORS, {
+            symbols,
+            regionName: region.name,
+            happiness: calculated.happiness,
+            carbonEmissions: calculated.total_carbon,
+            population: Math.round(calculated.next_population),
+            prevPopulation: input.population,
+        }) as any
+        if (sync?.success && sync.results?.length) message.info(`已同步 ${sync.results.length} 只股票的幸福度与碳排放`, 4)
+      } catch { /* 股票指标同步失败不回滚区域模拟 */ }
     } catch { message.error('计算失败') }
     finally { setLoading(false) }
   }
@@ -234,6 +244,8 @@ const CalculatePage: React.FC = () => {
                 valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono', 'Consolas', monospace" }} /></Col>
               <Col span={8}><Statistic title="满足度" value={result.consumer_satisfaction} precision={3}
                 valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono', 'Consolas', monospace", color: T.warmGold }} /></Col>
+              <Col span={8}><Statistic title="碳排放" value={result.total_carbon} precision={2}
+                valueStyle={{ fontSize: 18, fontFamily: "'JetBrains Mono', 'Consolas', monospace", color: T.silver2 }} /></Col>
             </Row>
           ) : (
             <div style={{ textAlign: 'center', color: T.silver3, padding: '20px 0', fontSize: 12 }}>

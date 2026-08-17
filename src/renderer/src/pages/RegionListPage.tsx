@@ -8,8 +8,11 @@ import { formatNumber, formatPercentDirect, formatTrendWithValue, POSITIVE_COLOR
 
 // ── Import unified design tokens ──
 import { tokens as T } from '../styles/design-tokens'
+import { useAuth } from '../context/AuthContext'
 
 const RegionListPage: React.FC = () => {
+  const user = useAuth()
+  const canDelete = user?.role === 'admin'
   const [searchParams] = useSearchParams()
   const [regions, setRegions] = useState<Region[]>([])
   const [loading, setLoading] = useState(true)
@@ -140,9 +143,9 @@ const RegionListPage: React.FC = () => {
             { title: '操作', width: 120, render: (_: any, r: Region) => (
               <Space size={4}>
                 <Button type="link" size="small" icon={<EditOutlined />} aria-label={`编辑区域 ${r.name}`} title="编辑区域" onClick={() => openEdit(r)} style={{ padding: '0 4px', color: T.silverSec }} />
-                <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}>
+                {canDelete && <Popconfirm title={`确认删除区域“${r.name}”？`} description="删除后无法恢复，仅管理端可以执行。" okText="删除区域" cancelText="取消" onConfirm={() => handleDelete(r.id)}>
                   <Button type="link" size="small" danger icon={<DeleteOutlined />} aria-label={`删除区域 ${r.name}`} title="删除区域" style={{ padding: '0 4px' }} />
-                </Popconfirm>
+                </Popconfirm>}
               </Space>
             )},
           ]}

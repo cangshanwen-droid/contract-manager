@@ -5,7 +5,7 @@ import { queryAll, queryOne } from '../database/helpers'
 import { syncStockPrices } from '../stock-sync'
 import type { FormulaInput, FormulaOutput } from '../../shared/types'
 
-function calculateFormulas(input: FormulaInput): FormulaOutput {
+export function calculateFormulas(input: FormulaInput): FormulaOutput {
   const {
     population,
     talent_population,
@@ -19,7 +19,8 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
     infra_employment_bonuses,
     infra_population_delta,
     population_capacity,
-    base_growth_rate
+    base_growth_rate,
+    infra_carbon_reduction
   } = input
 
   // 消费者满足度 c = Qs / Qd
@@ -33,15 +34,22 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
   // 市场需求量 Qd = β * P
   const market_demand = price_sensitivity * population
 
-  // 区域幸福度综合公式
+  // 统一碳排放口径：区域碳排放 - 基建减排（不重复叠加人口，也不附加显示单位）
+  const population_carbon = 0
+  const extraction_carbon = Math.max(0, carbon_emissions)
+  const effective_carbon_reduction = Math.max(0, infra_carbon_reduction || 0)
+  const remaining_extraction_carbon = Math.max(0, extraction_carbon - effective_carbon_reduction)
+  const total_carbon = Math.max(0, population_carbon + remaining_extraction_carbon)
+
+  // 区域幸福度综合公式：人才提高幸福度，单位人口碳排放降低幸福度。
   const talentRatio = population > 0 ? talent_population / population : 0
-  const carbonPerCapita = population > 0 ? carbon_emissions / population : 0
+  const carbonPerCapita = population > 0 ? total_carbon / population : 0
 
   const happiness =
     0.6 * consumer_satisfaction +
     0.1 * Math.log10(population + 100) +
-    0.2 * talentRatio +
-    -0.2 * carbonPerCapita
+    2 * talentRatio -
+    0.2 * carbonPerCapita
 
   const clampedHappiness = Math.max(1, Math.min(100, happiness * 10))
 
@@ -92,7 +100,12 @@ function calculateFormulas(input: FormulaInput): FormulaOutput {
     infra_employment_bonus_total,
     actual_infra_employment_bonus,
     total_employment_rate,
-    next_population
+    next_population,
+    population_carbon,
+    extraction_carbon,
+    infra_carbon_reduction: effective_carbon_reduction,
+    remaining_extraction_carbon,
+    total_carbon
   }
 }
 
@@ -130,8 +143,8 @@ export function registerFormulaHandlers(): void {
 
         db.run(
           `UPDATE regions SET current_happiness = ?, current_employment_rate = ?,
-           population = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
-          [output.happiness, output.total_employment_rate, Math.round(output.next_population), input.region_id]
+           population = ?, carbon_emissions = ?, updated_at = datetime('now','localtime') WHERE id = ?`,
+          [output.happiness, output.total_employment_rate, Math.round(output.next_population), output.total_carbon, input.region_id]
         )
 
         db.run('COMMIT')
@@ -143,7 +156,7 @@ export function registerFormulaHandlers(): void {
             syncStockPrices({
               regionName: region.name,
               happiness: output.happiness,
-              carbonEmissions: input.carbon_emissions,
+              carbonEmissions: output.total_carbon,
               population: Math.round(output.next_population),
               prevPopulation: input.population,
             }).catch(e => console.error('Stock sync failed:', e))

@@ -19,7 +19,8 @@ import { useNavigate } from 'react-router-dom'
 import { IPC_CHANNELS } from '../../../../shared/constants'
 import { createStock } from '../../api/cloudApi'
 import { companyApi } from '../../api/company.api'
-import type { Company } from '../../../../shared/types'
+import { api } from '../../api/dashboard.api'
+import type { Company, Region } from '../../../../shared/types'
 
 type AdminView = 'control' | 'securities' | 'accounts' | 'audit'
 type AdminOverview = {
@@ -79,6 +80,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
   const [accounts, setAccounts] = useState<AdminAccount[]>([])
   const [audit, setAudit] = useState<AuditRow[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
   const [listingCompanyId, setListingCompanyId] = useState<number | null>(null)
   const [listingSymbol, setListingSymbol] = useState('')
   const [listingPrice, setListingPrice] = useState<number>(100)
@@ -99,12 +101,14 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
       adminCall<AdminAccount[]>('accounts'),
       adminCall<AuditRow[]>('audit'),
       companyApi.list(),
+      api.region.list(),
     ])
     if (results[0].status === 'fulfilled') setOverview(results[0].value)
     if (results[1].status === 'fulfilled') setStocks(results[1].value)
     if (results[2].status === 'fulfilled') setAccounts(results[2].value)
     if (results[3].status === 'fulfilled') setAudit(results[3].value)
     if (results[4].status === 'fulfilled') setCompanies(results[4].value)
+    if (results[5].status === 'fulfilled') setRegions(results[5].value as Region[])
     const failures = results.filter((item) => item.status === 'rejected').length
     if (failures) message.warning(`${failures} 项管理数据暂未同步，可点击刷新重试`)
     setLoading(false)
@@ -246,7 +250,15 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
         <section className="gipfel-admin__section">
           <div className="gipfel-admin__section-head"><div><h3>创建上市证券</h3><p>公司目录与股票市场在同一事务流程中同步</p></div><DatabaseOutlined /></div>
           <div className="gipfel-security-drawer__form">
-            <label><span>上市公司</span><Select value={listingCompanyId} placeholder="选择未上市公司" onChange={setListingCompanyId} options={companies.filter((company) => !company.is_listed).map((company) => ({ value: company.id, label: `${company.name} · ${company.region || '未分区'}` }))} /></label>
+            <label><span>上市公司</span><Select value={listingCompanyId} placeholder="选择未上市公司" onChange={(companyId) => {
+              setListingCompanyId(companyId)
+              const company = companies.find((item) => item.id === companyId)
+              const region = regions.find((item) => item.id === company?.region_id || item.name === company?.region)
+              if (region) {
+                setListingPremium(Number(region.current_happiness ?? 50))
+                setListingCarbon(Number(region.carbon_emissions ?? 0))
+              }
+            }} options={companies.filter((company) => !company.is_listed).map((company) => ({ value: company.id, label: `${company.name} · ${company.region || '未分区'}` }))} /></label>
             <div className="gipfel-security-drawer__row">
               <label><span>证券代码</span><Input value={listingSymbol} maxLength={10} placeholder="例如 JGONG" onChange={(event) => setListingSymbol(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} /></label>
               <label><span>发行价格（元）</span><InputNumber min={0.01} precision={2} prefix="¥" value={listingPrice} onChange={(value) => setListingPrice(value ?? 100)} /></label>
@@ -256,11 +268,11 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
               <label><span>总股本（万股）</span><InputNumber min={0} precision={0} value={listingShares} onChange={(value) => setListingShares(value ?? 0)} /></label>
               <label><span>初始净利润（万）</span><InputNumber min={0} precision={2} value={listingRevenue} onChange={(value) => setListingRevenue(value ?? 0)} /></label>
               <label><span>行业市盈率</span><InputNumber min={0.01} precision={2} value={listingPe} onChange={(value) => setListingPe(value ?? 20)} /></label>
-              <label><span>当前幸福度</span><InputNumber min={0} precision={2} value={listingPremium} onChange={(value) => setListingPremium(value ?? 50)} /></label>
-              <label><span>当前碳指标</span><InputNumber min={0} precision={2} value={listingCarbon} onChange={(value) => setListingCarbon(value ?? 50)} /></label>
+              <label><span>幸福度（区域同步）</span><InputNumber disabled min={0} precision={2} value={listingPremium} /></label>
+              <label><span>碳排放（区域同步）</span><InputNumber disabled min={0} precision={2} value={listingCarbon} /></label>
               <label><span>基础波动率（%）</span><InputNumber min={0.2} max={5} step={0.1} precision={1} value={listingVolatility} onChange={(value) => setListingVolatility(value ?? 1.5)} /></label>
             </div>
-            <Alert type="info" showIcon message="发行参数会写入轮次结算模型；幸福度、碳指标和买卖强度共同决定收盘价，单轮涨跌限制为 ±10%。" />
+            <Alert type="info" showIcon message="幸福度和碳排放来自上市公司所属区域，不能在股票端单独修改；区域重新模拟后会自动同步，下一次收盘参与定价。" />
             <Button type="primary" icon={<PlusOutlined />} loading={listingSubmitting} disabled={!listingCompanyId || !listingSymbol} onClick={() => void submitListing()}>创建并上市</Button>
           </div>
         </section>
