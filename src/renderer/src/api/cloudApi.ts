@@ -524,6 +524,7 @@ export async function createStock(data: {
   industry_pe?: number
   premium_rate?: number
   carbon_price?: number
+  volatility?: number
 }): Promise<StockItem> {
   const result = await window.api.invoke(IPC_CHANNELS.STOCK_CREATE, data) as {
     success?: boolean

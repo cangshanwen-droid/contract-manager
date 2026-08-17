@@ -88,6 +88,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
   const [listingPe, setListingPe] = useState(20)
   const [listingPremium, setListingPremium] = useState(50)
   const [listingCarbon, setListingCarbon] = useState(50)
+  const [listingVolatility, setListingVolatility] = useState(1.5)
   const [listingSubmitting, setListingSubmitting] = useState(false)
 
   const reload = useCallback(async () => {
@@ -151,7 +152,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
         await createStock({
           symbol, name: company.name, price: listingPrice, sector: listingSector.trim() || '基础设施',
           total_shares: listingShares, revenue: listingRevenue, industry_pe: listingPe,
-          premium_rate: listingPremium, carbon_price: listingCarbon,
+          premium_rate: listingPremium, carbon_price: listingCarbon, volatility: listingVolatility / 100,
         })
       } catch (error: any) {
         if (error?.rollbackSafe) await companyApi.update(company.id, { is_listed: 0, stock_symbol: '', stock_initial_price: 100 })
@@ -168,7 +169,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
     } finally {
       setListingSubmitting(false)
     }
-  }, [companies, listingCarbon, listingCompanyId, listingPe, listingPremium, listingPrice, listingRevenue, listingSector, listingShares, listingSymbol, onMarketChanged, reload])
+  }, [companies, listingCarbon, listingCompanyId, listingPe, listingPremium, listingPrice, listingRevenue, listingSector, listingShares, listingSymbol, listingVolatility, onMarketChanged, reload])
 
   const deleteStock = useCallback((stock: AdminStock) => {
     Modal.confirm({
@@ -257,6 +258,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
               <label><span>行业市盈率</span><InputNumber min={0.01} precision={2} value={listingPe} onChange={(value) => setListingPe(value ?? 20)} /></label>
               <label><span>当前幸福度</span><InputNumber min={0} precision={2} value={listingPremium} onChange={(value) => setListingPremium(value ?? 50)} /></label>
               <label><span>当前碳指标</span><InputNumber min={0} precision={2} value={listingCarbon} onChange={(value) => setListingCarbon(value ?? 50)} /></label>
+              <label><span>基础波动率（%）</span><InputNumber min={0.2} max={5} step={0.1} precision={1} value={listingVolatility} onChange={(value) => setListingVolatility(value ?? 1.5)} /></label>
             </div>
             <Alert type="info" showIcon message="发行参数会写入轮次结算模型；幸福度、碳指标和买卖强度共同决定收盘价，单轮涨跌限制为 ±10%。" />
             <Button type="primary" icon={<PlusOutlined />} loading={listingSubmitting} disabled={!listingCompanyId || !listingSymbol} onClick={() => void submitListing()}>创建并上市</Button>

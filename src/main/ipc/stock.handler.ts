@@ -78,7 +78,7 @@ export function registerStockHandlers(): void {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.STOCK_CREATE, async (_event, payload: { symbol?: unknown; name?: unknown; price?: unknown; sector?: unknown; total_shares?: unknown; revenue?: unknown; industry_pe?: unknown; premium_rate?: unknown; carbon_price?: unknown }) => {
+  ipcMain.handle(IPC_CHANNELS.STOCK_CREATE, async (_event, payload: { symbol?: unknown; name?: unknown; price?: unknown; sector?: unknown; total_shares?: unknown; revenue?: unknown; industry_pe?: unknown; premium_rate?: unknown; carbon_price?: unknown; volatility?: unknown }) => {
     const session = getSessionUser()
     if (!session || session.role !== 'admin') {
       return { success: false, code: 'FORBIDDEN', message: '仅管理端可以创建上市证券', rollbackSafe: true }
@@ -95,9 +95,10 @@ export function registerStockHandlers(): void {
     const industryPe = Number(payload?.industry_pe ?? 20)
     const premiumRate = Number(payload?.premium_rate ?? 50)
     const carbonPrice = Number(payload?.carbon_price ?? 50)
+    const volatility = Number(payload?.volatility ?? 0.015)
     if (!/^[A-Z][A-Z0-9]{1,9}$/.test(symbol) || !name || !Number.isFinite(price) || price <= 0 ||
-        ![totalShares, revenue, industryPe, premiumRate, carbonPrice].every(Number.isFinite) ||
-        totalShares < 0 || revenue < 0 || industryPe <= 0 || premiumRate < 0 || carbonPrice < 0) {
+        ![totalShares, revenue, industryPe, premiumRate, carbonPrice, volatility].every(Number.isFinite) ||
+        totalShares < 0 || revenue < 0 || industryPe <= 0 || premiumRate < 0 || carbonPrice < 0 || volatility < 0.002 || volatility > 0.05) {
       return { success: false, code: 'INVALID_ARGUMENT', message: '证券资料不完整或格式不正确', rollbackSafe: true }
     }
 
@@ -120,7 +121,7 @@ export function registerStockHandlers(): void {
       const res = await net.fetch(`${CLOUD_API_BASE}/market/stocks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key },
-        body: JSON.stringify({ symbol, name, price, sector, total_shares: totalShares, revenue, industry_pe: industryPe, premium_rate: premiumRate, carbon_price: carbonPrice }),
+        body: JSON.stringify({ symbol, name, price, sector, total_shares: totalShares, revenue, industry_pe: industryPe, premium_rate: premiumRate, carbon_price: carbonPrice, volatility }),
         signal: controller.signal,
       })
       const body = await res.json().catch(() => ({})) as any
