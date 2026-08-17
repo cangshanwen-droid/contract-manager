@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Button, Tag, InputNumber, Segmented, Table, Empty, Spin, Modal, Select, Input, message, Drawer, Alert } from 'antd'
-import { WalletOutlined, ReloadOutlined, StarOutlined, StarFilled, SearchOutlined, LineChartOutlined, SafetyCertificateOutlined, StockOutlined, PlusOutlined, BankOutlined } from '@ant-design/icons'
+import { Button, Tag, InputNumber, Segmented, Table, Empty, Spin, Modal, Select, Input, message } from 'antd'
+import { WalletOutlined, ReloadOutlined, StarOutlined, StarFilled, SearchOutlined, LineChartOutlined, SafetyCertificateOutlined, StockOutlined } from '@ant-design/icons'
 import { useAuth } from '../context/AuthContext'
 import { canTradeStocks } from '../../../shared/permissions'
 import { IPC_CHANNELS } from '../../../shared/constants'
-import { createStock } from '../api/cloudApi'
-import { companyApi } from '../api/company.api'
 import { tokens as T } from '../styles/design-tokens'
 import { CLOUD_API_BASE } from '../../../shared/cloud-config'
 import ProfessionalKlineChart from '../components/stocks/ProfessionalKlineChart'
-import type { Company } from '../../../shared/types'
+import StockAdminConsole from '../components/stocks/StockAdminConsole'
 import '../styles/stock-trading.css'
 
 /**
@@ -72,15 +70,8 @@ export function StockMarketPage() {
   const [executionView, setExecutionView] = useState<'ticket' | 'book'>('ticket')
   const aliveRef = useRef(true)
 
-  // 证券管理（仅管理端）：公司上市与云端股票创建保持同一流程
+  // 市场管理控制台（仅管理端）
   const [securityOpen, setSecurityOpen] = useState(false)
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [companiesLoading, setCompaniesLoading] = useState(false)
-  const [listingCompanyId, setListingCompanyId] = useState<number | null>(null)
-  const [listingSymbol, setListingSymbol] = useState('')
-  const [listingPrice, setListingPrice] = useState<number>(100)
-  const [listingSector, setListingSector] = useState('基础设施')
-  const [listingSubmitting, setListingSubmitting] = useState(false)
 
   // 调整可用资金（仅 operator/admin）
   const [adjustOpen, setAdjustOpen] = useState(false)
@@ -189,63 +180,10 @@ export function StockMarketPage() {
     })
   }, [])
 
-  const openSecurityManager = useCallback(async () => {
+  const openSecurityManager = useCallback(() => {
     if (!isAdmin) return
     setSecurityOpen(true)
-    setCompaniesLoading(true)
-    try {
-      setCompanies(await companyApi.list())
-    } catch {
-      setCompanies([])
-      message.error('公司目录加载失败，请稍后重试')
-    } finally {
-      setCompaniesLoading(false)
-    }
   }, [isAdmin])
-
-  const submitListing = useCallback(async () => {
-    const company = companies.find((item) => item.id === listingCompanyId)
-    const symbol = listingSymbol.trim().toUpperCase()
-    if (!company) { message.warning('请选择准备上市的公司'); return }
-    if (!/^[A-Z][A-Z0-9]{1,9}$/.test(symbol)) { message.warning('股票代码须为 2–10 位大写字母或数字，并以字母开头'); return }
-    if (!listingPrice || listingPrice <= 0) { message.warning('请输入有效的发行价格'); return }
-
-    setListingSubmitting(true)
-    try {
-      await companyApi.update(company.id, {
-        is_listed: 1,
-        stock_symbol: symbol,
-        stock_initial_price: listingPrice,
-      })
-      try {
-        await createStock({ symbol, name: company.name, price: listingPrice, sector: listingSector.trim() || '基础设施' })
-      } catch (stockError: any) {
-        if (!stockError?.rollbackSafe) {
-          throw new Error(`${stockError?.message || '创建结果暂时无法确认'}；公司上市状态已保留，请刷新行情后核对`)
-        }
-        try {
-          await companyApi.update(company.id, { is_listed: 0, stock_symbol: '', stock_initial_price: 100 })
-        } catch (rollbackError: any) {
-          throw new Error(`股票创建失败，且公司状态回滚失败：${rollbackError?.message || '请到公司管理手动取消上市'}`)
-        }
-        throw new Error(`股票创建失败，公司上市状态已回滚：${stockError?.message || '请检查股票服务'}`)
-      }
-      message.success(`${company.name} 已上市，证券代码 ${symbol}`)
-      setSelected(symbol)
-      setListingCompanyId(null)
-      setListingSymbol('')
-      setListingPrice(100)
-      setSecurityOpen(false)
-      setCompanies((current) => current.map((item) => item.id === company.id
-        ? { ...item, is_listed: 1, stock_symbol: symbol, stock_initial_price: listingPrice }
-        : item))
-      void loadMarket()
-    } catch (error: any) {
-      message.error(error?.message || '创建股票失败')
-    } finally {
-      setListingSubmitting(false)
-    }
-  }, [companies, listingCompanyId, listingSymbol, listingPrice, listingSector, loadMarket])
 
   // ── 持仓拉取（/portfolio?username= 需 token）──
   const loadPortfolio = useCallback(async (tok: string, uname: string) => {
@@ -318,6 +256,21 @@ export function StockMarketPage() {
     if (price <= 0) { message.warning('请输入有效价格'); return }
     const available = portfolio?.positions?.find((p) => p.symbol === selected)?.shares ?? 0
     if (orderSide === 'sell' && orderShares > available) { message.warning(`可卖数量不足，当前可卖 ${available} 股`); return }
+    const availableCash = Number(portfolio?.user?.balance || 0)
+    const orderTotal = orderShares * price
+    if (orderSide === 'buy' && orderTotal > availableCash) { message.warning(`可用资金不足，最多可买 ${Math.floor(availableCash / price).toLocaleString('zh-CN')} 股`); return }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: `确认${orderSide === 'buy' ? '买入' : '卖出'} ${selected}`,
+        content: <div className="gipfel-trading__order-confirm"><span>委托价格 <b>{fmtMoney(price)}</b></span><span>委托数量 <b>{orderShares.toLocaleString('zh-CN')} 股</b></span><span>预计金额 <b>{fmtMoney(orderTotal)}</b></span><small>提交后将按当前轮次立即撮合，请核对价格和数量。</small></div>,
+        okText: `确认${orderSide === 'buy' ? '买入' : '卖出'}`,
+        cancelText: '返回修改',
+        okButtonProps: { danger: orderSide === 'sell' },
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
     setOrderSubmitting(true)
     try {
       const idem = `${orderSide}-${selected}-${username}-${Date.now()}`
@@ -428,6 +381,9 @@ export function StockMarketPage() {
   const selectedPct = selectedStock ? quotePct(selectedStock) : 0
   const selectedChange = Number(selectedStock?.change ?? (candles.length > 1 ? selectedPrice - candles[candles.length - 2].close : 0))
   const estimatedAmount = Math.max(0, Number(orderShares || 0) * Number(orderPrice || 0))
+  const maxOrderShares = orderSide === 'sell'
+    ? Number(selectedPosition?.shares || 0)
+    : Math.max(0, Math.floor(Number(portfolio?.user?.balance || 0) / Math.max(Number(orderPrice || selectedPrice), 0.01)))
   const filteredMarket = market.filter((stock) => {
     if (marketScope === 'watch' && !watchlist.includes(stock.symbol)) return false
     const query = marketQuery.trim().toLowerCase()
@@ -467,6 +423,9 @@ export function StockMarketPage() {
           {isTrader && (
             <Button className="gipfel-trading__fund-action" size="small" icon={<WalletOutlined />} onClick={openAdjust}>资金调度</Button>
           )}
+          {isAdmin && (
+            <Button className="gipfel-trading__security-action" size="small" icon={<SafetyCertificateOutlined />} onClick={openSecurityManager}>市场管理</Button>
+          )}
         </div>
       </header>
 
@@ -503,7 +462,6 @@ export function StockMarketPage() {
                 <div><strong>市场行情</strong><span>{market.length} 只 · 15 秒同步</span></div>
                 <div className="gipfel-trading__panel-actions">
                   <LineChartOutlined />
-                  {isAdmin && <button onClick={openSecurityManager}><PlusOutlined /> 创建股票</button>}
                 </div>
               </div>
               <Input
@@ -544,8 +502,8 @@ export function StockMarketPage() {
 
             <main className="gipfel-trading__chart-panel">
               <div className="gipfel-trading__chart-head">
-                <div><strong>价格走势</strong><span>按已成交订单聚合 · 30 秒同步</span></div>
-                <div className="gipfel-trading__legend"><span className="is-up">上涨</span><span className="is-down">下跌</span><span>十字光标查看 OHLC</span></div>
+                <div><strong>轮次 K 线</strong><span>每轮一根真实蜡烛 · 30 秒同步</span></div>
+                <div className="gipfel-trading__legend"><span className="is-up">上涨</span><span className="is-down">下跌</span><span className="is-ma5">MA5</span><span className="is-ma10">MA10</span><span>十字光标查看 OHLC</span></div>
               </div>
               <ProfessionalKlineChart candles={candles} loading={klineLoading} symbol={selected} />
               <div className="gipfel-trading__market-insight">
@@ -580,11 +538,11 @@ export function StockMarketPage() {
                     <label className="gipfel-trading__field"><span>数量（股）</span><InputNumber disabled={!token || marketState !== 'open'} min={1} max={orderSide === 'sell' ? selectedPosition?.shares : 1000000} precision={0} value={orderShares} onChange={(value) => setOrderShares(value ?? 0)} /></label>
                   </div>
                   <div className="gipfel-trading__quick-size">
-                    {[100, 500, 1000].map((size) => <button key={size} disabled={!token || marketState !== 'open'} onClick={() => setOrderShares(size)}>{size.toLocaleString('zh-CN')}</button>)}
-                    {orderSide === 'sell' && <button disabled={!token || marketState !== 'open'} onClick={() => setOrderShares(selectedPosition?.shares ?? 0)}>全部</button>}
+                    {[100, 500, 1000].map((size) => <button key={size} disabled={!token || marketState !== 'open' || size > maxOrderShares} onClick={() => setOrderShares(size)}>{size.toLocaleString('zh-CN')}</button>)}
+                    <button disabled={!token || marketState !== 'open' || maxOrderShares <= 0} onClick={() => setOrderShares(maxOrderShares)}>最大</button>
                   </div>
                   <dl className="gipfel-trading__order-summary">
-                    <div><dt>可卖数量</dt><dd>{(selectedPosition?.shares ?? 0).toLocaleString('zh-CN')} 股</dd></div>
+                    <div><dt>{orderSide === 'buy' ? '可买数量' : '可卖数量'}</dt><dd>{maxOrderShares.toLocaleString('zh-CN')} 股</dd></div>
                     <div><dt>预计金额</dt><dd>{fmtMoney(estimatedAmount)}</dd></div>
                     <div><dt>可用资金</dt><dd>{fmtMoney(portfolio?.user?.balance)}</dd></div>
                   </dl>
@@ -692,48 +650,19 @@ export function StockMarketPage() {
         </div>
       </Modal>
 
-      <Drawer
-        className="gipfel-security-drawer"
-        title={<div className="gipfel-security-drawer__title"><StockOutlined /><span>证券管理</span><small>公司上市与市场标的一体化管理</small></div>}
-        width="min(520px, calc(100vw - 24px))"
+      {isAdmin && <StockAdminConsole
         open={securityOpen}
         onClose={() => setSecurityOpen(false)}
-        extra={<Tag color="gold">仅管理端</Tag>}
-      >
-        <section className="gipfel-security-drawer__section">
-          <div className="gipfel-security-drawer__eyebrow">NEW LISTING</div>
-          <h3>创建上市证券</h3>
-          <p>选择系统内尚未上市的公司，创建后会同时写入股票市场并更新公司上市状态。</p>
-          <Alert type="info" showIcon message="这是原“公司管理 → 上市”能力的统一入口；失败时会自动回滚公司状态。" />
-          <div className="gipfel-security-drawer__form">
-            <label><span>上市公司</span><Select
-              loading={companiesLoading}
-              value={listingCompanyId}
-              placeholder="选择未上市公司"
-              onChange={(value) => setListingCompanyId(value)}
-              options={companies.filter((company) => !company.is_listed).map((company) => ({ value: company.id, label: `${company.name} · ${company.region || '未分区'}` }))}
-              notFoundContent={companiesLoading ? <Spin size="small" /> : '没有可上市的公司'}
-            /></label>
-            <div className="gipfel-security-drawer__row">
-              <label><span>证券代码</span><Input value={listingSymbol} maxLength={10} placeholder="例如 JGONG" onChange={(event) => setListingSymbol(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} /></label>
-              <label><span>发行价格（元）</span><InputNumber min={0.01} precision={2} prefix="¥" value={listingPrice} onChange={(value) => setListingPrice(value ?? 100)} /></label>
-            </div>
-            <label><span>所属板块</span><Input value={listingSector} maxLength={24} placeholder="基础设施" onChange={(event) => setListingSector(event.target.value)} /></label>
-            <Button type="primary" icon={<PlusOutlined />} loading={listingSubmitting} disabled={!listingCompanyId || !listingSymbol.trim()} onClick={submitListing}>确认创建并上市</Button>
-          </div>
-        </section>
-
-        <section className="gipfel-security-drawer__section is-list">
-          <div className="gipfel-security-drawer__eyebrow">LISTED SECURITIES</div>
-          <h3>已上市公司</h3>
-          <div className="gipfel-security-drawer__list">
-            {companies.filter((company) => company.is_listed).map((company) => (
-              <div key={company.id}><BankOutlined /><span><strong>{company.stock_symbol || '--'}</strong><small>{company.name}</small></span><b>{fmtMoney(company.stock_initial_price)}</b></div>
-            ))}
-            {!companiesLoading && !companies.some((company) => company.is_listed) && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无已上市公司" />}
-          </div>
-        </section>
-      </Drawer>
+        onMarketChanged={() => {
+          void loadMarket()
+          void loadKline(selected)
+          void loadOrderBook(selected)
+        }}
+        onOpenFunds={() => {
+          setSecurityOpen(false)
+          void openAdjust()
+        }}
+      />}
     </div>
   )
 }

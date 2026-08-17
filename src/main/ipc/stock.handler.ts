@@ -23,6 +23,61 @@ function setToken(token: string): void {
 }
 
 export function registerStockHandlers(): void {
+  ipcMain.handle(IPC_CHANNELS.STOCK_ADMIN, async (_event, payload: { action?: unknown; symbol?: unknown }) => {
+    const session = getSessionUser()
+    if (!session || session.role !== 'admin') {
+      return { success: false, code: 'FORBIDDEN', message: '仅管理端可使用市场控制台' }
+    }
+    const key = getAdminKey()
+    if (!key) return { success: false, code: 'NO_ADMIN_KEY', message: '未配置管理端密钥' }
+
+    const action = typeof payload?.action === 'string' ? payload.action : ''
+    const symbol = typeof payload?.symbol === 'string' ? payload.symbol.trim().toUpperCase() : ''
+    const routes: Record<string, { method: 'GET' | 'POST' | 'DELETE'; path: string; confirmation?: string }> = {
+      overview: { method: 'GET', path: '/admin/control/overview' },
+      accounts: { method: 'GET', path: '/admin/accounts' },
+      stocks: { method: 'GET', path: '/admin/stocks' },
+      audit: { method: 'GET', path: '/admin/audit-logs?limit=80' },
+      close: { method: 'POST', path: '/admin/market/close' },
+      open: { method: 'POST', path: '/admin/market/open' },
+      previous: { method: 'POST', path: '/admin/market/previous-round' },
+      reset: { method: 'POST', path: '/admin/market/reset-round1', confirmation: 'RESET ROUND 1' },
+      restore: { method: 'POST', path: '/admin/stocks/restore' },
+    }
+    if (action === 'delete-stock') {
+      if (!/^[A-Z][A-Z0-9]{1,9}$/.test(symbol)) {
+        return { success: false, code: 'INVALID_ARGUMENT', message: '证券代码格式不正确' }
+      }
+      routes[action] = { method: 'DELETE', path: `/admin/stocks/${encodeURIComponent(symbol)}` }
+    }
+    const route = routes[action]
+    if (!route) return { success: false, code: 'INVALID_ACTION', message: '不支持的管理操作' }
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
+    try {
+      const headers: Record<string, string> = { 'X-Admin-Key': key }
+      if (route.confirmation) headers['X-Confirm-Action'] = route.confirmation
+      const res = await net.fetch(`${CLOUD_API_BASE}${route.path}`, {
+        method: route.method,
+        headers,
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+      const body = await res.json().catch(() => ({})) as any
+      if (!res.ok) return { success: false, code: `HTTP_${res.status}`, message: body?.detail || `管理操作失败 (${res.status})` }
+      return { success: true, data: body }
+    } catch (error: any) {
+      return {
+        success: false,
+        code: error?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR',
+        message: error?.name === 'AbortError' ? '市场控制请求超时，请稍后重试' : '股票服务连接异常，请检查网络后重试',
+      }
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  })
+
   ipcMain.handle(IPC_CHANNELS.STOCK_CREATE, async (_event, payload: { symbol?: unknown; name?: unknown; price?: unknown; sector?: unknown }) => {
     const session = getSessionUser()
     if (!session || session.role !== 'admin') {
