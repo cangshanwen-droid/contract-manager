@@ -83,6 +83,11 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
   const [listingSymbol, setListingSymbol] = useState('')
   const [listingPrice, setListingPrice] = useState<number>(100)
   const [listingSector, setListingSector] = useState('基础设施')
+  const [listingShares, setListingShares] = useState(10000)
+  const [listingRevenue, setListingRevenue] = useState(100)
+  const [listingPe, setListingPe] = useState(20)
+  const [listingPremium, setListingPremium] = useState(50)
+  const [listingCarbon, setListingCarbon] = useState(50)
   const [listingSubmitting, setListingSubmitting] = useState(false)
 
   const reload = useCallback(async () => {
@@ -125,7 +130,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
   const confirmReset = () => {
     Modal.confirm({
       title: '确认回到第 1 轮？',
-      content: '该操作会清空股票成交与持仓记录，但不会删除用户、公司或股票。操作完成后无法撤销。',
+      content: '该操作会清空全部成交、持仓和资金账户，并将股票恢复到初始价格；用户、公司和证券资料会保留。操作完成后无法撤销。',
       okText: '确认重置',
       cancelText: '取消',
       okButtonProps: { danger: true },
@@ -143,7 +148,11 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
     try {
       await companyApi.update(company.id, { is_listed: 1, stock_symbol: symbol, stock_initial_price: listingPrice })
       try {
-        await createStock({ symbol, name: company.name, price: listingPrice, sector: listingSector.trim() || '基础设施' })
+        await createStock({
+          symbol, name: company.name, price: listingPrice, sector: listingSector.trim() || '基础设施',
+          total_shares: listingShares, revenue: listingRevenue, industry_pe: listingPe,
+          premium_rate: listingPremium, carbon_price: listingCarbon,
+        })
       } catch (error: any) {
         if (error?.rollbackSafe) await companyApi.update(company.id, { is_listed: 0, stock_symbol: '', stock_initial_price: 100 })
         throw error
@@ -159,7 +168,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
     } finally {
       setListingSubmitting(false)
     }
-  }, [companies, listingCompanyId, listingPrice, listingSector, listingSymbol, onMarketChanged, reload])
+  }, [companies, listingCarbon, listingCompanyId, listingPe, listingPremium, listingPrice, listingRevenue, listingSector, listingShares, listingSymbol, onMarketChanged, reload])
 
   const deleteStock = useCallback((stock: AdminStock) => {
     Modal.confirm({
@@ -228,7 +237,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
             <Button icon={<RollbackOutlined />} loading={actionLoading === 'previous'} disabled={(overview?.round || 1) <= 1} onClick={() => void runMarketAction('previous')}>返回上一轮</Button>
             <Button danger icon={<DeleteOutlined />} loading={actionLoading === 'reset'} onClick={confirmReset}>回到第 1 轮</Button>
           </div>
-          <Alert type="warning" showIcon message="回退保护" description="当前轮次已有成交时禁止直接返回上一轮，避免资金与持仓错账；需要重开赛程时使用“回到第 1 轮”。" />
+          <Alert type="warning" showIcon message="回退保护" description="返回上一轮会删除上一轮起点之后的成交和 K 线，并按历史成交自动重建资金与持仓；“回到第 1 轮”会清空全赛程及资金账户。" />
         </section>
       </div>}
 
@@ -242,6 +251,14 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
               <label><span>发行价格（元）</span><InputNumber min={0.01} precision={2} prefix="¥" value={listingPrice} onChange={(value) => setListingPrice(value ?? 100)} /></label>
             </div>
             <label><span>所属板块</span><Input value={listingSector} maxLength={24} onChange={(event) => setListingSector(event.target.value)} /></label>
+            <div className="gipfel-security-drawer__metrics">
+              <label><span>总股本（万股）</span><InputNumber min={0} precision={0} value={listingShares} onChange={(value) => setListingShares(value ?? 0)} /></label>
+              <label><span>初始净利润（万）</span><InputNumber min={0} precision={2} value={listingRevenue} onChange={(value) => setListingRevenue(value ?? 0)} /></label>
+              <label><span>行业市盈率</span><InputNumber min={0.01} precision={2} value={listingPe} onChange={(value) => setListingPe(value ?? 20)} /></label>
+              <label><span>当前幸福度</span><InputNumber min={0} precision={2} value={listingPremium} onChange={(value) => setListingPremium(value ?? 50)} /></label>
+              <label><span>当前碳指标</span><InputNumber min={0} precision={2} value={listingCarbon} onChange={(value) => setListingCarbon(value ?? 50)} /></label>
+            </div>
+            <Alert type="info" showIcon message="发行参数会写入轮次结算模型；幸福度、碳指标和买卖强度共同决定收盘价，单轮涨跌限制为 ±10%。" />
             <Button type="primary" icon={<PlusOutlined />} loading={listingSubmitting} disabled={!listingCompanyId || !listingSymbol} onClick={() => void submitListing()}>创建并上市</Button>
           </div>
         </section>
@@ -262,7 +279,7 @@ export default function StockAdminConsole({ open, onClose, onMarketChanged, onOp
         <section className="gipfel-admin__section">
           <div className="gipfel-admin__section-head"><div><h3>股票账户总览</h3><p>公司资金、持仓市值和账户使用情况</p></div><div className="gipfel-admin__head-actions"><Button onClick={onOpenFunds}>资金调度</Button><Button type="primary" onClick={() => { onClose(); navigate('/users') }}>统一用户管理</Button></div></div>
           <Table size="small" rowKey="id" pagination={false} dataSource={accounts} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无股票账户" /> }} columns={[
-            { title: '公司账户', dataIndex: 'company_name' },
+            { title: '账户所有者', dataIndex: 'company_name' },
             { title: '关联用户', dataIndex: 'user_count', width: 100 },
             { title: '可用资金', dataIndex: 'balance', width: 150, render: (value: number) => fmtMoney(value) },
             { title: '持仓市值', dataIndex: 'market_value', width: 150, render: (value: number) => fmtMoney(value) },

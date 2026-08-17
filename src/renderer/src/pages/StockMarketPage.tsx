@@ -25,6 +25,7 @@ type Position = { symbol: string; name: string; shares: number; avgCost: number;
 type Candle = { round: number; time: string; open: number; high: number; low: number; close: number; volume: number }
 type OrderBook = { mode?: 'trade-distribution'; bids: { price: number; quantity: number }[]; asks: { price: number; quantity: number }[]; largeTrades: { side: string; price: number; quantity: number; created_at: string }[] }
 type OrderRow = Record<string, unknown>
+type FundAccount = { id: number; accountId?: number; name: string; balance: number; initialBalance?: number; locked?: boolean }
 
 function fmtMoney(v: number | undefined | null): string {
   const n = Number(v ?? 0)
@@ -58,6 +59,12 @@ export function StockMarketPage() {
     try { return JSON.parse(localStorage.getItem('gipfel_stock_watchlist') || '[]') } catch { return [] }
   })
   const [portfolio, setPortfolio] = useState<{ user?: { balance?: number }; summary?: { marketValue?: number; totalAssets?: number; totalPnl?: number; pnlRatio?: number }; positions?: Position[]; orders?: OrderRow[]; recentTrades?: OrderRow[] } | null>(null)
+  const [fundAccounts, setFundAccounts] = useState<FundAccount[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [accountCreateOpen, setAccountCreateOpen] = useState(false)
+  const [accountName, setAccountName] = useState('竞赛资金账户')
+  const [accountInitialBalance, setAccountInitialBalance] = useState(100000)
+  const [accountSubmitting, setAccountSubmitting] = useState(false)
   const [orderSide, setOrderSide] = useState<'buy' | 'sell'>('buy')
   const [orderShares, setOrderShares] = useState<number>(100)
   const [orderPrice, setOrderPrice] = useState<number | null>(null)
@@ -68,6 +75,7 @@ export function StockMarketPage() {
   const [marketScope, setMarketScope] = useState<'all' | 'watch'>('all')
   const [ledgerView, setLedgerView] = useState<'positions' | 'trades'>('positions')
   const [executionView, setExecutionView] = useState<'ticket' | 'book'>('ticket')
+  const [workspaceMode, setWorkspaceMode] = useState<'chart' | 'trade'>('chart')
   const aliveRef = useRef(true)
 
   // 市场管理控制台（仅管理端）
@@ -185,12 +193,34 @@ export function StockMarketPage() {
     setSecurityOpen(true)
   }, [isAdmin])
 
-  // ── 持仓拉取（/portfolio?username= 需 token）──
-  const loadPortfolio = useCallback(async (tok: string, uname: string) => {
+  const loadFundAccounts = useCallback(async (tok: string, uname: string): Promise<FundAccount[]> => {
+    if (!tok) return []
+    try {
+      const res = await fetchWithStockAuth(`${STOCK_API}/fund-accounts?username=${encodeURIComponent(uname)}`, {}, tok)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const accounts = Array.isArray(data) ? data.map((item) => ({
+        id: Number(item.id ?? item.accountId), accountId: Number(item.accountId ?? item.id),
+        name: String(item.name ?? item.accountName ?? '资金账户'), balance: Number(item.balance ?? item.cash ?? 0),
+        initialBalance: Number(item.initialBalance ?? item.initial_balance ?? 0), locked: Boolean(item.locked),
+      })).filter((item) => Number.isFinite(item.id)) : []
+      setFundAccounts(accounts)
+      setSelectedAccountId((current) => accounts.some((item) => item.id === current) ? current : accounts[0]?.id ?? null)
+      return accounts
+    } catch {
+      setFundAccounts([])
+      setSelectedAccountId(null)
+      return []
+    }
+  }, [fetchWithStockAuth])
+
+  // ── 持仓拉取（按资金账户）──
+  const loadPortfolio = useCallback(async (tok: string, uname: string, accountId?: number | null) => {
     if (!tok) return
     try {
+      const accountQuery = accountId ? `&account_id=${encodeURIComponent(String(accountId))}` : ''
       const res = await fetchWithStockAuth(
-        `${STOCK_API}/portfolio?username=${encodeURIComponent(uname)}`,
+        `${STOCK_API}/portfolio?username=${encodeURIComponent(uname)}${accountQuery}`,
         {},
         tok,
       )
@@ -209,7 +239,8 @@ export function StockMarketPage() {
       if (auth) {
         setToken(auth.token)
         setUsername(auth.username)
-        loadPortfolio(auth.token, auth.username)
+        const accounts = await loadFundAccounts(auth.token, auth.username)
+        loadPortfolio(auth.token, auth.username, accounts[0]?.id)
       }
       await loadMarket()
       await loadKline(selected)
@@ -236,9 +267,13 @@ export function StockMarketPage() {
   // 持仓轮询（全角色；rep 只读展示资产）
   useEffect(() => {
     if (!token || !username) return
-    const t = setInterval(() => { loadPortfolio(token, username) }, PORTFOLIO_POLL_MS)
+    const t = setInterval(() => { loadPortfolio(token, username, selectedAccountId) }, PORTFOLIO_POLL_MS)
     return () => clearInterval(t)
-  }, [token, username, loadPortfolio])
+  }, [token, username, selectedAccountId, loadPortfolio])
+
+  useEffect(() => {
+    if (token && username && selectedAccountId) loadPortfolio(token, username, selectedAccountId)
+  }, [token, username, selectedAccountId, loadPortfolio])
 
   // 选中股票联动价格
   useEffect(() => {
@@ -249,6 +284,7 @@ export function StockMarketPage() {
   // ── 下单（/orders，仅 admin/operator）──
   const submitOrder = useCallback(async () => {
     if (!token || !username) { message.warning('请先登录'); return }
+    if (!selectedAccountId) { message.warning('请先创建并选择资金账户'); return }
     const stock = market.find((s) => s.symbol === selected)
     if (!stock) { message.warning('请选择股票'); return }
     const price = orderPrice ?? quotePrice(stock)
@@ -279,13 +315,14 @@ export function StockMarketPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol: selected, side: orderSide, quantity: orderShares, price,
-          username, idempotency_key: idem,
+          username, account_id: selectedAccountId, idempotency_key: idem,
         }),
       }, token)
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body?.detail || '下单失败')
       message.success(`${orderSide === 'buy' ? '买入' : '卖出'}成功：${selected} ${orderShares}股 @ ¥${price}`)
-      loadPortfolio(token, username)
+      loadPortfolio(token, username, selectedAccountId)
+      loadFundAccounts(token, username)
       loadMarket()
       loadKline(selected)
       loadOrderBook(selected)
@@ -294,7 +331,31 @@ export function StockMarketPage() {
     } finally {
       setOrderSubmitting(false)
     }
-  }, [token, username, market, selected, orderSide, orderShares, orderPrice, portfolio, loadPortfolio, loadMarket, loadKline, loadOrderBook, fetchWithStockAuth])
+  }, [token, username, market, selected, orderSide, orderShares, orderPrice, portfolio, selectedAccountId, loadPortfolio, loadFundAccounts, loadMarket, loadKline, loadOrderBook, fetchWithStockAuth])
+
+  const submitFundAccount = useCallback(async () => {
+    if (!token || !username) { message.warning('股票账户尚未连接'); return }
+    if (!accountName.trim()) { message.warning('请输入资金账户名称'); return }
+    if (accountInitialBalance < 0) { message.warning('初始资金不能为负数'); return }
+    setAccountSubmitting(true)
+    try {
+      const res = await fetchWithStockAuth(`${STOCK_API}/fund-accounts`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, name: accountName.trim(), initial_balance: accountInitialBalance }),
+      }, token)
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.detail || '资金账户创建失败')
+      const accounts = await loadFundAccounts(token, username)
+      const createdId = Number(body?.accountId ?? body?.id)
+      if (Number.isFinite(createdId) && accounts.some((item) => item.id === createdId)) setSelectedAccountId(createdId)
+      setAccountCreateOpen(false)
+      message.success(`资金账户“${accountName.trim()}”已创建`)
+    } catch (error: any) {
+      message.error(error?.message || '资金账户创建失败')
+    } finally {
+      setAccountSubmitting(false)
+    }
+  }, [accountInitialBalance, accountName, fetchWithStockAuth, loadFundAccounts, token, username])
 
   // ── 调整可用资金 Modal（仅 operator/admin）──
   const openAdjust = useCallback(async () => {
@@ -346,13 +407,15 @@ export function StockMarketPage() {
       setAdjustOpen(false)
       setAdjustAmount(0)
       setAdjustReason('')
-      if (adjustUser === username) loadPortfolio(token, username)
+      if (adjustUser === username) {
+        void loadFundAccounts(token, username).then(() => loadPortfolio(token, username, selectedAccountId))
+      }
     } catch (e: any) {
       message.error(e?.message || '调整失败')
     } finally {
       setAdjustSubmitting(false)
     }
-  }, [adjustUser, adjustAmount, adjustReason, token, username, loadPortfolio])
+  }, [adjustUser, adjustAmount, adjustReason, token, username, selectedAccountId, loadFundAccounts, loadPortfolio])
 
   // ── 持仓表列 ──
   const positionColumns = [
@@ -436,7 +499,17 @@ export function StockMarketPage() {
           <div className="gipfel-trading__account-offline"><Spin size="small" /><span><strong>正在同步账户资产</strong><small>{username}</small></span></div>
         ) : (
           <>
-            <div className="gipfel-trading__account-caption"><span>ACCOUNT</span><strong>{username}</strong></div>
+            <div className="gipfel-trading__account-selector">
+              <span>资金账户</span>
+              <div><Select
+                size="small"
+                value={selectedAccountId ?? undefined}
+                placeholder="选择资金账户"
+                onChange={setSelectedAccountId}
+                options={fundAccounts.map((account) => ({ value: account.id, label: `${account.name} · ${fmtMoney(account.balance)}` }))}
+                notFoundContent="暂无资金账户"
+              />{isTrader && <button onClick={() => setAccountCreateOpen(true)} aria-label="创建资金账户">+</button>}</div>
+            </div>
             <div className="is-primary"><span>总资产</span><strong>{fmtMoney(portfolio.summary?.totalAssets)}</strong><small>{username}</small></div>
             <div><span>可用资金</span><strong>{fmtMoney(portfolio.user?.balance)}</strong></div>
             <div><span>持仓市值</span><strong>{fmtMoney(portfolio.summary?.marketValue)}</strong></div>
@@ -445,6 +518,14 @@ export function StockMarketPage() {
           </>
         )}
       </section>
+
+      <div className="gipfel-trading__modebar" role="group" aria-label="股票工作区视图">
+        <div>
+          <button className={workspaceMode === 'chart' ? 'is-active' : ''} aria-pressed={workspaceMode === 'chart'} onClick={() => setWorkspaceMode('chart')}><LineChartOutlined /> 专业图表</button>
+          {isTrader && <button className={workspaceMode === 'trade' ? 'is-active' : ''} aria-pressed={workspaceMode === 'trade'} onClick={() => setWorkspaceMode('trade')}><StockOutlined /> 交易工作台</button>}
+        </div>
+        <span>{workspaceMode === 'chart' ? '全宽行情研判 · 滚轮缩放 · 拖动平移' : '行情、图表、委托联动操作'}</span>
+      </div>
 
       {loading ? (
         <div className="gipfel-trading__state"><div className="gipfel-trading__loading"><Spin /><span>正在连接交易市场</span></div></div>
@@ -456,7 +537,7 @@ export function StockMarketPage() {
         </div>
       ) : (
         <>
-          <section className={`gipfel-trading__workbench ${!isTrader ? 'is-readonly' : ''}`}>
+          <section className={`gipfel-trading__workbench ${!isTrader ? 'is-readonly' : ''} ${workspaceMode === 'chart' ? 'is-chart-focus' : 'is-trade-mode'}`}>
             <aside className="gipfel-trading__tape" aria-label="股票行情列表">
               <div className="gipfel-trading__panel-head">
                 <div><strong>市场行情</strong><span>{market.length} 只 · 15 秒同步</span></div>
@@ -501,6 +582,16 @@ export function StockMarketPage() {
             </aside>
 
             <main className="gipfel-trading__chart-panel">
+              {workspaceMode === 'chart' && <div className="gipfel-trading__symbol-strip" aria-label="股票快速切换">
+                {market.map((stock) => {
+                  const pct = quotePct(stock)
+                  return <button key={stock.symbol} className={selected === stock.symbol ? 'is-active' : ''} aria-pressed={selected === stock.symbol} onClick={() => setSelected(stock.symbol)}>
+                    <span><b>{stock.symbol}</b><small>{stock.name}</small></span>
+                    <strong>{quotePrice(stock).toFixed(2)}</strong>
+                    <em style={{ color: trendColor(pct) }}>{fmtPct(pct)}</em>
+                  </button>
+                })}
+              </div>}
               <div className="gipfel-trading__chart-head">
                 <div><strong>轮次 K 线</strong><span>每轮一根真实蜡烛 · 30 秒同步</span></div>
                 <div className="gipfel-trading__legend"><span className="is-up">上涨</span><span className="is-down">下跌</span><span className="is-ma5">MA5</span><span className="is-ma10">MA10</span><span>十字光标查看 OHLC</span></div>
@@ -606,6 +697,22 @@ export function StockMarketPage() {
         </>
       )}
 
+      <Modal
+        title="创建资金账户"
+        open={accountCreateOpen}
+        onCancel={() => setAccountCreateOpen(false)}
+        onOk={() => void submitFundAccount()}
+        okText="创建并锁定"
+        cancelText="取消"
+        confirmLoading={accountSubmitting}
+      >
+        <div className="gipfel-trading__account-form">
+          <label><span>账户名称</span><Input value={accountName} maxLength={60} onChange={(event) => setAccountName(event.target.value)} placeholder="例如：第一轮竞赛账户" /></label>
+          <label><span>初始资金</span><InputNumber value={accountInitialBalance} min={0} precision={2} prefix="¥" onChange={(value) => setAccountInitialBalance(value ?? 0)} /></label>
+          <p>资金账户创建后用于股票买卖和持仓核算，与合同、区域及基础设施资金完全隔离。</p>
+        </div>
+      </Modal>
+
       {/* ── 调整可用资金 Modal（仅 operator/admin）── */}
       <Modal
         title="调整可用资金"
@@ -657,6 +764,7 @@ export function StockMarketPage() {
           void loadMarket()
           void loadKline(selected)
           void loadOrderBook(selected)
+          if (token && username) void loadFundAccounts(token, username).then((accounts) => loadPortfolio(token, username, accounts[0]?.id))
         }}
         onOpenFunds={() => {
           setSecurityOpen(false)
